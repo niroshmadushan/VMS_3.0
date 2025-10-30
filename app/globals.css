@@ -1,0 +1,422 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  /* Premium blue color palette for light theme */
+  --background: oklch(0.99 0.005 240); /* Pure white with subtle blue tint */
+  --foreground: oklch(0.15 0.02 240); /* Deep blue-gray */
+  --card: oklch(0.98 0.01 240); /* Subtle blue-tinted white */
+  --card-foreground: oklch(0.15 0.02 240); /* Deep blue-gray */
+  --popover: oklch(0.99 0.005 240); /* Pure white with blue tint */
+  --popover-foreground: oklch(0.15 0.02 240); /* Deep blue-gray */
+  --primary: oklch(0.45 0.18 240); /* Rich royal blue */
+  --primary-foreground: oklch(0.99 0.005 240); /* White */
+  --secondary: oklch(0.55 0.12 220); /* Lighter professional blue */
+  --secondary-foreground: oklch(0.99 0.005 240); /* White */
+  --muted: oklch(0.96 0.01 240); /* Very light blue-gray */
+  --muted-foreground: oklch(0.45 0.02 240); /* Medium blue-gray */
+  --accent: oklch(0.65 0.15 200); /* Sophisticated teal accent */
+  --accent-foreground: oklch(0.99 0.005 240); /* White */
+  --destructive: oklch(0.55 0.22 15); /* Professional red */
+  --destructive-foreground: oklch(0.99 0.005 240); /* White */
+  --border: oklch(0.88 0.01 240); /* Light blue-gray border */
+  --input: oklch(0.96 0.01 240); /* Light blue-gray input */
+  --ring: oklch(0.45 0.18 240); /* Royal blue focus ring */
+  --chart-1: oklch(0.45 0.18 240); /* Royal blue */
+  --chart-2: oklch(0.55 0.12 220); /* Professional blue */
+  --chart-3: oklch(0.65 0.15 200); /* Teal accent */
+  --chart-4: oklch(0.75 0.08 240); /* Light blue */
+  --chart-5: oklch(0.85 0.04 240); /* Very light blue */
+  --radius: 0.75rem; /* Slightly larger radius for premium feel */
+  --sidebar: oklch(0.97 0.01 240); /* Light blue sidebar */
+  --sidebar-foreground: oklch(0.25 0.02 240); /* Dark blue-gray */
+  --sidebar-primary: oklch(0.45 0.18 240); /* Royal blue */
+  --sidebar-primary-foreground: oklch(0.99 0.005 240); /* White */
+  --sidebar-accent: oklch(0.94 0.02 240); /* Subtle blue accent */
+  --sidebar-accent-foreground: oklch(0.25 0.02 240); /* Dark blue-gray */
+  --sidebar-border: oklch(0.88 0.01 240); /* Light border */
+  --sidebar-ring: oklch(0.45 0.18 240); /* Royal blue ring */
+}
+
+.dark {
+  /* Premium blue color palette for dark theme */
+  --background: oklch(0.08 0.01 240); /* Deep blue-black */
+  --foreground: oklch(0.95 0.01 240); /* Light blue-white */
+  --card: oklch(0.12 0.02 240); /* Dark blue card */
+  --card-foreground: oklch(0.95 0.01 240); /* Light blue-white */
+  --popover: oklch(0.1 0.01 240); /* Dark blue popover */
+  --popover-foreground: oklch(0.95 0.01 240); /* Light blue-white */
+  --primary: oklch(0.65 0.18 240); /* Bright royal blue */
+  --primary-foreground: oklch(0.08 0.01 240); /* Deep blue-black */
+  --secondary: oklch(0.35 0.12 220); /* Darker professional blue */
+  --secondary-foreground: oklch(0.95 0.01 240); /* Light blue-white */
+  --muted: oklch(0.18 0.02 240); /* Dark blue-gray */
+  --muted-foreground: oklch(0.65 0.02 240); /* Medium blue-gray */
+  --accent: oklch(0.55 0.15 200); /* Teal accent for dark */
+  --accent-foreground: oklch(0.08 0.01 240); /* Deep blue-black */
+  --destructive: oklch(0.65 0.22 15); /* Bright red for dark */
+  --destructive-foreground: oklch(0.08 0.01 240); /* Deep blue-black */
+  --border: oklch(0.22 0.02 240); /* Dark blue border */
+  --input: oklch(0.18 0.02 240); /* Dark blue input */
+  --ring: oklch(0.65 0.18 240); /* Bright blue ring */
+  --chart-1: oklch(0.65 0.18 240); /* Bright royal blue */
+  --chart-2: oklch(0.55 0.12 220); /* Professional blue */
+  --chart-3: oklch(0.55 0.15 200); /* Teal accent */
+  --chart-4: oklch(0.45 0.08 240); /* Medium blue */
+  --chart-5: oklch(0.35 0.04 240); /* Dark blue */
+  --sidebar: oklch(0.06 0.01 240); /* Very dark blue sidebar */
+  --sidebar-foreground: oklch(0.85 0.01 240); /* Light blue-gray */
+  --sidebar-primary: oklch(0.65 0.18 240); /* Bright royal blue */
+  --sidebar-primary-foreground: oklch(0.95 0.01 240); /* Light blue-white */
+  --sidebar-accent: oklch(0.15 0.02 240); /* Dark blue accent */
+  --sidebar-accent-foreground: oklch(0.85 0.01 240); /* Light blue-gray */
+  --sidebar-border: oklch(0.22 0.02 240); /* Dark border */
+  --sidebar-ring: oklch(0.65 0.18 240); /* Bright blue ring */
+}
+
+@theme inline {
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  html {
+    /* Prevent horizontal scroll and ensure proper height */
+    overflow-x: hidden;
+    height: 100%;
+  }
+
+  body {
+    @apply bg-background text-foreground transition-colors duration-300;
+    /* Ensure proper height and prevent layout shifts */
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Enhanced responsive layout utilities */
+  .layout-container {
+    @apply w-full max-w-none overflow-hidden;
+  }
+
+  .content-area {
+    @apply w-full min-w-0 flex-1;
+  }
+
+  .sidebar-content {
+    @apply overflow-y-auto overflow-x-hidden;
+    scrollbar-width: thin;
+  }
+
+  /* Improved sidebar animations to work with native sidebar transitions */
+  /* Sidebar-specific animations that don't conflict with built-in transitions */
+  .sidebar-smooth {
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Enhanced but non-conflicting animations */
+  .animate-fade-in {
+    animation: fadeInSmooth 0.4s ease-out forwards;
+  }
+
+  .animate-slide-up {
+    animation: slideUpSmooth 0.5s ease-out forwards;
+  }
+
+  .animate-scale-in {
+    animation: scaleInSmooth 0.3s ease-out forwards;
+  }
+
+  .animate-bounce-gentle {
+    animation: bounceGentle 2s ease-in-out infinite;
+  }
+
+  .animate-pulse-slow {
+    animation: pulseGlow 3s ease-in-out infinite;
+  }
+
+  .animate-gradient {
+    animation: gradientShift 6s ease-in-out infinite;
+    background-size: 200% 200%;
+  }
+
+  /* Improved hover effects that don't interfere with sidebar */
+  .hover-lift {
+    transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .hover-lift:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.1);
+  }
+
+  /* Sidebar-specific hover that doesn't conflict */
+  .sidebar-hover {
+    transition: background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .hover-glow:hover {
+    box-shadow: 0 0 20px rgba(var(--primary), 0.3);
+  }
+
+  /* Enhanced mobile-specific styles */
+  @media (max-width: 768px) {
+    .mobile-optimized {
+      @apply text-sm leading-relaxed;
+    }
+
+    .mobile-padding {
+      @apply px-4 py-3;
+    }
+
+    .mobile-grid {
+      @apply grid-cols-1 gap-4;
+    }
+  }
+
+  /* Improved text truncation and overflow handling */
+  .text-truncate-responsive {
+    @apply truncate;
+    max-width: 100%;
+  }
+
+  .content-safe {
+    @apply break-words;
+    /* Replaced invalid Tailwind utility with standard CSS property */
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+  }
+
+  /* Loading states */
+  .skeleton {
+    background: linear-gradient(90deg, transparent, rgba(var(--primary), 0.1), transparent);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+  }
+}
+
+/* Updated animation keyframes for better performance and less conflict */
+@keyframes fadeInSmooth {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideUpSmooth {
+  from {
+    opacity: 0;
+    transform: translateY(15px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scaleInSmooth {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes bounceGentle {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+@keyframes pulseGlow {
+  0%,
+  100% {
+    box-shadow: 0 0 5px rgba(var(--primary), 0.5);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(var(--primary), 0.8), 0 0 30px rgba(var(--primary), 0.4);
+  }
+}
+
+@keyframes gradientShift {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* Premium focus states */
+.focus-ring {
+  @apply focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background;
+}
+
+/* Smooth transitions for interactive elements */
+button,
+a,
+input,
+select {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Enhanced custom scrollbar with better mobile support */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(var(--primary), 0.3);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(var(--primary), 0.5);
+}
+
+/* Better mobile scrollbar for Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(var(--primary), 0.3) transparent;
+}
+
+/* Selection styling */
+::selection {
+  background: rgba(var(--primary), 0.2);
+  color: var(--foreground);
+}
+
+/* Enhanced responsive utilities */
+@media (max-width: 640px) {
+  .responsive-text {
+    @apply text-sm;
+  }
+
+  .responsive-padding {
+    @apply p-4;
+  }
+
+  .responsive-margin {
+    @apply m-2;
+  }
+}
+
+@media (min-width: 768px) {
+  .responsive-text {
+    @apply text-base;
+  }
+
+  .responsive-padding {
+    @apply p-6;
+  }
+
+  .responsive-margin {
+    @apply m-4;
+  }
+}
+
+/* Enhanced sidebar-specific styles for smooth operation */
+/* Sidebar animation improvements */
+[data-slot="sidebar-container"] {
+  transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1), right 0.3s cubic-bezier(0.4, 0, 0.2, 1), width 0.3s
+    cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+[data-slot="sidebar-gap"] {
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Improved sidebar trigger animation */
+[data-slot="sidebar-trigger"] {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+[data-slot="sidebar-trigger"]:hover {
+  transform: scale(1.05);
+}
+
+/* Better sidebar menu button animations */
+[data-slot="sidebar-menu-button"] {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Smooth sidebar content transitions */
+[data-slot="sidebar-content"] {
+  transition: opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Enhanced mobile sidebar animations */
+@media (max-width: 768px) {
+  [data-mobile="true"] {
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+}
