@@ -529,3 +529,4 @@ module.exports = {
     sendBookingReminderEmail,
     getBookingEmailHistory
 };
+

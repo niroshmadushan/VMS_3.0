@@ -113,3 +113,4 @@ module.exports = {
     sendEmailVerificationOTP: (email, firstName, otpCode) => emailService.sendEmailVerificationOTP(email, firstName, otpCode),
     sendOTPEmail: (email, firstName, otpCode, type) => emailService.sendOTPEmail(email, firstName, otpCode, type)
 };
+

@@ -105,3 +105,4 @@ Once configured, the API will:
 - Handle errors gracefully
 
 **The system is now ready to send booking notifications via email!** 🎉
+

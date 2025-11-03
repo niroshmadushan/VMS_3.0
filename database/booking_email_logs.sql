@@ -22,3 +22,4 @@ CREATE INDEX idx_booking_email_logs_booking_id ON booking_email_logs(booking_id)
 CREATE INDEX idx_booking_email_logs_recipient_email ON booking_email_logs(recipient_email);
 CREATE INDEX idx_booking_email_logs_sent_at ON booking_email_logs(sent_at);
 CREATE INDEX idx_booking_email_logs_status ON booking_email_logs(status);
+

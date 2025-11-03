@@ -9,7 +9,6 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useRouter } from "next/navigation"
 import { Eye, EyeOff, Loader2, Mail, Lock, UserCircle, User } from "lucide-react"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useAuth } from '@/lib/auth-context'
 
 type UserRole = "admin" | "staff" | "reception" | "assistant"
@@ -17,18 +16,14 @@ type UserRole = "admin" | "staff" | "reception" | "assistant"
 export function LoginForm() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
-  const [firstName, setFirstName] = useState("")
-  const [lastName, setLastName] = useState("")
-  const [role, setRole] = useState<UserRole>("staff")
   const [isLoading, setIsLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
-  const [activeTab, setActiveTab] = useState("login")
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [otpRequired, setOtpRequired] = useState(false)
   const [otpCode, setOtpCode] = useState("")
   const router = useRouter()
-  const { signIn, verifyOTP, signUp, isAuthenticated, user } = useAuth()
+  const { signIn, verifyOTP, isAuthenticated, user } = useAuth()
 
   // Check if user is already logged in and redirect
   useEffect(() => {
@@ -115,39 +110,6 @@ export function LoginForm() {
     }
   }
 
-  const handleSignupSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsLoading(true)
-    setError('')
-    setSuccess('')
-
-    try {
-      const result = await signUp({
-        email,
-        password,
-        firstName,
-        lastName,
-        role: role as 'admin' | 'employee' | 'reception' | 'user'
-      })
-
-      if (result.success) {
-        setSuccess('Account created successfully! Please check your email to verify your account.')
-        // Reset form
-        setEmail('')
-        setPassword('')
-        setFirstName('')
-        setLastName('')
-        setRole('admin')
-      } else {
-        setError(result.error || 'Sign up failed. Please try again.')
-      }
-    } catch (error) {
-      console.error('Error during signup:', error)
-      setError('An unexpected error occurred. Please try again.')
-    } finally {
-      setIsLoading(false)
-    }
-  }
 
   return (
     <Card className="shadow-xl border-0 bg-card/80 backdrop-blur-sm">
@@ -167,14 +129,9 @@ export function LoginForm() {
             {success}
           </div>
         )}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="login">Sign In</TabsTrigger>
-            <TabsTrigger value="signup">Sign Up</TabsTrigger>
-          </TabsList>
-          <TabsContent value="login">
-            {!otpRequired ? (
-              <form onSubmit={handleLoginSubmit} className="space-y-5">
+        <div className="w-full">
+          {!otpRequired ? (
+            <form onSubmit={handleLoginSubmit} className="space-y-5">
                 <div className="space-y-2">
                   <Label htmlFor="email" className="text-sm font-medium text-foreground">
                     Email Address
@@ -288,126 +245,7 @@ export function LoginForm() {
                 </div>
               </form>
             )}
-          </TabsContent>
-          <TabsContent value="signup">
-            <form onSubmit={handleSignupSubmit} className="space-y-5">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="firstName" className="text-sm font-medium text-foreground">
-                    First Name
-                  </Label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="firstName"
-                      type="text"
-                      placeholder="First name"
-                      value={firstName}
-                      onChange={(e) => setFirstName(e.target.value)}
-                      className="pl-10 h-11 bg-background/50 border-border/50 focus:border-primary transition-all duration-200"
-                      required
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="lastName" className="text-sm font-medium text-foreground">
-                    Last Name
-                  </Label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="lastName"
-                      type="text"
-                      placeholder="Last name"
-                      value={lastName}
-                      onChange={(e) => setLastName(e.target.value)}
-                      className="pl-10 h-11 bg-background/50 border-border/50 focus:border-primary transition-all duration-200"
-                      required
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="signup-email" className="text-sm font-medium text-foreground">
-                  Email Address
-                </Label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="signup-email"
-                    type="email"
-                    placeholder="Enter your email address"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="pl-10 h-11 bg-background/50 border-border/50 focus:border-primary transition-all duration-200"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="signup-password" className="text-sm font-medium text-foreground">
-                  Password
-                </Label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="signup-password"
-                    type={showPassword ? "text" : "password"}
-                    placeholder="Create a password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="pl-10 pr-10 h-11 bg-background/50 border-border/50 focus:border-primary transition-all duration-200"
-                    required
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="signup-role" className="text-sm font-medium text-foreground">
-                  Access Level
-                </Label>
-                <div className="relative">
-                  <UserCircle className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground z-10" />
-                  <Select value={role} onValueChange={(value: UserRole) => setRole(value)}>
-                    <SelectTrigger className="pl-10 h-11 bg-background/50 border-border/50 focus:border-primary transition-all duration-200">
-                      <SelectValue placeholder="Select your access level" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="admin">Administrator</SelectItem>
-                      <SelectItem value="staff">Staff</SelectItem>
-                      <SelectItem value="reception">Reception Desk</SelectItem>
-                      <SelectItem value="assistant">Smart Assistant</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <Button
-                type="submit"
-                className="w-full h-11 bg-gradient-to-r from-primary to-secondary hover:from-primary/90 hover:to-secondary/90 text-primary-foreground font-medium shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02]"
-                disabled={isLoading}
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Creating Account...
-                  </>
-                ) : (
-                  "Create Account"
-                )}
-              </Button>
-            </form>
-          </TabsContent>
-        </Tabs>
+        </div>
 
         <div className="relative">
           <div className="absolute inset-0 flex items-center">

@@ -40,3 +40,4 @@ router.post('/:bookingId/send-reminder', sendBookingReminderEmail);
 router.get('/:bookingId/history', getBookingEmailHistory);
 
 module.exports = router;
+

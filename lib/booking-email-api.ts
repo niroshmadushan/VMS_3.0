@@ -296,3 +296,4 @@ export const getEmailTypeLabel = (type: string): string => {
   }
   return labels[type] || type
 }
+

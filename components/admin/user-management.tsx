@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 import { 
   Users, 
+  User as UserIcon,
   UserPlus, 
   Search, 
   Filter, 
@@ -37,9 +38,15 @@ import {
   AlertTriangle,
   CheckCircle,
   XCircle,
-  Activity
+  Activity,
+  EyeOff,
+  Eye as EyeIcon,
+  Loader2,
+  UserCircle,
+  Lock
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { useAuth } from '@/lib/auth-context'
 
 interface User {
   id: string
@@ -156,8 +163,22 @@ export function UserManagement() {
   const [isUserDialogOpen, setIsUserDialogOpen] = useState(false)
   const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false)
   const [isDeactivateDialogOpen, setIsDeactivateDialogOpen] = useState(false)
+  const [isCreateUserDialogOpen, setIsCreateUserDialogOpen] = useState(false)
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
   const [deactivateReason, setDeactivateReason] = useState('')
+
+  // Create user form states
+  const [createUserFormData, setCreateUserFormData] = useState({
+    email: '',
+    password: '',
+    firstName: '',
+    lastName: '',
+    role: 'staff' as 'admin' | 'staff' | 'assistant'
+  })
+  const [showCreatePassword, setShowCreatePassword] = useState(false)
+  const [isCreatingUser, setIsCreatingUser] = useState(false)
+  
+  const { signUp } = useAuth()
 
   // Form data
   const [userFormData, setUserFormData] = useState({
@@ -450,6 +471,90 @@ export function UserManagement() {
     }
   }
 
+  const handleCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    // Frontend validation
+    if (!createUserFormData.firstName || !createUserFormData.firstName.trim()) {
+      toast.error('First name is required')
+      return
+    }
+    
+    if (!createUserFormData.lastName || !createUserFormData.lastName.trim()) {
+      toast.error('Last name is required')
+      return
+    }
+    
+    if (!createUserFormData.email || !createUserFormData.email.trim()) {
+      toast.error('Email is required')
+      return
+    }
+    
+    // Email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(createUserFormData.email)) {
+      toast.error('Please enter a valid email address')
+      return
+    }
+    
+    if (!createUserFormData.password || createUserFormData.password.length < 6) {
+      toast.error('Password must be at least 6 characters long')
+      return
+    }
+    
+    if (!createUserFormData.role) {
+      toast.error('Please select a role')
+      return
+    }
+    
+    setIsCreatingUser(true)
+
+    try {
+      console.log('📝 Creating user with data:', {
+        email: createUserFormData.email,
+        firstName: createUserFormData.firstName,
+        lastName: createUserFormData.lastName,
+        role: createUserFormData.role,
+        passwordLength: createUserFormData.password.length
+      })
+      
+      const result = await signUp({
+        email: createUserFormData.email.trim(),
+        password: createUserFormData.password,
+        firstName: createUserFormData.firstName.trim(),
+        lastName: createUserFormData.lastName.trim(),
+        role: createUserFormData.role as 'admin' | 'staff' | 'assistant'
+      })
+
+      console.log('📝 SignUp result:', result)
+
+      if (result.success) {
+        toast.success('User created successfully!')
+        // Reset form
+        setCreateUserFormData({
+          email: '',
+          password: '',
+          firstName: '',
+          lastName: '',
+          role: 'staff'
+        })
+        setIsCreateUserDialogOpen(false)
+        // Reload users list
+        loadUsers()
+      } else {
+        console.error('❌ SignUp failed:', result)
+        const errorMessage = result.error || result.message || 'Failed to create user. Please try again.'
+        toast.error(errorMessage)
+      }
+    } catch (error: any) {
+      console.error('❌ Error creating user:', error)
+      const errorMessage = error?.message || error?.error || 'An unexpected error occurred. Please try again.'
+      toast.error(errorMessage)
+    } finally {
+      setIsCreatingUser(false)
+    }
+  }
+
   const openUserDialog = (user: User) => {
     setSelectedUser(user)
     setUserFormData({
@@ -625,6 +730,13 @@ export function UserManagement() {
                       <SelectItem value="inactive">Inactive</SelectItem>
                     </SelectContent>
                   </Select>
+                  <Button
+                    onClick={() => setIsCreateUserDialogOpen(true)}
+                    className="bg-gradient-to-r from-primary to-secondary hover:from-primary/90 hover:to-secondary/90"
+                  >
+                    <UserPlus className="h-4 w-4 mr-2" />
+                    Create User
+                  </Button>
                 </div>
               </div>
             </CardContent>
@@ -1149,6 +1261,160 @@ export function UserManagement() {
               </Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create User Dialog */}
+      <Dialog open={isCreateUserDialogOpen} onOpenChange={setIsCreateUserDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserPlus className="h-5 w-5" />
+              Create New User
+            </DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleCreateUser} className="space-y-5">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="create-firstName" className="text-sm font-medium">
+                  First Name
+                </Label>
+                <div className="relative">
+                  <UserIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="create-firstName"
+                    type="text"
+                    placeholder="First name"
+                    value={createUserFormData.firstName}
+                    onChange={(e) => setCreateUserFormData({ ...createUserFormData, firstName: e.target.value })}
+                    className="pl-10"
+                    required
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="create-lastName" className="text-sm font-medium">
+                  Last Name
+                </Label>
+                <div className="relative">
+                  <UserIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="create-lastName"
+                    type="text"
+                    placeholder="Last name"
+                    value={createUserFormData.lastName}
+                    onChange={(e) => setCreateUserFormData({ ...createUserFormData, lastName: e.target.value })}
+                    className="pl-10"
+                    required
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="create-email" className="text-sm font-medium">
+                Email Address
+              </Label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="create-email"
+                  type="email"
+                  placeholder="Enter email address"
+                  value={createUserFormData.email}
+                  onChange={(e) => setCreateUserFormData({ ...createUserFormData, email: e.target.value })}
+                  className="pl-10"
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="create-password" className="text-sm font-medium">
+                Password
+              </Label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="create-password"
+                  type={showCreatePassword ? "text" : "password"}
+                  placeholder="Create a password"
+                  value={createUserFormData.password}
+                  onChange={(e) => setCreateUserFormData({ ...createUserFormData, password: e.target.value })}
+                  className="pl-10 pr-10"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowCreatePassword(!showCreatePassword)}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {showCreatePassword ? <EyeOff className="h-4 w-4" /> : <EyeIcon className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="create-role" className="text-sm font-medium">
+                Access Level
+              </Label>
+              <div className="relative">
+                <UserCircle className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground z-10" />
+                <Select 
+                  value={createUserFormData.role} 
+                  onValueChange={(value: 'admin' | 'staff' | 'assistant') => 
+                    setCreateUserFormData({ ...createUserFormData, role: value })
+                  }
+                >
+                  <SelectTrigger className="pl-10">
+                    <SelectValue placeholder="Select access level" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="admin">Administrator</SelectItem>
+                    <SelectItem value="staff">Staff</SelectItem>
+                    <SelectItem value="assistant">Smart Assistant</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setIsCreateUserDialogOpen(false)
+                  setCreateUserFormData({
+                    email: '',
+                    password: '',
+                    firstName: '',
+                    lastName: '',
+                    role: 'employee'
+                  })
+                }}
+                disabled={isCreatingUser}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                className="bg-gradient-to-r from-primary to-secondary hover:from-primary/90 hover:to-secondary/90"
+                disabled={isCreatingUser}
+              >
+                {isCreatingUser ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  <>
+                    <UserPlus className="mr-2 h-4 w-4" />
+                    Create User
+                  </>
+                )}
+              </Button>
+            </div>
+          </form>
         </DialogContent>
       </Dialog>
     </div>

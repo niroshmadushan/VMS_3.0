@@ -118,6 +118,13 @@ export const removeStoredToken = (): void => {
 
 // Sign up new user
 export async function signUp(data: SignUpData): Promise<AuthResponse> {
+  console.log('📝 SignUp with role:', {
+    email: data.email,
+    firstName: data.firstName,
+    lastName: data.lastName,
+    role: data.role
+  })
+  
   const response = await apiRequest('/api/auth/signup', {
     method: 'POST',
     body: JSON.stringify({
