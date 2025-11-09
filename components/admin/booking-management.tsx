@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Plus, Edit, Trash2, Calendar, Clock, MapPin, Users, X, Search, AlertTriangle, Loader2, Utensils, Mail, Send } from "lucide-react"
+import { Plus, Edit, Trash2, Calendar, Clock, MapPin, Users, X, Search, AlertTriangle, Loader2, Utensils, Mail, Send, Info } from "lucide-react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { placeManagementAPI } from "@/lib/place-management-api"
 import { bookingEmailAPI, type BookingParticipant } from "@/lib/booking-email-api"
@@ -222,6 +222,15 @@ const generateMockEmployees = (): Employee[] => {
 
 const mockEmployees = generateMockEmployees()
 
+interface BookingCancellation {
+  id: string
+  booking_id: string
+  cancelled_by: string
+  cancellation_reason: string
+  cancellation_type: string
+  cancelled_at: string
+}
+
 interface Booking {
   id: string
   bookingRefId?: string // 6-character reference ID
@@ -242,6 +251,7 @@ interface Booking {
   totalParticipantsCount?: number // From database for accurate display
   internalParticipantsCount?: number
   externalParticipantsCount?: number
+  cancellation?: BookingCancellation // Cancellation details if cancelled
 }
 
 const mockPlaces = [
@@ -345,6 +355,11 @@ export function BookingManagement() {
   const [confirmAction, setConfirmAction] = useState<(() => void) | null>(null)
   const [confirmMessage, setConfirmMessage] = useState("")
   const [confirmTitle, setConfirmTitle] = useState("")
+  const [cancellationReason, setCancellationReason] = useState("")
+  const [isCancellationDialog, setIsCancellationDialog] = useState(false)
+  const [bookingToCancel, setBookingToCancel] = useState<string | null>(null)
+  const [isCancellationReasonDialogOpen, setIsCancellationReasonDialogOpen] = useState(false)
+  const [selectedCancellation, setSelectedCancellation] = useState<BookingCancellation | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingBooking, setEditingBooking] = useState<Booking | null>(null)
   const [activeTab, setActiveTab] = useState("list")
@@ -420,6 +435,51 @@ export function BookingManagement() {
   useEffect(() => {
     fetchUsers()
   }, [])
+
+  // Reload participants when email dialog opens
+  useEffect(() => {
+    if (isEmailDialogOpen && selectedBookingForEmail) {
+      console.log('📧 ==========================================')
+      console.log('📧 EMAIL DIALOG OPENED')
+      console.log('📧 ==========================================')
+      console.log('📧 Booking ID:', selectedBookingForEmail.id)
+      console.log('📧 Booking Title:', selectedBookingForEmail.title)
+      
+      // Create participants from booking data immediately (synchronous)
+      const participantsFromBooking = createParticipantsFromBooking(selectedBookingForEmail)
+      console.log('📧 ==========================================')
+      console.log('📧 PARTICIPANTS FROM BOOKING DATA')
+      console.log('📧 ==========================================')
+      console.log('📧 Total participants:', participantsFromBooking.length)
+      participantsFromBooking.forEach((p, index) => {
+        console.log(`📧   ${index + 1}. ID: ${p.id}`)
+        console.log(`📧      Name: ${p.full_name}`)
+        console.log(`📧      Email: ${p.email || 'NO EMAIL ❌'}`)
+        console.log(`📧      Has Email: ${p.has_email === 1 ? '✅' : '❌'}`)
+        console.log(`📧      Type: ${p.member_type || 'N/A'}`)
+      })
+      
+      if (participantsFromBooking.length > 0) {
+        console.log('✅ Setting participants from booking data:', participantsFromBooking.length)
+        setBookingParticipants(participantsFromBooking)
+      } else {
+        console.warn('⚠️ No participants found in booking data')
+        setBookingParticipants([])
+      }
+      
+      // Also try to load from API (may update with more accurate data)
+      loadBookingParticipants(selectedBookingForEmail.id).catch(error => {
+        console.error('Failed to load participants from API:', error)
+        // Keep the participants from booking data if API fails
+      })
+    } else if (!isEmailDialogOpen) {
+      // Clear participants when dialog closes
+      console.log('📧 Email dialog closed, clearing participants')
+      setBookingParticipants([])
+      setSelectedEmailParticipants([])
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEmailDialogOpen, selectedBookingForEmail?.id])
 
   // Fetch users (admin and employee roles) from userprofile table
   const fetchUsers = async () => {
@@ -564,8 +624,6 @@ export function BookingManagement() {
       setIsLoadingBookings(true)
       setBookingsError(null)
       
-      console.log('📚 Fetching bookings from database...')
-      
       // Fetch all bookings (not deleted)
       const bookingsResponse = await placeManagementAPI.getTableData('bookings', {
         filters: [
@@ -578,31 +636,40 @@ export function BookingManagement() {
       
       const bookingsData: any[] = Array.isArray(bookingsResponse) ? bookingsResponse : []
       
-      console.log('📚 ========== RAW DATABASE DATA ==========')
-      console.log('📚 Total records from database:', bookingsData.length)
-      console.log('📚 Complete raw data:', JSON.stringify(bookingsData, null, 2))
-      
-      console.log('\n📅 ========== DETAILED BOOKING DATES ==========')
-      bookingsData.forEach((b, idx) => {
-        console.log(`\n${idx + 1}. "${b.title}"`)
-        console.log(`   booking_date (raw):`, b.booking_date)
-        console.log(`   booking_date (type):`, typeof b.booking_date)
-        console.log(`   booking_date (JSON):`, JSON.stringify(b.booking_date))
-        console.log(`   place_id:`, b.place_id)
-        console.log(`   place_name:`, b.place_name)
-        console.log(`   start_time:`, b.start_time)
-        console.log(`   end_time:`, b.end_time)
-        console.log(`   status:`, b.status)
-      })
-      console.log('\n========================================\n')
+      // Fetch ALL cancellations once at the start (more reliable than filtering per booking)
+      console.log('\n  🔍 ========== FETCHING ALL CANCELLATIONS ==========')
+      let allCancellations: any[] = []
+      try {
+        const allCancellationsResponse = await placeManagementAPI.getTableData('booking_cancellations', {
+          limit: 1000 // Get all cancellations
+        })
+        
+        console.log(`  📥 RAW CANCELLATIONS API RESPONSE:`, allCancellationsResponse)
+        
+        // Handle different response formats
+        if (Array.isArray(allCancellationsResponse)) {
+          allCancellations = allCancellationsResponse
+        } else if (allCancellationsResponse && allCancellationsResponse.data && Array.isArray(allCancellationsResponse.data)) {
+          allCancellations = allCancellationsResponse.data
+        } else if (allCancellationsResponse && allCancellationsResponse.success && Array.isArray(allCancellationsResponse.data)) {
+          allCancellations = allCancellationsResponse.data
+        }
+        
+        console.log(`  📊 Total cancellations fetched: ${allCancellations.length}`)
+        console.log(`  📋 Cancellation booking IDs:`, allCancellations.map((c: any) => ({
+          id: c.id,
+          booking_id: c.booking_id || c.bookingId,
+          reason: c.cancellation_reason || c.cancellationReason
+        })))
+        console.log(`  ==========================================\n`)
+      } catch (error) {
+        console.error(`  ❌ Error fetching all cancellations:`, error)
+      }
       
       // Transform database records to Booking interface
       const transformedBookings: Booking[] = await Promise.all(
         bookingsData.map(async (booking: any) => {
           // Fetch participants for this booking
-          console.log(`  🔍 Fetching participants for booking ID: "${booking.id}"`)
-          console.log(`     Booking title: "${booking.title}"`)
-          
           const participantsResponse = await placeManagementAPI.getTableData('booking_participants', {
             limit: 50
           })
@@ -613,22 +680,8 @@ export function BookingManagement() {
             p.booking_id === booking.id && (p.is_deleted === false || p.is_deleted === 0)
           )
           
-          console.log(`     ✅ Active participants (is_deleted=false):`, participants.length)
-          console.log(`     📊 Internal participants API returned:`, participants.length, 'records')
-          if (participants.length > 0) {
-            console.log(`     📋 Internal participant IDs:`, participants.map(p => ({ 
-              id: p.id, 
-              booking_id: p.booking_id, 
-              name: p.employee_name 
-            })))
-          }
-          
           // CLIENT-SIDE FILTER: Ensure we only use participants for THIS booking
-          const originalCount = participants.length
           participants = participants.filter(p => p.booking_id === booking.id)
-          if (originalCount !== participants.length) {
-            console.log(`     ⚠️ API filter not working! Returned ${originalCount}, filtered to ${participants.length} on client`)
-          }
           
           // Fetch external participants
           const externalParticipantsResponse = await placeManagementAPI.getTableData('external_participants', {
@@ -641,17 +694,6 @@ export function BookingManagement() {
             p.booking_id === booking.id && (p.is_deleted === false || p.is_deleted === 0)
           )
           
-          console.log(`     ✅ Active external participants (is_deleted=false):`, externalParticipants.length)
-          console.log(`     📊 External participants:`, externalParticipants.length, 'records')
-          if (externalParticipants.length > 0) {
-            console.log(`     📋 External participant IDs:`, externalParticipants.map(p => ({ 
-              id: p.id, 
-              booking_id: p.booking_id, 
-              name: p.full_name,
-              is_deleted: p.is_deleted
-            })))
-          }
-          
           // Fetch refreshments
           const refreshmentsResponse = await placeManagementAPI.getTableData('booking_refreshments', {
             filters: [
@@ -660,6 +702,64 @@ export function BookingManagement() {
             limit: 1
           })
           const refreshments: any[] = Array.isArray(refreshmentsResponse) ? refreshmentsResponse : []
+          
+          // Find cancellation data from pre-fetched list (client-side matching)
+          let cancellationData: BookingCancellation | undefined = undefined
+          const isCancelledStatus = booking.status?.toLowerCase() === 'cancelled' || booking.status === 'cancelled' || booking.status === 'Cancelled'
+          if (isCancelledStatus) {
+            console.log(`\n  🔍 ========== MATCHING CANCELLATION DATA ==========`)
+            console.log(`  📋 Booking ID: "${booking.id}"`)
+            console.log(`  📋 Booking Title: "${booking.title}"`)
+            console.log(`  📋 Booking Status: "${booking.status}"`)
+            console.log(`  📊 Total cancellations available: ${allCancellations.length}`)
+            
+            // Find matching cancellation (try multiple field name variations)
+            const matchingCancellation = allCancellations.find((c: any) => {
+              const bookingIdMatch = c.booking_id === booking.id || 
+                                    c.bookingId === booking.id ||
+                                    String(c.booking_id || '').toLowerCase() === String(booking.id || '').toLowerCase() ||
+                                    String(c.bookingId || '').toLowerCase() === String(booking.id || '').toLowerCase()
+              
+              if (bookingIdMatch) {
+                console.log(`  ✅ Found matching cancellation:`, {
+                  cancellation_id: c.id,
+                  cancellation_booking_id: c.booking_id || c.bookingId,
+                  booking_id: booking.id,
+                  reason: c.cancellation_reason || c.cancellationReason
+                })
+              }
+              
+              return bookingIdMatch
+            })
+            
+            if (matchingCancellation) {
+              console.log(`  📋 Raw cancellation object:`, matchingCancellation)
+              console.log(`  📋 Cancellation object keys:`, Object.keys(matchingCancellation))
+              
+              const reason = matchingCancellation.cancellation_reason || 
+                           matchingCancellation.cancellationReason ||
+                           matchingCancellation['cancellation_reason'] ||
+                           matchingCancellation.reason ||
+                           ''
+              
+              cancellationData = {
+                id: matchingCancellation.id,
+                booking_id: matchingCancellation.booking_id || matchingCancellation.bookingId || booking.id,
+                cancelled_by: matchingCancellation.cancelled_by || matchingCancellation.cancelledBy,
+                cancellation_reason: String(reason).trim(),
+                cancellation_type: matchingCancellation.cancellation_type || matchingCancellation.cancellationType || 'user_cancelled',
+                cancelled_at: matchingCancellation.cancelled_at || matchingCancellation.cancelledAt
+              }
+              
+              console.log(`  ✅ Final cancellation data object:`, cancellationData)
+              console.log(`  ✅ Cancellation reason (final):`, cancellationData.cancellation_reason)
+              console.log(`  ==========================================\n`)
+            } else {
+              console.log(`  ⚠️ No matching cancellation found for booking ${booking.id}`)
+              console.log(`  📋 Available cancellation booking IDs:`, allCancellations.map((c: any) => c.booking_id || c.bookingId))
+              console.log(`  ==========================================\n`)
+            }
+          }
           
           // Transform participants
           const selectedEmployees: Employee[] = participants.map((p: any) => ({
@@ -680,11 +780,6 @@ export function BookingManagement() {
             referenceType: p.reference_type,
             referenceValue: p.reference_value
           }))
-          
-          console.log(`  👥 Participants for "${booking.title}":`)
-          console.log(`     Internal: ${selectedEmployees.length} (${selectedEmployees.map(e => e.name).join(', ') || 'none'})`)
-          console.log(`     External: ${externalParticipantsList.length} (${externalParticipantsList.map(e => e.fullName).join(', ') || 'none'})`)
-          console.log(`     Total: ${selectedEmployees.length + externalParticipantsList.length}`)
           
           // Parse refreshments
           let refreshmentDetails: RefreshmentDetails = {
@@ -723,43 +818,33 @@ export function BookingManagement() {
           // We need to convert back to LOCAL date
           let normalizedDate = booking.booking_date
           
-          console.log(`  📅 Processing "${booking.title}" booking_date:`, booking.booking_date, `(type: ${typeof booking.booking_date})`)
-          
           if (normalizedDate) {
             // If it's already in simple YYYY-MM-DD format (no time), keep it
             if (typeof normalizedDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(normalizedDate)) {
-              console.log(`     ✅ Already YYYY-MM-DD format, keeping as-is`)
               // Already in correct format, no conversion needed
             }
             // If it's "YYYY-MM-DD HH:MM:SS" format, extract date part
             else if (typeof normalizedDate === 'string' && normalizedDate.includes(' ') && !normalizedDate.includes('T')) {
               normalizedDate = normalizedDate.split(' ')[0]
-              console.log(`     ✅ MySQL datetime format, extracted date part: ${normalizedDate}`)
             }
             // If it's ISO string (with T) - this is UTC, convert to LOCAL date
             else if (typeof normalizedDate === 'string' && normalizedDate.includes('T')) {
-              console.log(`     ⚠️ ISO timestamp detected (UTC), converting to local date...`)
               // Parse as UTC and get the local date components
               const d = new Date(normalizedDate)
               const year = d.getFullYear()
               const month = String(d.getMonth() + 1).padStart(2, '0')
               const day = String(d.getDate()).padStart(2, '0')
               normalizedDate = `${year}-${month}-${day}`
-              console.log(`     ✅ Converted to local date: ${normalizedDate}`)
             }
             // If it's a Date object
             else if (typeof normalizedDate === 'object') {
-              console.log(`     ⚠️ Date object detected, converting to local date...`)
               const d = new Date(normalizedDate)
               const year = d.getFullYear()
               const month = String(d.getMonth() + 1).padStart(2, '0')
               const day = String(d.getDate()).padStart(2, '0')
               normalizedDate = `${year}-${month}-${day}`
-              console.log(`     ✅ Converted to: ${normalizedDate}`)
             }
           }
-          
-          console.log(`  ✅ Final date for "${booking.title}": ${normalizedDate}`)
           
           return {
             id: booking.id,
@@ -781,49 +866,28 @@ export function BookingManagement() {
             // Use actual loaded participant counts (more accurate than database totals)
             totalParticipantsCount: selectedEmployees.length + externalParticipantsList.length,
             internalParticipantsCount: selectedEmployees.length,
-            externalParticipantsCount: externalParticipantsList.length
+            externalParticipantsCount: externalParticipantsList.length,
+            cancellation: cancellationData // Add cancellation data if available
           }
         })
       )
       
-      console.log('✅ Transformed bookings:', transformedBookings.length)
-      console.log('\n' + '='.repeat(80))
-      console.log('📊 COMPLETE BOOKINGS SUMMARY WITH PARTICIPANTS')
-      console.log('='.repeat(80) + '\n')
-      
-      transformedBookings.forEach((b, index) => {
-        console.log(`\n${index + 1}. 📅 ${b.title.toUpperCase()}`)
-        console.log('─'.repeat(60))
-        console.log(`   ID: ${b.id}`)
-        console.log(`   Date: ${b.date}`)
-        console.log(`   Place: ${b.place} (ID: ${b.placeId?.substring(0, 8)}...)`)
-        console.log(`   Time: ${b.startTime} - ${b.endTime}`)
-        console.log(`   Status: ${b.status}`)
-        console.log(`   Responsible: ${b.responsiblePerson?.name || 'Not assigned'}`)
-        console.log('')
-        console.log(`   👥 PARTICIPANTS (Total: ${b.totalParticipantsCount || 0}):`)
-        console.log(`   ├─ Internal: ${b.internalParticipantsCount || 0}`)
-        if (b.selectedEmployees.length > 0) {
-          b.selectedEmployees.forEach((emp, idx) => {
-            console.log(`   │  ${idx + 1}. ${emp.name} (${emp.email})`)
-          })
-        } else {
-          console.log(`   │  (No internal participants)`)
+      // Log cancellation data for each booking to verify correct assignment
+      console.log('\n📋 CANCELLATION DATA VERIFICATION:')
+      transformedBookings.forEach((b, idx) => {
+        if (b.status === 'cancelled' || b.status === 'Cancelled') {
+          console.log(`\n${idx + 1}. Booking "${b.title}" (ID: ${b.id}):`)
+          if (b.cancellation) {
+            console.log(`   ✅ Has cancellation data:`)
+            console.log(`      - Reason: "${b.cancellation.cancellation_reason}"`)
+            console.log(`      - Booking ID: ${b.cancellation.booking_id}`)
+            console.log(`      - Cancelled by: ${b.cancellation.cancelled_by}`)
+          } else {
+            console.log(`   ⚠️ No cancellation data found`)
+          }
         }
-        console.log(`   └─ External: ${b.externalParticipantsCount || 0}`)
-        if (b.externalParticipants.length > 0) {
-          b.externalParticipants.forEach((ext, idx) => {
-            console.log(`      ${idx + 1}. ${ext.fullName} (${ext.phone})`)
-          })
-        } else {
-          console.log(`      (No external participants)`)
-        }
-        console.log('')
       })
-      
-      console.log('\n' + '='.repeat(80))
-      console.log(`📊 TOTAL: ${transformedBookings.length} bookings loaded from database`)
-      console.log('='.repeat(80) + '\n')
+      console.log('\n')
       
       setBookings(transformedBookings)
       
@@ -1631,38 +1695,157 @@ export function BookingManagement() {
     const booking = bookings.find(b => b.id === id)
     if (!booking) return
     
-    setConfirmTitle("Cancel Booking")
-    setConfirmMessage(`Are you sure you want to cancel "${booking.title}"? This action cannot be undone.`)
-    setConfirmAction(() => async () => {
-      try {
-        await placeManagementAPI.updateRecord('bookings', 
-          { id }, 
-          { 
-            status: 'cancelled',
-            cancelled_at: new Date().toISOString(),
-            cancellation_reason: 'Cancelled by user'
-          }
-        )
+    // Open cancellation reason dialog
+    setBookingToCancel(id)
+    setCancellationReason("")
+    setIsCancellationDialog(true)
+  }
+
+  const handleShowCancellationReason = async (booking: Booking) => {
+    console.log(`🔍 handleShowCancellationReason called for booking ${booking.id}:`, {
+      hasCancellation: !!booking.cancellation,
+      cancellation: booking.cancellation,
+      status: booking.status
+    })
+    
+    // If cancellation data is already loaded, use it
+    if (booking.cancellation) {
+      const cancellationWithReason = {
+        ...booking.cancellation,
+        cancellation_reason: booking.cancellation.cancellation_reason || 
+                           booking.cancellation['cancellation_reason'] ||
+                           ''
+      }
+      
+      console.log(`✅ Using existing cancellation data:`, cancellationWithReason)
+      setSelectedCancellation(cancellationWithReason)
+      setIsCancellationReasonDialogOpen(true)
+      return
+    }
+    
+    // If cancellation data is not loaded, try to fetch it
+    console.log(`⚠️ Cancellation data not found in booking, fetching from database...`)
+    try {
+      const cancellationResponse = await placeManagementAPI.getTableData('booking_cancellations', {
+        filters: [
+          { field: 'booking_id', operator: '=', value: booking.id }
+        ],
+        limit: 1,
+        sortBy: 'cancelled_at',
+        sortOrder: 'desc'
+      })
+      
+      console.log(`📥 Cancellation API response:`, cancellationResponse)
+      
+      // Handle different response formats
+      let cancellations: any[] = []
+      if (Array.isArray(cancellationResponse)) {
+        cancellations = cancellationResponse
+      } else if (cancellationResponse && cancellationResponse.data && Array.isArray(cancellationResponse.data)) {
+        cancellations = cancellationResponse.data
+      } else if (cancellationResponse && cancellationResponse.success && Array.isArray(cancellationResponse.data)) {
+        cancellations = cancellationResponse.data
+      }
+      
+      if (cancellations.length > 0) {
+        const cancellation = cancellations[0]
+        const reason = cancellation.cancellation_reason || 
+                     cancellation['cancellation_reason'] ||
+                     cancellation.cancellationReason ||
+                     cancellation.reason ||
+                     ''
         
-        setBookings(bookings.map((b) => (b.id === id ? { ...b, status: "cancelled" } : b)))
+        const cancellationData: BookingCancellation = {
+          id: cancellation.id,
+          booking_id: cancellation.booking_id || cancellation.bookingId || booking.id,
+          cancelled_by: cancellation.cancelled_by || cancellation.cancelledBy,
+          cancellation_reason: String(reason).trim(),
+          cancellation_type: cancellation.cancellation_type || cancellation.cancellationType || 'user_cancelled',
+          cancelled_at: cancellation.cancelled_at || cancellation.cancelledAt
+        }
         
-        toast.success('Booking cancelled successfully', {
+        console.log(`✅ Fetched cancellation data:`, cancellationData)
+        setSelectedCancellation(cancellationData)
+        setIsCancellationReasonDialogOpen(true)
+      } else {
+        console.log(`❌ No cancellation data found in database for booking ${booking.id}`)
+        toast.error('Cancellation reason not found in database', {
           position: 'top-center',
           duration: 3000,
-          icon: '✅'
-        })
-        
-        setIsConfirmDialogOpen(false)
-      } catch (error: any) {
-        console.error('Failed to cancel booking:', error)
-        toast.error(error.message || 'Failed to cancel booking', {
-          position: 'top-center',
-          duration: 4000,
-          icon: '❌'
+          icon: '⚠️'
         })
       }
-    })
-    setIsConfirmDialogOpen(true)
+    } catch (error) {
+      console.error('❌ Error fetching cancellation data:', error)
+      toast.error('Failed to load cancellation data', {
+        position: 'top-center',
+        duration: 3000,
+        icon: '⚠️'
+      })
+    }
+  }
+
+  const handleConfirmCancellation = async () => {
+    if (!bookingToCancel) return
+    
+    if (!cancellationReason.trim()) {
+      toast.error('Please provide a reason for cancellation', {
+        position: 'top-center',
+        duration: 3000,
+        icon: '⚠️'
+      })
+      return
+    }
+
+    const booking = bookings.find(b => b.id === bookingToCancel)
+    if (!booking) return
+
+    try {
+      // Get current user ID from localStorage
+      const userData = localStorage.getItem('userData')
+      const currentUser = userData ? JSON.parse(userData) : null
+      const cancelledBy = currentUser?.id || 'system'
+
+      // Update booking status
+      await placeManagementAPI.updateRecord('bookings', 
+        { id: bookingToCancel }, 
+        { 
+          status: 'cancelled',
+          cancelled_at: new Date().toISOString()
+        }
+      )
+
+      // Save cancellation reason to booking_cancellations table
+      const cancellationData = {
+        id: crypto.randomUUID(),
+        booking_id: bookingToCancel,
+        cancelled_by: cancelledBy,
+        cancellation_reason: cancellationReason.trim(),
+        cancellation_type: 'admin_cancelled',
+        cancelled_at: new Date().toISOString()
+      }
+
+      await placeManagementAPI.insertRecord('booking_cancellations', cancellationData)
+      
+      setBookings(bookings.map((b) => (b.id === bookingToCancel ? { ...b, status: "cancelled" } : b)))
+      
+      toast.success('Booking cancelled successfully', {
+        position: 'top-center',
+        duration: 3000,
+        icon: '✅'
+      })
+      
+      setIsCancellationDialog(false)
+      setCancellationReason("")
+      setBookingToCancel(null)
+    } catch (error: any) {
+      console.error('Failed to cancel booking:', error)
+      toast.error(error.message || 'Failed to cancel booking', {
+        position: 'top-center',
+        duration: 4000,
+        icon: '❌'
+      })
+    }
   }
 
   const addExternalParticipant = () => {
@@ -1861,7 +2044,14 @@ export function BookingManagement() {
     setCustomMessage('')
     setIsEmailDialogOpen(true)
     
-    // Load participants for this booking
+    // First, create participants from booking data (immediate)
+    const participantsFromBooking = createParticipantsFromBooking(booking)
+    if (participantsFromBooking.length > 0) {
+      console.log('🔍 Setting participants from booking data:', participantsFromBooking.length)
+      setBookingParticipants(participantsFromBooking)
+    }
+    
+    // Also try to load from API (for more accurate data)
     console.log('🔍 About to call loadBookingParticipants')
     await loadBookingParticipants(booking.id)
     console.log('🔍 loadBookingParticipants completed')
@@ -1876,23 +2066,74 @@ export function BookingManagement() {
       // Use the NEW Booking Email API to get participants
       console.log('🔍 Fetching participants using NEW API...')
       
+      // Get token from localStorage (check both possible keys) - same as OTP email sending
+      const token = localStorage.getItem('authToken') || 
+                    localStorage.getItem('jwt_token') || 
+                    localStorage.getItem('token') || 
+                    ''
+      
+      if (!token) {
+        console.error('❌ No authentication token found in localStorage')
+        toast.error('Authentication required. Please log in again.', {
+          position: 'top-center',
+          duration: 3000
+        })
+        setBookingParticipants([])
+        return
+      }
+      
+      // Get required headers from environment (same as OTP email sending)
+      const appId = process.env.NEXT_PUBLIC_APP_ID || 'default_app_id'
+      const serviceKey = process.env.NEXT_PUBLIC_SERVICE_KEY || 'default_service_key'
+      
+      console.log('🔍 Using token for API request:', token.substring(0, 20) + '...')
+      console.log('🔍 App-Id:', appId)
+      console.log('🔍 Service-Key:', serviceKey ? '✅ Set' : '❌ Missing')
+      
+      // Use same headers as OTP email sending
       const response = await fetch(`/api/booking-email/${bookingId}/participants`, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+          'Content-Type': 'application/json',
+          'X-App-Id': appId,
+          'X-Service-Key': serviceKey,
+          'Authorization': `Bearer ${token}`
         }
       })
+      
+      // Check if response is unauthorized
+      if (response.status === 401) {
+        console.error('❌ Unauthorized: Token may be expired or invalid')
+        toast.error('Authentication failed. Please log in again.', {
+          position: 'top-center',
+          duration: 3000
+        })
+        setBookingParticipants([])
+        return
+      }
+      
+      // Check if response is not OK
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        console.error('❌ API Error:', response.status, errorData)
+        toast.error(errorData.message || 'Failed to load participants from API', {
+          position: 'top-center',
+          duration: 3000
+        })
+        // Keep participants from booking data if API fails
+        return
+      }
       
       const result = await response.json()
       console.log('🔍 NEW API Response:', result)
       
-      if (result.success) {
+      if (result.success && result.data && result.data.participants && result.data.participants.length > 0) {
         const participants: BookingParticipant[] = result.data.participants.map((p: any) => ({
-          id: p.id,
-          full_name: p.full_name,
-          email: p.email,
-          phone: p.phone,
-          company_name: p.company_name,
-          member_type: p.member_type,
+          id: p.id || `api-${p.full_name}-${Date.now()}`,
+          full_name: p.full_name || 'Unknown',
+          email: p.email || '',
+          phone: p.phone || '',
+          company_name: p.company_name || '',
+          member_type: p.member_type || 'employee',
           has_email: p.email ? 1 : 0
         }))
         
@@ -1912,14 +2153,29 @@ export function BookingManagement() {
         setBookingParticipants(participants)
         console.log('🔍 Set bookingParticipants state with NEW API data')
       } else {
-        console.error('❌ Failed to get participants from NEW API:', result.message)
-        setBookingParticipants([])
+        console.error('❌ Failed to get participants from NEW API or no participants returned:', result.message)
+        // Don't clear participants if we already have them from booking data
+        if (bookingParticipants.length === 0) {
+          console.log('🔍 No participants from API and no existing participants, keeping empty')
+        } else {
+          console.log('🔍 Keeping existing participants from booking data:', bookingParticipants.length)
+        }
       }
       
     } catch (error: any) {
-      console.error('🔍 Error loading participants:', error)
-      setBookingParticipants([])
-      toast.error('Failed to load participants')
+      console.error('🔍 Error loading participants from API:', error)
+      // Don't clear participants - keep the ones we loaded from booking data
+      console.log('🔍 Keeping participants from booking data')
+      // Only show error if we don't have any participants
+      const currentParticipants = bookingParticipants.length
+      if (currentParticipants === 0) {
+        toast.error('Failed to load participants. Please try again.', {
+          position: 'top-center',
+          duration: 3000
+        })
+      } else {
+        console.log(`🔍 Using ${currentParticipants} participants from booking data`)
+      }
     } finally {
       setIsLoadingParticipants(false)
     }
@@ -1933,14 +2189,13 @@ export function BookingManagement() {
       id: booking.id,
       title: booking.title,
       responsiblePerson: booking.responsiblePerson,
-      responsiblePersonEmail: booking.responsiblePersonEmail,
-      selectedEmployees: booking.selectedEmployees,
-      externalParticipants: booking.externalParticipants
+      selectedEmployees: booking.selectedEmployees?.length || 0,
+      externalParticipants: booking.externalParticipants?.length || 0
     })
     
     // Add responsible person
     if (booking.responsiblePerson) {
-      console.log('🔍 Adding responsible person:', booking.responsiblePerson, booking.responsiblePersonEmail)
+      console.log('🔍 Adding responsible person:', booking.responsiblePerson)
       
       // Handle both string and object formats for responsiblePerson
       let responsiblePersonName = ''
@@ -1948,24 +2203,16 @@ export function BookingManagement() {
       
       if (typeof booking.responsiblePerson === 'string') {
         responsiblePersonName = booking.responsiblePerson
-        responsiblePersonEmail = booking.responsiblePersonEmail || ''
+        responsiblePersonEmail = ''
       } else if (typeof booking.responsiblePerson === 'object' && booking.responsiblePerson !== null) {
         // Extract name from object
-        responsiblePersonName = booking.responsiblePerson.name || 
-                               booking.responsiblePerson.full_name || 
-                               booking.responsiblePerson.fullName ||
-                               'Responsible Person'
-        // Extract email from object or use separate field
-        responsiblePersonEmail = booking.responsiblePerson.email || 
-                                booking.responsiblePersonEmail || 
-                                ''
+        responsiblePersonName = booking.responsiblePerson.name || 'Responsible Person'
+        // Extract email from object
+        responsiblePersonEmail = booking.responsiblePerson.email || ''
         
         console.log('🔍 Responsible person object details:', {
           name: booking.responsiblePerson.name,
-          full_name: booking.responsiblePerson.full_name,
-          fullName: booking.responsiblePerson.fullName,
           email: booking.responsiblePerson.email,
-          responsiblePersonEmail: booking.responsiblePersonEmail,
           extractedName: responsiblePersonName,
           extractedEmail: responsiblePersonEmail
         })
@@ -1973,11 +2220,16 @@ export function BookingManagement() {
       
       participants.push({
         id: `responsible-${booking.id}`,
-        full_name: responsiblePersonName,
-        email: responsiblePersonEmail,
+        full_name: responsiblePersonName || 'Responsible Person',
+        email: responsiblePersonEmail || '',
         phone: '',
         company_name: '',
-        member_type: 'employee',
+        member_type: 'employee', // Use 'employee' type for responsible person
+        has_email: responsiblePersonEmail ? 1 : 0
+      })
+      console.log('✅ Added responsible person to participants:', {
+        name: responsiblePersonName,
+        email: responsiblePersonEmail,
         has_email: responsiblePersonEmail ? 1 : 0
       })
     } else {
@@ -1985,6 +2237,7 @@ export function BookingManagement() {
     }
     
     // Add internal participants (employees)
+    // Format: internal-{bookingId}-{userId} or internal-{bookingId}-{email}
     if (booking.selectedEmployees && Array.isArray(booking.selectedEmployees)) {
       console.log('🔍 Adding internal participants:', booking.selectedEmployees.length)
       booking.selectedEmployees.forEach((employee, index) => {
@@ -1992,16 +2245,35 @@ export function BookingManagement() {
         console.log('🔍 Employee email check:', {
           email: employee.email,
           hasEmail: !!employee.email,
-          emailType: typeof employee.email
+          emailType: typeof employee.email,
+          employeeId: employee.id
         })
+        const employeeName = String(employee.name || 'Unknown Employee')
+        const employeeEmail = String(employee.email || '')
+        const employeeId = employee.id || ''
+        
+        // Format ID: Use email if available, otherwise use user ID
+        // Format: internal-{bookingId}-{email} or internal-{bookingId}-{userId}
+        const participantId = employeeEmail 
+          ? `internal-${booking.id}-${employeeEmail}`
+          : `internal-${booking.id}-${employeeId}`
+        
         participants.push({
-          id: `internal-${booking.id}-${index}`,
-          full_name: String(employee.name || 'Unknown Employee'),
-          email: String(employee.email || ''),
+          id: participantId,
+          full_name: employeeName,
+          email: employeeEmail,
           phone: String(employee.phone || ''),
           company_name: '',
           member_type: 'employee',
-          has_email: employee.email ? 1 : 0
+          has_email: employeeEmail ? 1 : 0,
+          user_id: employeeId // Store user ID for reference
+        })
+        console.log(`✅ Added internal participant ${index + 1}:`, {
+          id: participantId,
+          name: employeeName,
+          email: employeeEmail,
+          user_id: employeeId,
+          has_email: employeeEmail ? 1 : 0
         })
       })
     } else {
@@ -2009,6 +2281,7 @@ export function BookingManagement() {
     }
     
     // Add external participants
+    // Format: external-{participantId} (UUID from external_participants table)
     if (booking.externalParticipants && Array.isArray(booking.externalParticipants)) {
       console.log('🔍 Adding external participants:', booking.externalParticipants.length)
       booking.externalParticipants.forEach((participant, index) => {
@@ -2016,16 +2289,31 @@ export function BookingManagement() {
         console.log('🔍 External participant email check:', {
           email: participant.email,
           hasEmail: !!participant.email,
-          emailType: typeof participant.email
+          emailType: typeof participant.email,
+          participantId: participant.id
         })
+        const participantName = String(participant.fullName || 'Unknown Participant')
+        const participantEmail = String(participant.email || '')
+        // Use participant.id (UUID) if available, otherwise generate a placeholder
+        // Format: external-{uuid}
+        const participantId = participant.id 
+          ? `external-${participant.id}`
+          : `external-${booking.id}-${index}` // Fallback if no UUID
+        
         participants.push({
-          id: `external-${booking.id}-${index}`,
-          full_name: String(participant.fullName || 'Unknown Participant'),
-          email: String(participant.email || ''),
+          id: participantId,
+          full_name: participantName,
+          email: participantEmail,
           phone: String(participant.phone || ''),
           company_name: String(participant.companyName || ''),
           member_type: 'visitor',
-          has_email: participant.email ? 1 : 0
+          has_email: participantEmail ? 1 : 0
+        })
+        console.log(`✅ Added external participant ${index + 1}:`, {
+          id: participantId,
+          name: participantName,
+          email: participantEmail,
+          has_email: participantEmail ? 1 : 0
         })
       })
     } else {
@@ -2033,20 +2321,6 @@ export function BookingManagement() {
     }
     
     console.log('🔍 Final participants created:', participants.length, participants)
-    
-    // Always add a test participant to ensure UI works
-    console.log('🔍 Adding test participant to ensure UI works')
-    participants.push({
-      id: `test-${booking.id}`,
-      full_name: 'Test Participant',
-      email: 'test@example.com',
-      phone: '+1234567890',
-      company_name: 'Test Company',
-      member_type: 'visitor',
-      has_email: 1
-    })
-    
-    console.log('🔍 Final participants with test:', participants.length, participants)
     
     // Debug each participant's email data
     participants.forEach((participant, index) => {
@@ -2063,10 +2337,19 @@ export function BookingManagement() {
   }
 
   const handleParticipantEmailSelection = (participantId: string, checked: boolean) => {
+    console.log('📧 Participant selection changed:', { participantId, checked })
     if (checked) {
-      setSelectedEmailParticipants(prev => [...prev, participantId])
+      setSelectedEmailParticipants(prev => {
+        const updated = [...prev, participantId]
+        console.log('📧 Added participant. Selected count:', updated.length, 'IDs:', updated)
+        return updated
+      })
     } else {
-      setSelectedEmailParticipants(prev => prev.filter(id => id !== participantId))
+      setSelectedEmailParticipants(prev => {
+        const updated = prev.filter(id => id !== participantId)
+        console.log('📧 Removed participant. Selected count:', updated.length, 'IDs:', updated)
+        return updated
+      })
     }
   }
 
@@ -2075,14 +2358,22 @@ export function BookingManagement() {
       const allParticipantIds = bookingParticipants
         .filter(p => p.has_email === 1)
         .map(p => p.id)
+      console.log('📧 Select All clicked - selecting:', allParticipantIds.length, 'participants')
+      console.log('📧 Participant IDs:', allParticipantIds)
       setSelectedEmailParticipants(allParticipantIds)
     } else {
+      console.log('📧 Select All unchecked - clearing selection')
       setSelectedEmailParticipants([])
     }
   }
 
   const sendReminderEmails = async (reminderType: '24_hours' | '1_hour') => {
+    console.log('📧 ==========================================')
+    console.log('📧 REMINDER EMAIL SENDING FUNCTION CALLED')
+    console.log('📧 ==========================================')
+    
     if (!selectedBookingForEmail) {
+      console.error('❌ REMINDER EMAIL ERROR: No booking selected')
       toast.error('Please select a booking')
       return
     }
@@ -2090,14 +2381,55 @@ export function BookingManagement() {
     try {
       setIsSendingEmails(true)
       
-      console.log('📧 Sending reminder emails:', reminderType)
+      // Get token from localStorage (check all possible keys)
+      const token = localStorage.getItem('authToken') || 
+                    localStorage.getItem('jwt_token') || 
+                    localStorage.getItem('token') || 
+                    ''
+      
+      // Get required headers from environment
+      const appId = process.env.NEXT_PUBLIC_APP_ID || 'default_app_id'
+      const serviceKey = process.env.NEXT_PUBLIC_SERVICE_KEY || 'default_service_key'
+      
+      console.log('📧 ==========================================')
+      console.log('📧 REMINDER EMAIL - INITIAL DATA')
+      console.log('📧 ==========================================')
+      console.log('📧 Reminder Type:', reminderType)
+      console.log('📧 Booking ID:', selectedBookingForEmail.id)
+      console.log('📧 Booking Title:', selectedBookingForEmail.title)
+      console.log('📧 Custom Message:', customMessage || '(none)')
+      console.log('📧 Token Available:', !!token)
+      console.log('📧 Token Preview:', token ? token.substring(0, 20) + '...' : 'NO TOKEN')
+      console.log('📧 App-Id:', appId)
+      console.log('📧 Service-Key:', serviceKey ? '✅ Set' : '❌ Missing')
+      console.log('📧 Total Participants:', bookingParticipants.length)
+      console.log('📧 Participants with Email:', bookingParticipants.filter(p => p.has_email === 1).length)
 
-      // Use the NEW Booking Email API for reminders
+      console.log('📧 ==========================================')
+      console.log('📧 SENDING REMINDER API REQUEST')
+      console.log('📧 ==========================================')
+      console.log('📧 API Endpoint:', `/api/booking-email/${selectedBookingForEmail.id}/send-reminder`)
+      console.log('📧 Request Method: POST')
+      console.log('📧 Request Headers:', {
+        'Content-Type': 'application/json',
+        'X-App-Id': appId,
+        'X-Service-Key': serviceKey ? '✅ Set' : '❌ Missing',
+        'Authorization': token ? 'Bearer ' + token.substring(0, 20) + '...' : '❌ Missing'
+      })
+      console.log('📧 Request Body:', {
+        reminderType: reminderType,
+        customMessage: customMessage || '(none)'
+      })
+      
+      const requestStartTime = Date.now()
+
       const response = await fetch(`/api/booking-email/${selectedBookingForEmail.id}/send-reminder`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+          'X-App-Id': appId,
+          'X-Service-Key': serviceKey,
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
           reminderType: reminderType,
@@ -2105,11 +2437,63 @@ export function BookingManagement() {
         })
       })
 
+      const requestDuration = Date.now() - requestStartTime
+      console.log('📧 ==========================================')
+      console.log('📧 REMINDER API RESPONSE RECEIVED')
+      console.log('📧 ==========================================')
+      console.log('📧 Response Status:', response.status)
+      console.log('📧 Response OK:', response.ok)
+      console.log('📧 Request Duration:', requestDuration + 'ms')
+
+      // Check for errors before parsing JSON
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error('❌ ==========================================')
+        console.error('❌ REMINDER API ERROR RESPONSE')
+        console.error('❌ ==========================================')
+        console.error('❌ Status:', response.status)
+        console.error('❌ Status Text:', response.statusText)
+        console.error('❌ Error Response Body:', errorText)
+        
+        try {
+          const errorResult = JSON.parse(errorText)
+          console.error('❌ Parsed Error:', errorResult)
+          toast.error(errorResult.message || `Failed to send reminder emails (Status: ${response.status})`)
+        } catch (parseError) {
+          console.error('❌ Could not parse error response as JSON')
+          toast.error(`Failed to send reminder emails (Status: ${response.status})`)
+        }
+        return
+      }
+
       const result = await response.json()
-      console.log('📧 Reminder API Response:', result)
+      console.log('📧 ==========================================')
+      console.log('📧 REMINDER API RESPONSE DATA')
+      console.log('📧 ==========================================')
+      console.log('📧 Full Response:', JSON.stringify(result, null, 2))
+      console.log('📧 Success:', result.success)
+      console.log('📧 Message:', result.message)
+      console.log('📧 Data:', result.data)
 
       if (result.success) {
-        const { emailsSent, emailsFailed } = result.data || {}
+        const { emailsSent, emailsFailed, results } = result.data || {}
+        console.log('📧 ==========================================')
+        console.log('📧 REMINDER EMAIL SENDING RESULTS')
+        console.log('📧 ==========================================')
+        console.log('📧 Emails Sent:', emailsSent)
+        console.log('📧 Emails Failed:', emailsFailed)
+        
+        if (results && Array.isArray(results)) {
+          console.log('📧 Individual Reminder Email Results:')
+          results.forEach((emailResult: any, index: number) => {
+            if (emailResult.success) {
+              console.log(`📧   ✅ ${index + 1}. ${emailResult.participantEmail} - ${emailResult.message}`)
+            } else {
+              console.error(`📧   ❌ ${index + 1}. ${emailResult.participantEmail} - ${emailResult.message}`)
+            }
+          })
+        }
+        
         if (emailsFailed > 0) {
           toast.success(`Reminder emails sent to ${emailsSent} participants, ${emailsFailed} failed`)
         } else {
@@ -2123,19 +2507,229 @@ export function BookingManagement() {
         setBookingParticipants([])
         setCustomMessage('')
       } else {
+        console.error('❌ ==========================================')
+        console.error('❌ REMINDER EMAIL SENDING FAILED')
+        console.error('❌ ==========================================')
+        console.error('❌ Error Message:', result.message)
+        console.error('❌ Error Data:', result.error)
         toast.error(result.message || 'Failed to send reminder emails')
       }
       
+      console.log('📧 ==========================================')
+      console.log('📧 REMINDER EMAIL SENDING FUNCTION COMPLETED')
+      console.log('📧 ==========================================')
+      
     } catch (error: any) {
-      console.error('❌ Error sending reminder emails:', error)
+      console.error('❌ ==========================================')
+      console.error('❌ REMINDER EMAIL SENDING EXCEPTION')
+      console.error('❌ ==========================================')
+      console.error('❌ Error Type:', error.constructor.name)
+      console.error('❌ Error Message:', error.message)
+      console.error('❌ Error Stack:', error.stack)
+      console.error('❌ Full Error Object:', error)
       toast.error(`Failed to send reminder emails: ${error.message}`)
     } finally {
       setIsSendingEmails(false)
+      console.log('📧 Reminder email sending state reset (isSendingEmails = false)')
+    }
+  }
+
+  // New simplified API: Send email with all details from frontend (no database queries)
+  const sendBookingEmailFromFrontend = async (bookingData: {
+    meetingName: string
+    date: string
+    startTime: string
+    endTime: string
+    place?: string
+    description?: string
+    participantEmails: string[]
+    emailType?: string
+    customMessage?: string
+  }) => {
+    try {
+      console.log('📧 ==========================================')
+      console.log('📧 SEND BOOKING EMAIL FROM FRONTEND (NEW API)')
+      console.log('📧 ==========================================')
+      console.log('📧 Booking Data:', bookingData)
+
+      // Get token from localStorage
+      const token = localStorage.getItem('authToken') || 
+                    localStorage.getItem('jwt_token') || 
+                    localStorage.getItem('token') || 
+                    ''
+
+      if (!token) {
+        toast.error('Authentication required. Please log in again.', {
+          position: 'top-center',
+          duration: 3000
+        })
+        return
+      }
+
+      // Prepare full API request details
+      const apiUrl = '/api/booking-email/send-from-frontend'
+      const requestMethod = 'POST'
+      const requestHeaders = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      }
+      const requestBody = JSON.stringify(bookingData)
+      
+      console.log('📧 ==========================================')
+      console.log('📧 ==========================================')
+      console.log('📧 FULL API REQUEST - FRONTEND')
+      console.log('📧 ==========================================')
+      console.log('📧 ==========================================')
+      console.log('')
+      console.log('📧 REQUEST URL:')
+      console.log('📧   ', apiUrl)
+      console.log('')
+      console.log('📧 REQUEST METHOD:')
+      console.log('📧   ', requestMethod)
+      console.log('')
+      console.log('📧 REQUEST HEADERS:')
+      console.log('📧   ', JSON.stringify(requestHeaders, null, 2))
+      console.log('')
+      console.log('📧 AUTHORIZATION HEADER:')
+      console.log('📧   ', requestHeaders['Authorization'] ? `Bearer ${token.substring(0, 30)}...` : '❌ Missing')
+      console.log('')
+      console.log('📧 REQUEST BODY (JSON):')
+      console.log('📧   ', requestBody)
+      console.log('')
+      console.log('📧 REQUEST BODY (Parsed/Object):')
+      console.log('📧   ', JSON.stringify(bookingData, null, 2))
+      console.log('')
+      console.log('📧 REQUEST BODY FIELDS:')
+      console.log('📧   meetingName:', bookingData.meetingName)
+      console.log('📧   date:', bookingData.date)
+      console.log('📧   startTime:', bookingData.startTime)
+      console.log('📧   endTime:', bookingData.endTime)
+      console.log('📧   place:', bookingData.place || '(not provided)')
+      console.log('📧   description:', bookingData.description || '(not provided)')
+      console.log('📧   participantEmails:', bookingData.participantEmails)
+      console.log('📧   participantEmails (count):', bookingData.participantEmails ? bookingData.participantEmails.length : 0)
+      console.log('📧   emailType:', bookingData.emailType || 'booking_details (default)')
+      console.log('📧   customMessage:', bookingData.customMessage || '(not provided)')
+      console.log('')
+      console.log('📧 REQUEST BODY FIELD TYPES:')
+      console.log('📧   meetingName type:', typeof bookingData.meetingName)
+      console.log('📧   date type:', typeof bookingData.date)
+      console.log('📧   startTime type:', typeof bookingData.startTime)
+      console.log('📧   endTime type:', typeof bookingData.endTime)
+      console.log('📧   participantEmails type:', typeof bookingData.participantEmails)
+      console.log('📧   participantEmails isArray:', Array.isArray(bookingData.participantEmails))
+      console.log('')
+      console.log('📧 COMPLETE FETCH REQUEST:')
+      console.log('📧   fetch("' + apiUrl + '", {')
+      console.log('📧     method: "' + requestMethod + '",')
+      console.log('📧     headers: ' + JSON.stringify(requestHeaders, null, 6).replace(/\n/g, '\n📧     '))
+      console.log('📧     body: ' + requestBody.substring(0, 200) + (requestBody.length > 200 ? '...' : ''))
+      console.log('📧   })')
+      console.log('')
+      console.log('📧 ==========================================')
+      console.log('📧 ==========================================')
+      console.log('')
+
+      const requestStartTime = Date.now()
+      console.log('📧 Sending fetch request at:', new Date().toISOString())
+      console.log('📧 Request timestamp:', requestStartTime)
+      
+      const response = await fetch(apiUrl, {
+        method: requestMethod,
+        headers: requestHeaders,
+        body: requestBody
+      })
+
+      const requestDuration = Date.now() - requestStartTime
+      console.log('📧 Request Duration:', requestDuration + 'ms')
+
+      if (response.status === 401) {
+        toast.error('Session expired. Please log in again.', {
+          position: 'top-center',
+          duration: 3000
+        })
+        return
+      }
+
+      const result = await response.json()
+
+      console.log('📧 ==========================================')
+      console.log('📧 FRONTEND - EMAIL SENDING RESPONSE')
+      console.log('📧 ==========================================')
+      console.log('📧 Response Status:', response.status)
+      console.log('📧 Response OK:', response.ok)
+      console.log('📧 Result Success:', result.success)
+      console.log('📧 Result Message:', result.message)
+
+      if (result.success) {
+        console.log('📧 ==========================================')
+        console.log('📧 EMAIL SENDING SUCCESS SUMMARY')
+        console.log('📧 ==========================================')
+        console.log('📧 Meeting Name:', result.data?.meetingName)
+        console.log('📧 Total Participants:', result.data?.totalParticipants)
+        console.log('📧 Emails Sent:', result.data?.emailsSent)
+        console.log('📧 Emails Failed:', result.data?.emailsFailed)
+        console.log('📧 ==========================================')
+        console.log('📧 DETAILED RESULTS:')
+        console.log('📧 ==========================================')
+        if (result.data?.results && Array.isArray(result.data.results)) {
+          result.data.results.forEach((emailResult: any, index: number) => {
+            if (emailResult.success) {
+              console.log(`✅ ${index + 1}. ${emailResult.participantEmail} - ${emailResult.message}`)
+            } else {
+              console.error(`❌ ${index + 1}. ${emailResult.participantEmail} - ${emailResult.message}`)
+            }
+          })
+        }
+        console.log('📧 ==========================================')
+
+        toast.success(`✅ Emails sent to ${result.data.emailsSent} participants`, {
+          position: 'top-center',
+          duration: 3000
+        })
+        console.log('✅ Full email sending result:', JSON.stringify(result, null, 2))
+        return result
+      } else {
+        console.error('❌ ==========================================')
+        console.error('❌ EMAIL SENDING FAILED')
+        console.error('❌ ==========================================')
+        console.error('❌ Error Message:', result.message)
+        console.error('❌ Error Details:', result.error)
+        console.error('❌ Full Error Response:', JSON.stringify(result, null, 2))
+
+        toast.error(result.message || 'Failed to send emails', {
+          position: 'top-center',
+          duration: 3000
+        })
+        return null
+      }
+    } catch (error: any) {
+      console.error('❌ ==========================================')
+      console.error('❌ FRONTEND - EMAIL SENDING EXCEPTION')
+      console.error('❌ ==========================================')
+      console.error('❌ Error Type:', error.constructor.name)
+      console.error('❌ Error Message:', error.message)
+      console.error('❌ Error Stack:', error.stack)
+      console.error('❌ Full Error:', error)
+      console.error('❌ ==========================================')
+
+      toast.error('Failed to send emails. Please try again.', {
+        position: 'top-center',
+        duration: 3000
+      })
+      return null
     }
   }
 
   const sendEmailNotifications = async () => {
+    console.log('📧 ==========================================')
+    console.log('📧 EMAIL SENDING FUNCTION CALLED')
+    console.log('📧 ==========================================')
+    
     if (!selectedBookingForEmail || selectedEmailParticipants.length === 0) {
+      console.error('❌ EMAIL SEND ERROR: No booking or participants selected')
+      console.error('❌ selectedBookingForEmail:', selectedBookingForEmail)
+      console.error('❌ selectedEmailParticipants.length:', selectedEmailParticipants.length)
       toast.error('Please select participants to send emails to')
       return
     }
@@ -2143,41 +2737,152 @@ export function BookingManagement() {
     try {
       setIsSendingEmails(true)
       
-      console.log('📧 Using NEW Booking Email API to send emails')
-      console.log('📧 Selected participants:', selectedEmailParticipants)
-      console.log('📧 Email type:', emailType)
-      console.log('📧 Custom message:', customMessage)
-      console.log('📧 Booking ID:', selectedBookingForEmail.id)
-      console.log('📧 Token available:', !!localStorage.getItem('token'))
-
-      // Use the NEW Booking Email API
-      console.log('📧 Using NEW Booking Email API...')
+      // Get token from localStorage (check all possible keys)
+      const token = localStorage.getItem('authToken') || 
+                    localStorage.getItem('jwt_token') || 
+                    localStorage.getItem('token') || 
+                    ''
       
-      const response = await fetch(`/api/booking-email/${selectedBookingForEmail.id}/send-details`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
-        },
-        body: JSON.stringify({
-          participantIds: selectedEmailParticipants,
-          emailType: emailType,
-          customMessage: customMessage
+      if (!token) {
+        console.error('❌ No authentication token found')
+        toast.error('Authentication required. Please log in again.', {
+          position: 'top-center',
+          duration: 3000
         })
+        return
+      }
+      
+      console.log('📧 ==========================================')
+      console.log('📧 EMAIL SENDING - INITIAL DATA (NEW SIMPLIFIED API)')
+      console.log('📧 ==========================================')
+      console.log('📧 Booking Title:', selectedBookingForEmail.title)
+      console.log('📧 Booking Date:', selectedBookingForEmail.date)
+      console.log('📧 Selected Participants Count:', selectedEmailParticipants.length)
+      console.log('📧 Email Type:', emailType)
+      console.log('📧 Custom Message:', customMessage || '(none)')
+      console.log('📧 Token Available:', !!token)
+      
+      if (!selectedEmailParticipants || selectedEmailParticipants.length === 0) {
+        console.error('❌ NO PARTICIPANTS SELECTED')
+        toast.error('Please select at least one participant to send emails to', {
+          position: 'top-center',
+          duration: 3000
+        })
+        return
+      }
+      
+      // Get selected participants with valid emails (NEW APPROACH - extract emails directly)
+      const selectedParticipantsWithEmails = bookingParticipants.filter(p => 
+        selectedEmailParticipants.includes(p.id) && 
+        p.email && 
+        p.email.trim() !== '' &&
+        p.has_email === 1
+      )
+      
+      if (selectedParticipantsWithEmails.length === 0) {
+        console.error('❌ NO PARTICIPANTS WITH VALID EMAILS FOUND!')
+        toast.error('No participants with valid emails found. Please select participants with email addresses.', {
+          position: 'top-center',
+          duration: 3000
+        })
+        return
+      }
+      
+      // Extract participant emails
+      const participantEmails = selectedParticipantsWithEmails
+        .map(p => p.email)
+        .filter((email): email is string => !!email && email.trim() !== '')
+      
+      console.log('📧 ==========================================')
+      console.log('📧 SELECTED PARTICIPANTS WITH VALID EMAILS')
+      console.log('📧 ==========================================')
+      selectedParticipantsWithEmails.forEach((p, index) => {
+        console.log(`📧   ${index + 1}. ${p.full_name} (${p.email})`)
       })
-
-      console.log('📧 Response status:', response.status)
-      console.log('📧 Response ok:', response.ok)
-
-      const result = await response.json()
-      console.log('📧 NEW API Response:', result)
-
-      if (result.success) {
-        const { emailsSent, emailsFailed } = result.data || {}
-        if (emailsFailed > 0) {
-          toast.success(`Emails sent successfully to ${emailsSent} participants, ${emailsFailed} failed`)
+      console.log('📧 Total emails to send:', participantEmails.length)
+      
+      // Format time - ensure it has seconds (HH:MM:SS)
+      const formatTime = (time: string): string => {
+        if (!time) return ''
+        // If time is in HH:MM format, add :00 for seconds
+        if (time.split(':').length === 2) {
+          return time + ':00'
+        }
+        // If already in HH:MM:SS format, return as is
+        return time
+      }
+      
+      // Format date - ensure YYYY-MM-DD format
+      const formatDate = (date: string): string => {
+        if (!date) return ''
+        // If date is already in YYYY-MM-DD format, return as is
+        if (date.match(/^\d{4}-\d{2}-\d{2}$/)) {
+          return date
+        }
+        // Try to parse and format if needed
+        try {
+          const dateObj = new Date(date)
+          const year = dateObj.getFullYear()
+          const month = String(dateObj.getMonth() + 1).padStart(2, '0')
+          const day = String(dateObj.getDate()).padStart(2, '0')
+          return `${year}-${month}-${day}`
+        } catch (e) {
+          return date
+        }
+      }
+      
+      // Prepare booking data for NEW SIMPLIFIED API (no booking ID needed!)
+      const bookingData = {
+        meetingName: selectedBookingForEmail.title || 'Meeting',
+        date: formatDate(selectedBookingForEmail.date),
+        startTime: formatTime(selectedBookingForEmail.startTime),
+        endTime: formatTime(selectedBookingForEmail.endTime),
+        place: selectedBookingForEmail.place || '',
+        description: selectedBookingForEmail.description || '',
+        participantEmails: participantEmails,
+        emailType: emailType || 'booking_details',
+        customMessage: customMessage || ''
+      }
+      
+      console.log('📧 ==========================================')
+      console.log('📧 PREPARED BOOKING DATA FOR NEW SIMPLIFIED API')
+      console.log('📧 ==========================================')
+      console.log('📧 meetingName:', bookingData.meetingName)
+      console.log('📧 date:', bookingData.date)
+      console.log('📧 startTime:', bookingData.startTime)
+      console.log('📧 endTime:', bookingData.endTime)
+      console.log('📧 place:', bookingData.place || '(not provided)')
+      console.log('📧 description:', bookingData.description || '(not provided)')
+      console.log('📧 participantEmails:', participantEmails)
+      console.log('📧 participantEmails count:', participantEmails.length)
+      console.log('📧 emailType:', bookingData.emailType)
+      console.log('📧 customMessage:', bookingData.customMessage || '(not provided)')
+      console.log('📧 ==========================================')
+      console.log('📧 USING NEW SIMPLIFIED API - NO BOOKING ID NEEDED!')
+      console.log('📧 ==========================================')
+      
+      // Use the new simplified API function (already exists in the file)
+      // Note: The function gets the token internally, so we don't pass it
+      const result = await sendBookingEmailFromFrontend(bookingData)
+      
+      if (result && result.success) {
+        console.log('📧 ==========================================')
+        console.log('📧 EMAIL SENDING SUCCESS')
+        console.log('📧 ==========================================')
+        console.log('📧 Emails Sent:', result.data?.emailsSent)
+        console.log('📧 Emails Failed:', result.data?.emailsFailed)
+        console.log('📧 Total Participants:', result.data?.totalParticipants)
+        
+        if (result.data?.emailsFailed && result.data.emailsFailed > 0) {
+          toast.success(`✅ Emails sent to ${result.data.emailsSent} participants, ${result.data.emailsFailed} failed`, {
+            position: 'top-center',
+            duration: 3000
+          })
         } else {
-          toast.success(`Emails sent successfully to ${emailsSent} participants`)
+          toast.success(`✅ Emails sent successfully to ${result.data?.emailsSent || participantEmails.length} participants`, {
+            position: 'top-center',
+            duration: 3000
+          })
         }
         
         // Close dialog
@@ -2187,15 +2892,32 @@ export function BookingManagement() {
         setBookingParticipants([])
         setCustomMessage('')
       } else {
-        toast.error(result.message || 'Failed to send emails')
+        console.error('❌ ==========================================')
+        console.error('❌ EMAIL SENDING FAILED')
+        console.error('❌ ==========================================')
+        console.error('❌ Result:', result)
+        toast.error(result?.message || 'Failed to send emails. Please try again.', {
+          position: 'top-center',
+          duration: 3000
+        })
       }
       
+      console.log('📧 ==========================================')
+      console.log('📧 EMAIL SENDING FUNCTION COMPLETED')
+      console.log('📧 ==========================================')
       
     } catch (error: any) {
-      console.error('❌ Error sending emails:', error)
+      console.error('❌ ==========================================')
+      console.error('❌ EMAIL SENDING EXCEPTION')
+      console.error('❌ ==========================================')
+      console.error('❌ Error Type:', error.constructor.name)
+      console.error('❌ Error Message:', error.message)
+      console.error('❌ Error Stack:', error.stack)
+      console.error('❌ Full Error Object:', error)
       toast.error(`Failed to send email notifications: ${error.message}`)
     } finally {
       setIsSendingEmails(false)
+      console.log('📧 Email sending state reset (isSendingEmails = false)')
     }
   }
 
@@ -3037,7 +3759,20 @@ export function BookingManagement() {
                         <Badge {...getStatusBadgeProps(booking.status)}>{booking.status}</Badge>
                       </TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {/* Only show Mail button if booking is NOT cancelled or completed */}
+                          {booking.status !== "cancelled" && booking.status !== "completed" && (
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              onClick={() => handleSendEmailClick(booking)}
+                              className="text-blue-600 border-blue-600 hover:bg-blue-50"
+                              title="Send email to participants"
+                            >
+                              <Mail className="h-4 w-4" />
+                            </Button>
+                          )}
+                          
                           <Button 
                             variant="outline" 
                             size="sm" 
@@ -3052,10 +3787,10 @@ export function BookingManagement() {
                             <Edit className="h-4 w-4" />
                           </Button>
                           
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleCancel(booking.id)}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleCancel(booking.id)}
                             disabled={booking.status === "completed" || booking.status === "cancelled"}
                             className="text-red-600 hover:text-red-700 hover:border-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
                             title={
@@ -3063,9 +3798,52 @@ export function BookingManagement() {
                                 ? "Cannot cancel this booking" 
                                 : "Cancel booking"
                             }
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+
+                          {/* Always show cancellation reason button for ALL cancelled bookings */}
+                          {(() => {
+                            // Check if booking is cancelled (handle all case variations)
+                            const bookingStatus = String(booking.status || '').toLowerCase().trim()
+                            const isCancelled = bookingStatus === 'cancelled'
+                            
+                            if (!isCancelled) return null
+                            
+                            // Get cancellation reason with fallbacks
+                            const reason = booking.cancellation?.cancellation_reason || 
+                                         booking.cancellation?.['cancellation_reason'] ||
+                                         booking.cancellation?.cancellationReason ||
+                                         booking.cancellation?.reason ||
+                                         ''
+                            
+                            const hasReason = reason && String(reason).trim().length > 0
+                            
+                            return (
+                              <div className="flex items-center gap-2 min-w-[150px]">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleShowCancellationReason(booking)}
+                                  className="text-blue-600 hover:text-blue-700 hover:border-blue-600"
+                                  title={hasReason ? `View cancellation reason: ${String(reason).substring(0, 50)}...` : "View cancellation details"}
+                                >
+                                  <Info className="h-4 w-4" />
+                                </Button>
+                                {hasReason ? (
+                                  <span 
+                                    className="text-xs text-muted-foreground max-w-[200px] truncate cursor-pointer hover:text-foreground"
+                                    onClick={() => handleShowCancellationReason(booking)}
+                                    title={String(reason)}
+                                  >
+                                    {String(reason)}
+                                  </span>
+                                ) : (
+                                  <span className="text-xs text-muted-foreground">No reason</span>
+                                )}
+                              </div>
+                            )
+                          })()}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -3118,15 +3896,19 @@ export function BookingManagement() {
                           </div>
                           <div className="flex items-center gap-2">
                             <div className="flex items-center gap-2">
+                              {/* Only show Mail button if booking is NOT cancelled or completed */}
+                              {booking.status !== "cancelled" && booking.status !== "completed" && (
                               <Button
                                 onClick={() => handleSendEmailClick(booking)}
                                 size="sm"
                                 variant="outline"
                                 className="flex items-center gap-1 text-blue-600 border-blue-600 hover:bg-blue-50"
+                                  title="Send email to participants"
                               >
                                 <Mail className="h-4 w-4" />
                                 Send Email
                               </Button>
+                              )}
                             </div>
                             <Badge {...getStatusBadgeProps(booking.status)}>{booking.status}</Badge>
                           </div>
@@ -3172,13 +3954,116 @@ export function BookingManagement() {
         </DialogContent>
       </Dialog>
 
+      {/* Cancellation Reason Dialog */}
+      <Dialog open={isCancellationDialog} onOpenChange={setIsCancellationDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-red-500" />
+              Cancel Booking
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Please provide a reason for cancelling this booking. This information will be stored for records.
+            </p>
+            <div className="space-y-2">
+              <Label htmlFor="cancellationReason">Cancellation Reason *</Label>
+              <Textarea
+                id="cancellationReason"
+                placeholder="Enter the reason for cancellation (e.g., Room unavailable, Event postponed, etc.)"
+                value={cancellationReason}
+                onChange={(e) => setCancellationReason(e.target.value)}
+                rows={4}
+                className="resize-none"
+                required
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-3">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsCancellationDialog(false)
+                setCancellationReason("")
+                setBookingToCancel(null)
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleConfirmCancellation}
+              disabled={!cancellationReason.trim()}
+            >
+              Confirm Cancellation
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* View Cancellation Reason Dialog */}
+      <Dialog open={isCancellationReasonDialogOpen} onOpenChange={setIsCancellationReasonDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Info className="h-5 w-5 text-blue-500" />
+              Cancellation Details
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            {selectedCancellation && (
+              <>
+                <div className="space-y-2">
+                  <Label className="text-sm font-semibold">Cancellation Reason</Label>
+                  <div className="p-3 bg-gray-50 rounded-lg border">
+                    <p className="text-sm text-foreground whitespace-pre-wrap">
+                      {selectedCancellation.cancellation_reason}
+                    </p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4 pt-2 border-t">
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Cancelled At</Label>
+                    <p className="text-sm font-medium">
+                      {selectedCancellation.cancelled_at 
+                        ? new Date(selectedCancellation.cancelled_at).toLocaleString('en-US', {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })
+                        : 'N/A'}
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Cancellation Type</Label>
+                    <p className="text-sm font-medium capitalize">
+                      {selectedCancellation.cancellation_type?.replace('_', ' ') || 'N/A'}
+                    </p>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+          <div className="flex justify-end">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsCancellationReasonDialogOpen(false)
+                setSelectedCancellation(null)
+              }}
+            >
+              Close
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Email Notification Dialog */}
       <Dialog open={isEmailDialogOpen} onOpenChange={setIsEmailDialogOpen}>
         <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
-          {(() => {
-            console.log('🔍 Dialog is rendering, isEmailDialogOpen:', isEmailDialogOpen)
-            return null
-          })()}
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Mail className="h-5 w-5 text-blue-600" />
@@ -3251,18 +4136,16 @@ export function BookingManagement() {
                   </div>
                   <Badge variant="outline">
                     {selectedEmailParticipants.length} of {bookingParticipants.filter(p => p.has_email === 1).length} selected
+                    {bookingParticipants.length > 0 && (
+                      <span className="ml-2 text-xs text-muted-foreground">
+                        ({bookingParticipants.length} total)
+                      </span>
+                    )}
                   </Badge>
                 </div>
 
                 {/* Participants List */}
                 <div className="space-y-3 max-h-60 overflow-y-auto">
-                  {(() => {
-                    console.log('🔍 Dialog rendering check:')
-                    console.log('  - isLoadingParticipants:', isLoadingParticipants)
-                    console.log('  - bookingParticipants.length:', bookingParticipants.length)
-                    console.log('  - bookingParticipants:', bookingParticipants)
-                    return null
-                  })()}
                   {isLoadingParticipants ? (
                     <div className="text-center py-8">
                       <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
@@ -3271,18 +4154,53 @@ export function BookingManagement() {
                   ) : bookingParticipants.length === 0 ? (
                     <div className="text-center py-8 text-muted-foreground">
                       <Users className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                      <p>No participants found for this booking</p>
-                      <p className="text-xs">Debug: bookingParticipants.length = {bookingParticipants.length}</p>
+                      <p className="font-medium">No participants found for this booking</p>
+                      <p className="text-xs mt-2">
+                        {selectedBookingForEmail ? (
+                          <>
+                            Booking ID: {selectedBookingForEmail.id}<br/>
+                            This booking may not have any participants assigned yet.
+                          </>
+                        ) : (
+                          'Loading booking information...'
+                        )}
+                      </p>
                     </div>
                   ) : (
-                    bookingParticipants.map((participant) => (
+                    (() => {
+                      console.log('📧 ==========================================')
+                      console.log('📧 RENDERING PARTICIPANTS LIST')
+                      console.log('📧 ==========================================')
+                      console.log('📧 Total participants to render:', bookingParticipants.length)
+                      console.log('📧 Currently selected:', selectedEmailParticipants.length, 'participants')
+                      console.log('📧 Selected IDs:', selectedEmailParticipants)
+                      bookingParticipants.forEach((p, index) => {
+                        console.log(`📧   Participant ${index + 1}:`)
+                        console.log(`📧      ID: ${p.id}`)
+                        console.log(`📧      Name: ${p.full_name}`)
+                        console.log(`📧      Email: ${p.email || 'NO EMAIL ❌'}`)
+                        console.log(`📧      Has Email: ${p.has_email === 1 ? '✅' : '❌'}`)
+                        console.log(`📧      Is Selected: ${selectedEmailParticipants.includes(p.id) ? '✅ YES' : '❌ NO'}`)
+                      })
+                      return bookingParticipants.map((participant) => (
                       <div key={participant.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50">
                         <div className="flex items-center space-x-3">
                           <input
                             type="checkbox"
                             id={`participant-${participant.id}`}
                             checked={selectedEmailParticipants.includes(participant.id)}
-                            onChange={(e) => handleParticipantEmailSelection(participant.id, e.target.checked)}
+                              onChange={(e) => {
+                                console.log('📧 ==========================================')
+                                console.log('📧 CHECKBOX CLICKED')
+                                console.log('📧 ==========================================')
+                                console.log('📧 Participant ID:', participant.id)
+                                console.log('📧 Participant Name:', participant.full_name)
+                                console.log('📧 Participant Email:', participant.email || 'NO EMAIL')
+                                console.log('📧 Checked:', e.target.checked)
+                                console.log('📧 Current selected count:', selectedEmailParticipants.length)
+                                console.log('📧 Current selected IDs:', selectedEmailParticipants)
+                                handleParticipantEmailSelection(participant.id, e.target.checked)
+                              }}
                             className="h-4 w-4"
                             disabled={participant.has_email === 0}
                           />
@@ -3316,27 +4234,44 @@ export function BookingManagement() {
                             variant={participant.has_email === 0 ? 'destructive' : 'outline'}
                             className="text-xs"
                           >
-                            {participant.member_type}
+                            {participant.member_type || 'N/A'}
                           </Badge>
                           {participant.has_email === 0 && (
                             <Badge variant="destructive" className="text-xs">
                               No Email
                             </Badge>
                           )}
+                          {selectedEmailParticipants.includes(participant.id) && (
+                            <Badge variant="default" className="text-xs bg-green-500">
+                              Selected ✅
+                            </Badge>
+                          )}
                         </div>
                       </div>
                     ))
+                    })()
                   )}
                 </div>
 
-                {bookingParticipants.filter(p => p.has_email === 1).length === 0 && !isLoadingParticipants && (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <Mail className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                    <p>No participants with email addresses found</p>
-                    <p className="text-xs">Add email addresses to participants to enable email notifications</p>
+                {bookingParticipants.filter(p => p.has_email === 1).length === 0 && 
+                 bookingParticipants.length > 0 && 
+                 !isLoadingParticipants && (
+                  <div className="text-center py-4 text-muted-foreground border-t pt-4">
+                    <AlertTriangle className="h-8 w-8 mx-auto mb-2 opacity-50 text-yellow-600" />
+                    <p className="text-sm font-medium">No email addresses available</p>
+                    <p className="text-xs">None of the {bookingParticipants.length} participant(s) have email addresses</p>
                   </div>
                 )}
               </div>
+              
+              {/* Debug Info - Remove in production */}
+              {process.env.NODE_ENV === 'development' && (
+                <div className="text-xs text-muted-foreground p-2 bg-gray-50 rounded border">
+                  <p>Debug: {bookingParticipants.length} participants loaded</p>
+                  <p>Participants with email: {bookingParticipants.filter(p => p.has_email === 1).length}</p>
+                  <p>Selected: {selectedEmailParticipants.length}</p>
+                </div>
+              )}
 
               {/* Action Buttons */}
               <div className="flex justify-between items-center pt-4 border-t">

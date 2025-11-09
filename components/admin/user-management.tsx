@@ -776,140 +776,144 @@ export function UserManagement() {
                 </div>
               ) : (
                 <div className="border-2 rounded-lg overflow-hidden shadow-lg">
-                  <div className="overflow-x-auto">
-                    <Table>
+                  <div className="relative overflow-x-auto">
+                    <Table className="w-full">
                       <TableHeader className="bg-gradient-to-r from-blue-100 to-purple-100">
                         <TableRow>
-                          <TableHead className="font-bold">User Details</TableHead>
-                          <TableHead className="font-bold">Contact</TableHead>
-                          <TableHead className="font-bold">Role</TableHead>
-                          <TableHead className="font-bold">Status</TableHead>
-                          <TableHead className="font-bold">Last Login</TableHead>
-                          <TableHead className="font-bold">Created</TableHead>
-                          <TableHead className="font-bold text-center">Actions</TableHead>
+                          <TableHead className="font-bold min-w-[200px]">User Details</TableHead>
+                          <TableHead className="font-bold min-w-[150px]">Contact</TableHead>
+                          <TableHead className="font-bold min-w-[100px]">Role</TableHead>
+                          <TableHead className="font-bold min-w-[100px]">Status</TableHead>
+                          <TableHead className="font-bold min-w-[150px]">Last Login</TableHead>
+                          <TableHead className="font-bold min-w-[120px]">Created</TableHead>
+                          <TableHead className="font-bold text-center min-w-[200px]">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
-                      <TableBody>
-                        {users.map((user) => (
-                          <TableRow key={user.id} className="hover:bg-blue-50 transition-colors">
-                            <TableCell>
-                              <div className="space-y-1">
-                                <p className="font-bold">
-                                  {user.first_name && user.last_name 
-                                    ? `${user.first_name} ${user.last_name}`
-                                    : 'No Name Set'
-                                  }
-                                </p>
-                                <p className="text-sm text-muted-foreground">{user.email}</p>
-                                {user.phone && (
-                                  <p className="text-sm text-muted-foreground flex items-center gap-1">
-                                    <Phone className="h-3 w-3" />
-                                    {user.phone}
-                                  </p>
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="space-y-1">
-                                {user.city && user.country && (
-                                  <p className="text-sm flex items-center gap-1">
-                                    <MapPin className="h-3 w-3 text-muted-foreground" />
-                                    {user.city}, {user.country}
-                                  </p>
-                                )}
-                                {user.website && (
-                                  <p className="text-sm flex items-center gap-1">
-                                    <Globe className="h-3 w-3 text-muted-foreground" />
-                                    <a href={user.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
-                                      Website
-                                    </a>
-                                  </p>
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant={getRoleBadgeVariant(user.role)}>
-                                {user.role.toUpperCase()}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
-                              {getStatusBadge(user)}
-                            </TableCell>
-                            <TableCell>
-                              <div className="text-sm">
-                                <p>{formatDateTime(user.last_login)}</p>
-                                {user.login_attempts > 0 && (
-                                  <p className="text-red-600 text-xs">
-                                    {user.login_attempts} failed attempts
-                                  </p>
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="text-sm">
-                                <p>{formatDate(user.user_created_at)}</p>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-1 justify-center">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => openUserDialog(user)}
-                                  title="Edit User"
-                                >
-                                  <Edit className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => openProfileDialog(user)}
-                                  title="Edit Profile"
-                                >
-                                  <Eye className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => handleSendPasswordReset(user.id)}
-                                  title="Send Password Reset"
-                                >
-                                  <Mail className="h-4 w-4" />
-                                </Button>
-                                {user.status === 'active' ? (
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => openDeactivateDialog(user)}
-                                    title="Deactivate User"
-                                  >
-                                    <ShieldX className="h-4 w-4" />
-                                  </Button>
-                                ) : (
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => handleActivateUser(user.id)}
-                                    title="Activate User"
-                                  >
-                                    <ShieldCheck className="h-4 w-4" />
-                                  </Button>
-                                )}
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => handleDeleteUser(user.id)}
-                                  title="Delete User"
-                                  className="text-red-600 hover:text-red-700"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
                     </Table>
+                    <div className="max-h-[450px] overflow-y-auto">
+                      <Table className="w-full">
+                        <TableBody>
+                          {users.map((user) => (
+                            <TableRow key={user.id} className="hover:bg-blue-50 transition-colors">
+                              <TableCell className="min-w-[200px]">
+                                <div className="space-y-1">
+                                  <p className="font-bold">
+                                    {user.first_name && user.last_name 
+                                      ? `${user.first_name} ${user.last_name}`
+                                      : 'No Name Set'
+                                    }
+                                  </p>
+                                  <p className="text-sm text-muted-foreground">{user.email}</p>
+                                  {user.phone && (
+                                    <p className="text-sm text-muted-foreground flex items-center gap-1">
+                                      <Phone className="h-3 w-3" />
+                                      {user.phone}
+                                    </p>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell className="min-w-[150px]">
+                                <div className="space-y-1">
+                                  {user.city && user.country && (
+                                    <p className="text-sm flex items-center gap-1">
+                                      <MapPin className="h-3 w-3 text-muted-foreground" />
+                                      {user.city}, {user.country}
+                                    </p>
+                                  )}
+                                  {user.website && (
+                                    <p className="text-sm flex items-center gap-1">
+                                      <Globe className="h-3 w-3 text-muted-foreground" />
+                                      <a href={user.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                                        Website
+                                      </a>
+                                    </p>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell className="min-w-[100px]">
+                                <Badge variant={getRoleBadgeVariant(user.role)}>
+                                  {user.role.toUpperCase()}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="min-w-[100px]">
+                                {getStatusBadge(user)}
+                              </TableCell>
+                              <TableCell className="min-w-[150px]">
+                                <div className="text-sm">
+                                  <p>{formatDateTime(user.last_login)}</p>
+                                  {user.login_attempts > 0 && (
+                                    <p className="text-red-600 text-xs">
+                                      {user.login_attempts} failed attempts
+                                    </p>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell className="min-w-[120px]">
+                                <div className="text-sm">
+                                  <p>{formatDate(user.user_created_at)}</p>
+                                </div>
+                              </TableCell>
+                              <TableCell className="min-w-[200px]">
+                                <div className="flex items-center gap-1 justify-center">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => openUserDialog(user)}
+                                    title="Edit User"
+                                  >
+                                    <Edit className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => openProfileDialog(user)}
+                                    title="Edit Profile"
+                                  >
+                                    <Eye className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleSendPasswordReset(user.id)}
+                                    title="Send Password Reset"
+                                  >
+                                    <Mail className="h-4 w-4" />
+                                  </Button>
+                                  {user.status === 'active' ? (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => openDeactivateDialog(user)}
+                                      title="Deactivate User"
+                                    >
+                                      <ShieldX className="h-4 w-4" />
+                                    </Button>
+                                  ) : (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => handleActivateUser(user.id)}
+                                      title="Activate User"
+                                    >
+                                      <ShieldCheck className="h-4 w-4" />
+                                    </Button>
+                                  )}
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleDeleteUser(user.id)}
+                                    title="Delete User"
+                                    className="text-red-600 hover:text-red-700"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
                   </div>
                 </div>
               )}

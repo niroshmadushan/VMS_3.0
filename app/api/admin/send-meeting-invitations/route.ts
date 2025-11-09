@@ -147,8 +147,19 @@ If you have any questions, please contact the meeting organizer.
     `
 
     // Send emails to all recipients using your backend API
-    const emailPromises = recipients.map(async (email: string) => {
+    const emailPromises = recipients.map(async (email: string, index: number) => {
+      console.log(`📧 ==========================================`)
+      console.log(`📧 SENDING EMAIL ${index + 1}/${recipients.length}`)
+      console.log(`📧 ==========================================`)
+      console.log(`📧 Recipient Email: ${email}`)
+      console.log(`📧 Email Subject: ${subject}`)
+      console.log(`📧 Backend API URL: ${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/api/send-email`)
+      console.log(`📧 App-Id: ${process.env.NEXT_PUBLIC_APP_ID || 'default_app_id'}`)
+      console.log(`📧 Service-Key: ${process.env.NEXT_PUBLIC_SERVICE_KEY ? '✅ Set' : '❌ Missing'}`)
+      
       try {
+        const requestStartTime = Date.now()
+        
         // Call your backend API to send the email (same as login OTP emails)
         const backendResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/api/send-email`, {
           method: 'POST',
@@ -167,32 +178,76 @@ If you have any questions, please contact the meeting organizer.
           })
         })
 
+        const requestDuration = Date.now() - requestStartTime
+        console.log(`📧 Response Status: ${backendResponse.status}`)
+        console.log(`📧 Response OK: ${backendResponse.ok}`)
+        console.log(`📧 Request Duration: ${requestDuration}ms`)
+
         const result = await backendResponse.json()
+        console.log(`📧 Backend Response:`, JSON.stringify(result, null, 2))
 
         if (!backendResponse.ok) {
-          console.error(`Failed to send email to ${email}:`, result.error)
+          console.error(`❌ ==========================================`)
+          console.error(`❌ EMAIL SEND FAILED FOR: ${email}`)
+          console.error(`❌ ==========================================`)
+          console.error(`❌ Status: ${backendResponse.status}`)
+          console.error(`❌ Error:`, result.error)
+          console.error(`❌ Full Response:`, result)
           return { email, success: false, error: result.error || 'Failed to send email' }
         }
 
-        console.log(`✅ Email sent successfully to ${email}`)
+        console.log(`✅ ==========================================`)
+        console.log(`✅ EMAIL SENT SUCCESSFULLY TO: ${email}`)
+        console.log(`✅ ==========================================`)
         return { email, success: true }
       } catch (error: any) {
-        console.error(`Error sending email to ${email}:`, error)
+        console.error(`❌ ==========================================`)
+        console.error(`❌ EMAIL SEND EXCEPTION FOR: ${email}`)
+        console.error(`❌ ==========================================`)
+        console.error(`❌ Error Type:`, error.constructor.name)
+        console.error(`❌ Error Message:`, error.message)
+        console.error(`❌ Error Stack:`, error.stack)
+        console.error(`❌ Full Error:`, error)
         return { email, success: false, error: error.message }
       }
     })
 
     // Wait for all emails to be sent
+    console.log(`📧 ==========================================`)
+    console.log(`📧 WAITING FOR ALL EMAILS TO BE SENT`)
+    console.log(`📧 ==========================================`)
+    console.log(`📧 Total Recipients: ${recipients.length}`)
+    
     const results = await Promise.all(emailPromises)
     
     // Count successful and failed sends
     const successful = results.filter(r => r.success).length
     const failed = results.filter(r => !r.success)
     
-    console.log(`📧 Email sending completed: ${successful} successful, ${failed.length} failed`)
+    console.log(`📧 ==========================================`)
+    console.log(`📧 EMAIL SENDING SUMMARY`)
+    console.log(`📧 ==========================================`)
+    console.log(`📧 Total Recipients: ${recipients.length}`)
+    console.log(`📧 Successful: ${successful} ✅`)
+    console.log(`📧 Failed: ${failed.length} ❌`)
+    console.log(`📧 Success Rate: ${((successful / recipients.length) * 100).toFixed(1)}%`)
 
     if (failed.length > 0) {
-      console.error('Failed emails:', failed)
+      console.error(`❌ ==========================================`)
+      console.error(`❌ FAILED EMAILS DETAILS`)
+      console.error(`❌ ==========================================`)
+      failed.forEach((f, index) => {
+        console.error(`❌ ${index + 1}. ${f.email}: ${f.error}`)
+      })
+    }
+    
+    if (successful > 0) {
+      console.log(`✅ ==========================================`)
+      console.log(`✅ SUCCESSFUL EMAILS`)
+      console.log(`✅ ==========================================`)
+      results.filter(r => r.success).forEach((r, index) => {
+        console.log(`✅ ${index + 1}. ${r.email}`)
+      })
     }
 
     return NextResponse.json({ 

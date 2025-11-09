@@ -13,15 +13,22 @@ class EmailService {
         });
     }
 
-    async sendEmail(to, subject, html, text) {
+    async sendEmail(to, subject, html, text, attachments = []) {
         try {
-            const result = await this.transporter.sendMail({
+            const mailOptions = {
                 from: process.env.SMTP_FROM || process.env.SMTP_USER,
                 to: to,
                 subject: subject,
                 html: html,
                 text: text
-            });
+            };
+            
+            // Add attachments if provided
+            if (attachments && attachments.length > 0) {
+                mailOptions.attachments = attachments;
+            }
+            
+            const result = await this.transporter.sendMail(mailOptions);
             return { success: true, messageId: result.messageId };
         } catch (error) {
             return { success: false, error: error.message };
@@ -107,7 +114,13 @@ const emailService = new EmailService();
 
 module.exports = {
     transporter: emailService.transporter,
-    sendEmail: (emailData) => emailService.sendEmail(emailData.to, emailData.subject, emailData.html, emailData.text),
+    sendEmail: (emailData) => emailService.sendEmail(
+        emailData.to, 
+        emailData.subject, 
+        emailData.html, 
+        emailData.text,
+        emailData.attachments || []
+    ),
     sendVerificationEmail: (email, firstName, verificationToken) => emailService.sendVerificationEmail(email, firstName, verificationToken),
     sendPasswordResetEmail: (email, firstName, resetToken) => emailService.sendPasswordResetEmail(email, firstName, resetToken),
     sendEmailVerificationOTP: (email, firstName, otpCode) => emailService.sendEmailVerificationOTP(email, firstName, otpCode),

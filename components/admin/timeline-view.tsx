@@ -282,7 +282,7 @@ export function TimelineView() {
           ) : (
             <div className="relative">
               {/* Timeline */}
-              <div className="space-y-6">
+              <div className="max-h-[600px] overflow-y-auto space-y-6 pr-2">
                 {bookings.map((booking, index) => {
                   const isOngoing = isBookingOngoing(booking)
                   const isCompleted = booking.status === 'completed'

@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Plus, Edit, Trash2, Calendar, Clock, MapPin, Users, X, Search, AlertTriangle, Loader2, Utensils, Mail, Send, Info, Lock } from "lucide-react"
+import { Plus, Edit, Trash2, Calendar, Clock, MapPin, Users, X, Search, AlertTriangle, Loader2, Utensils, Mail, Send, Info } from "lucide-react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { placeManagementAPI } from "@/lib/place-management-api"
 import { bookingEmailAPI, type BookingParticipant } from "@/lib/booking-email-api"
@@ -581,6 +581,8 @@ export function StaffBookingManagement() {
       setIsLoadingBookings(true)
       setBookingsError(null)
       
+      console.log('📚 Fetching bookings from database...')
+      
       // Fetch all bookings (not deleted)
       const bookingsResponse = await placeManagementAPI.getTableData('bookings', {
         filters: [
@@ -593,40 +595,31 @@ export function StaffBookingManagement() {
       
       const bookingsData: any[] = Array.isArray(bookingsResponse) ? bookingsResponse : []
       
-      // Fetch ALL cancellations once at the start (more reliable than filtering per booking)
-      console.log('\n  🔍 ========== FETCHING ALL CANCELLATIONS ==========')
-      let allCancellations: any[] = []
-      try {
-        const allCancellationsResponse = await placeManagementAPI.getTableData('booking_cancellations', {
-          limit: 1000 // Get all cancellations
-        })
-        
-        console.log(`  📥 RAW CANCELLATIONS API RESPONSE:`, allCancellationsResponse)
-        
-        // Handle different response formats
-        if (Array.isArray(allCancellationsResponse)) {
-          allCancellations = allCancellationsResponse
-        } else if (allCancellationsResponse && allCancellationsResponse.data && Array.isArray(allCancellationsResponse.data)) {
-          allCancellations = allCancellationsResponse.data
-        } else if (allCancellationsResponse && allCancellationsResponse.success && Array.isArray(allCancellationsResponse.data)) {
-          allCancellations = allCancellationsResponse.data
-        }
-        
-        console.log(`  📊 Total cancellations fetched: ${allCancellations.length}`)
-        console.log(`  📋 Cancellation booking IDs:`, allCancellations.map((c: any) => ({
-          id: c.id,
-          booking_id: c.booking_id || c.bookingId,
-          reason: c.cancellation_reason || c.cancellationReason
-        })))
-        console.log(`  ==========================================\n`)
-      } catch (error) {
-        console.error(`  ❌ Error fetching all cancellations:`, error)
-      }
+      console.log('📚 ========== RAW DATABASE DATA ==========')
+      console.log('📚 Total records from database:', bookingsData.length)
+      console.log('📚 Complete raw data:', JSON.stringify(bookingsData, null, 2))
+      
+      console.log('\n📅 ========== DETAILED BOOKING DATES ==========')
+      bookingsData.forEach((b, idx) => {
+        console.log(`\n${idx + 1}. "${b.title}"`)
+        console.log(`   booking_date (raw):`, b.booking_date)
+        console.log(`   booking_date (type):`, typeof b.booking_date)
+        console.log(`   booking_date (JSON):`, JSON.stringify(b.booking_date))
+        console.log(`   place_id:`, b.place_id)
+        console.log(`   place_name:`, b.place_name)
+        console.log(`   start_time:`, b.start_time)
+        console.log(`   end_time:`, b.end_time)
+        console.log(`   status:`, b.status)
+      })
+      console.log('\n========================================\n')
       
       // Transform database records to Booking interface
       const transformedBookings: Booking[] = await Promise.all(
         bookingsData.map(async (booking: any) => {
           // Fetch participants for this booking
+          console.log(`  🔍 Fetching participants for booking ID: "${booking.id}"`)
+          console.log(`     Booking title: "${booking.title}"`)
+          
           const participantsResponse = await placeManagementAPI.getTableData('booking_participants', {
             limit: 50
           })
@@ -637,8 +630,22 @@ export function StaffBookingManagement() {
             p.booking_id === booking.id && (p.is_deleted === false || p.is_deleted === 0)
           )
           
+          console.log(`     ✅ Active participants (is_deleted=false):`, participants.length)
+          console.log(`     📊 Internal participants API returned:`, participants.length, 'records')
+          if (participants.length > 0) {
+            console.log(`     📋 Internal participant IDs:`, participants.map(p => ({ 
+              id: p.id, 
+              booking_id: p.booking_id, 
+              name: p.employee_name 
+            })))
+          }
+          
           // CLIENT-SIDE FILTER: Ensure we only use participants for THIS booking
+          const originalCount = participants.length
           participants = participants.filter(p => p.booking_id === booking.id)
+          if (originalCount !== participants.length) {
+            console.log(`     ⚠️ API filter not working! Returned ${originalCount}, filtered to ${participants.length} on client`)
+          }
           
           // Fetch external participants
           const externalParticipantsResponse = await placeManagementAPI.getTableData('external_participants', {
@@ -651,6 +658,17 @@ export function StaffBookingManagement() {
             p.booking_id === booking.id && (p.is_deleted === false || p.is_deleted === 0)
           )
           
+          console.log(`     ✅ Active external participants (is_deleted=false):`, externalParticipants.length)
+          console.log(`     📊 External participants:`, externalParticipants.length, 'records')
+          if (externalParticipants.length > 0) {
+            console.log(`     📋 External participant IDs:`, externalParticipants.map(p => ({ 
+              id: p.id, 
+              booking_id: p.booking_id, 
+              name: p.full_name,
+              is_deleted: p.is_deleted
+            })))
+          }
+          
           // Fetch refreshments
           const refreshmentsResponse = await placeManagementAPI.getTableData('booking_refreshments', {
             filters: [
@@ -660,61 +678,56 @@ export function StaffBookingManagement() {
           })
           const refreshments: any[] = Array.isArray(refreshmentsResponse) ? refreshmentsResponse : []
           
-          // Find cancellation data from pre-fetched list (client-side matching)
+          // Fetch cancellation data if booking is cancelled
           let cancellationData: BookingCancellation | undefined = undefined
-          const isCancelledStatus = booking.status?.toLowerCase() === 'cancelled' || booking.status === 'cancelled' || booking.status === 'Cancelled'
-          if (isCancelledStatus) {
-            console.log(`\n  🔍 ========== MATCHING CANCELLATION DATA ==========`)
-            console.log(`  📋 Booking ID: "${booking.id}"`)
-            console.log(`  📋 Booking Title: "${booking.title}"`)
-            console.log(`  📋 Booking Status: "${booking.status}"`)
-            console.log(`  📊 Total cancellations available: ${allCancellations.length}`)
-            
-            // Find matching cancellation (try multiple field name variations)
-            const matchingCancellation = allCancellations.find((c: any) => {
-              const bookingIdMatch = c.booking_id === booking.id || 
-                                    c.bookingId === booking.id ||
-                                    String(c.booking_id || '').toLowerCase() === String(booking.id || '').toLowerCase() ||
-                                    String(c.bookingId || '').toLowerCase() === String(booking.id || '').toLowerCase()
+          if (booking.status === 'cancelled') {
+            try {
+              const cancellationResponse = await placeManagementAPI.getTableData('booking_cancellations', {
+                filters: [
+                  { field: 'booking_id', operator: '=', value: booking.id }
+                ],
+                limit: 1,
+                sortBy: 'cancelled_at',
+                sortOrder: 'desc'
+              })
               
-              if (bookingIdMatch) {
-                console.log(`  ✅ Found matching cancellation:`, {
-                  cancellation_id: c.id,
-                  cancellation_booking_id: c.booking_id || c.bookingId,
-                  booking_id: booking.id,
-                  reason: c.cancellation_reason || c.cancellationReason
+              // Handle different response formats
+              let cancellations: any[] = []
+              if (Array.isArray(cancellationResponse)) {
+                cancellations = cancellationResponse
+              } else if (cancellationResponse && cancellationResponse.data && Array.isArray(cancellationResponse.data)) {
+                cancellations = cancellationResponse.data
+              } else if (cancellationResponse && cancellationResponse.success && Array.isArray(cancellationResponse.data)) {
+                cancellations = cancellationResponse.data
+              }
+              
+              if (cancellations.length > 0) {
+                const cancellation = cancellations[0]
+                
+                // Directly access cancellation_reason with multiple fallbacks
+                const reason = cancellation.cancellation_reason || 
+                             cancellation['cancellation_reason'] ||
+                             cancellation.cancellationReason ||
+                             cancellation.reason ||
+                             ''
+                
+                cancellationData = {
+                  id: cancellation.id,
+                  booking_id: cancellation.booking_id || cancellation.bookingId,
+                  cancelled_by: cancellation.cancelled_by || cancellation.cancelledBy,
+                  cancellation_reason: String(reason).trim(), // Ensure it's a string and trimmed
+                  cancellation_type: cancellation.cancellation_type || cancellation.cancellationType || 'user_cancelled',
+                  cancelled_at: cancellation.cancelled_at || cancellation.cancelledAt
+                }
+                
+                console.log(`✅ Cancellation data for booking ${booking.id}:`, {
+                  has_reason: !!cancellationData.cancellation_reason,
+                  reason: cancellationData.cancellation_reason,
+                  reason_length: cancellationData.cancellation_reason.length
                 })
               }
-              
-              return bookingIdMatch
-            })
-            
-            if (matchingCancellation) {
-              console.log(`  📋 Raw cancellation object:`, matchingCancellation)
-              console.log(`  📋 Cancellation object keys:`, Object.keys(matchingCancellation))
-              
-              const reason = matchingCancellation.cancellation_reason || 
-                           matchingCancellation.cancellationReason ||
-                           matchingCancellation['cancellation_reason'] ||
-                           matchingCancellation.reason ||
-                           ''
-              
-              cancellationData = {
-                id: matchingCancellation.id,
-                booking_id: matchingCancellation.booking_id || matchingCancellation.bookingId || booking.id,
-                cancelled_by: matchingCancellation.cancelled_by || matchingCancellation.cancelledBy,
-                cancellation_reason: String(reason).trim(),
-                cancellation_type: matchingCancellation.cancellation_type || matchingCancellation.cancellationType || 'user_cancelled',
-                cancelled_at: matchingCancellation.cancelled_at || matchingCancellation.cancelledAt
-              }
-              
-              console.log(`  ✅ Final cancellation data object:`, cancellationData)
-              console.log(`  ✅ Cancellation reason (final):`, cancellationData.cancellation_reason)
-              console.log(`  ==========================================\n`)
-            } else {
-              console.log(`  ⚠️ No matching cancellation found for booking ${booking.id}`)
-              console.log(`  📋 Available cancellation booking IDs:`, allCancellations.map((c: any) => c.booking_id || c.bookingId))
-              console.log(`  ==========================================\n`)
+            } catch (error) {
+              console.error('Error fetching cancellation data:', error)
             }
           }
           
@@ -737,6 +750,11 @@ export function StaffBookingManagement() {
             referenceType: p.reference_type,
             referenceValue: p.reference_value
           }))
+          
+          console.log(`  👥 Participants for "${booking.title}":`)
+          console.log(`     Internal: ${selectedEmployees.length} (${selectedEmployees.map(e => e.name).join(', ') || 'none'})`)
+          console.log(`     External: ${externalParticipantsList.length} (${externalParticipantsList.map(e => e.fullName).join(', ') || 'none'})`)
+          console.log(`     Total: ${selectedEmployees.length + externalParticipantsList.length}`)
           
           // Parse refreshments
           let refreshmentDetails: RefreshmentDetails = {
@@ -775,33 +793,43 @@ export function StaffBookingManagement() {
           // We need to convert back to LOCAL date
           let normalizedDate = booking.booking_date
           
+          console.log(`  📅 Processing "${booking.title}" booking_date:`, booking.booking_date, `(type: ${typeof booking.booking_date})`)
+          
           if (normalizedDate) {
             // If it's already in simple YYYY-MM-DD format (no time), keep it
             if (typeof normalizedDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(normalizedDate)) {
+              console.log(`     ✅ Already YYYY-MM-DD format, keeping as-is`)
               // Already in correct format, no conversion needed
             }
             // If it's "YYYY-MM-DD HH:MM:SS" format, extract date part
             else if (typeof normalizedDate === 'string' && normalizedDate.includes(' ') && !normalizedDate.includes('T')) {
               normalizedDate = normalizedDate.split(' ')[0]
+              console.log(`     ✅ MySQL datetime format, extracted date part: ${normalizedDate}`)
             }
             // If it's ISO string (with T) - this is UTC, convert to LOCAL date
             else if (typeof normalizedDate === 'string' && normalizedDate.includes('T')) {
+              console.log(`     ⚠️ ISO timestamp detected (UTC), converting to local date...`)
               // Parse as UTC and get the local date components
               const d = new Date(normalizedDate)
               const year = d.getFullYear()
               const month = String(d.getMonth() + 1).padStart(2, '0')
               const day = String(d.getDate()).padStart(2, '0')
               normalizedDate = `${year}-${month}-${day}`
+              console.log(`     ✅ Converted to local date: ${normalizedDate}`)
             }
             // If it's a Date object
             else if (typeof normalizedDate === 'object') {
+              console.log(`     ⚠️ Date object detected, converting to local date...`)
               const d = new Date(normalizedDate)
               const year = d.getFullYear()
               const month = String(d.getMonth() + 1).padStart(2, '0')
               const day = String(d.getDate()).padStart(2, '0')
               normalizedDate = `${year}-${month}-${day}`
+              console.log(`     ✅ Converted to: ${normalizedDate}`)
             }
           }
+          
+          console.log(`  ✅ Final date for "${booking.title}": ${normalizedDate}`)
           
           return {
             id: booking.id,
@@ -829,22 +857,44 @@ export function StaffBookingManagement() {
         })
       )
       
-      // Log cancellation data for each booking to verify correct assignment
-      console.log('\n📋 CANCELLATION DATA VERIFICATION:')
-      transformedBookings.forEach((b, idx) => {
-        if (b.status === 'cancelled' || b.status === 'Cancelled') {
-          console.log(`\n${idx + 1}. Booking "${b.title}" (ID: ${b.id}):`)
-          if (b.cancellation) {
-            console.log(`   ✅ Has cancellation data:`)
-            console.log(`      - Reason: "${b.cancellation.cancellation_reason}"`)
-            console.log(`      - Booking ID: ${b.cancellation.booking_id}`)
-            console.log(`      - Cancelled by: ${b.cancellation.cancelled_by}`)
-          } else {
-            console.log(`   ⚠️ No cancellation data found`)
-          }
+      console.log('✅ Transformed bookings:', transformedBookings.length)
+      console.log('\n' + '='.repeat(80))
+      console.log('📊 COMPLETE BOOKINGS SUMMARY WITH PARTICIPANTS')
+      console.log('='.repeat(80) + '\n')
+      
+      transformedBookings.forEach((b, index) => {
+        console.log(`\n${index + 1}. 📅 ${b.title.toUpperCase()}`)
+        console.log('─'.repeat(60))
+        console.log(`   ID: ${b.id}`)
+        console.log(`   Date: ${b.date}`)
+        console.log(`   Place: ${b.place} (ID: ${b.placeId?.substring(0, 8)}...)`)
+        console.log(`   Time: ${b.startTime} - ${b.endTime}`)
+        console.log(`   Status: ${b.status}`)
+        console.log(`   Responsible: ${b.responsiblePerson?.name || 'Not assigned'}`)
+        console.log('')
+        console.log(`   👥 PARTICIPANTS (Total: ${b.totalParticipantsCount || 0}):`)
+        console.log(`   ├─ Internal: ${b.internalParticipantsCount || 0}`)
+        if (b.selectedEmployees.length > 0) {
+          b.selectedEmployees.forEach((emp, idx) => {
+            console.log(`   │  ${idx + 1}. ${emp.name} (${emp.email})`)
+          })
+        } else {
+          console.log(`   │  (No internal participants)`)
         }
+        console.log(`   └─ External: ${b.externalParticipantsCount || 0}`)
+        if (b.externalParticipants.length > 0) {
+          b.externalParticipants.forEach((ext, idx) => {
+            console.log(`      ${idx + 1}. ${ext.fullName} (${ext.phone})`)
+          })
+        } else {
+          console.log(`      (No external participants)`)
+        }
+        console.log('')
       })
-      console.log('\n')
+      
+      console.log('\n' + '='.repeat(80))
+      console.log(`📊 TOTAL: ${transformedBookings.length} bookings loaded from database`)
+      console.log('='.repeat(80) + '\n')
       
       setBookings(transformedBookings)
       
@@ -1275,53 +1325,6 @@ export function StaffBookingManagement() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formData.place, formData.date, bookings])
 
-  // Populate form when editingBooking changes
-  useEffect(() => {
-    if (editingBooking) {
-      setFormData({
-        title: editingBooking.title || '',
-        description: editingBooking.description || '',
-        date: editingBooking.date || '',
-        startTime: editingBooking.startTime || '',
-        endTime: editingBooking.endTime || '',
-        place: editingBooking.placeId || '',
-        responsiblePerson: editingBooking.responsiblePerson || null,
-        selectedEmployees: editingBooking.selectedEmployees || [],
-        externalParticipants: editingBooking.externalParticipants || [],
-        refreshments: editingBooking.refreshments || {
-          required: false,
-          type: '',
-          items: [],
-          servingTime: '',
-          specialRequests: '',
-          estimatedCount: 0
-        }
-      })
-      setIsDialogOpen(true)
-    } else {
-      // Reset form when not editing
-      setFormData({
-        title: '',
-        description: '',
-        date: '',
-        startTime: '',
-        endTime: '',
-        place: '',
-        responsiblePerson: null,
-        selectedEmployees: [],
-        externalParticipants: [],
-        refreshments: {
-          required: false,
-          type: '',
-          items: [],
-          servingTime: '',
-          specialRequests: '',
-          estimatedCount: 0
-        }
-      })
-    }
-  }, [editingBooking])
-
   const handleEmployeeSearch = (searchTerm: string) => {
     setEmployeeSearch(searchTerm)
     if (searchTerm.length > 0) {
@@ -1594,7 +1597,7 @@ export function StaffBookingManagement() {
           refreshments_required: formData.refreshments.required ? 1 : 0,
           refreshments_details: JSON.stringify(formData.refreshments),
           is_deleted: 0,
-          created_by: user?.id || 'Unknown' // Set created_by to current user
+          created_by: user?.id || null // Set created_by to current user
         }
 
         console.log('📝 Creating new booking:', newBookingData)
@@ -1667,19 +1670,6 @@ export function StaffBookingManagement() {
   }
 
   const handleEdit = (booking: Booking) => {
-    // Staff can only edit bookings where they are the responsible person (checked by email)
-    const responsiblePersonEmail = booking.responsiblePerson?.email || ''
-    const currentUserEmail = user?.email || ''
-    const isResponsiblePerson = responsiblePersonEmail.toLowerCase().trim() === currentUserEmail.toLowerCase().trim()
-    
-    if (!booking.responsiblePerson || !isResponsiblePerson) {
-      toast.error('You can only edit bookings where you are the responsible person', {
-        position: 'top-center',
-        duration: 3000,
-        icon: '🚫'
-      })
-      return
-    }
     // Check if booking is completed or cancelled
     if (booking.status === "completed") {
       toast.error("Cannot edit completed bookings", {
@@ -1699,26 +1689,36 @@ export function StaffBookingManagement() {
       return
     }
 
-    // Open edit dialog with booking data
-    setEditingBooking(booking)
-    setIsDialogOpen(true)
+    // Staff can only edit bookings they created
+    if (booking.createdBy !== user?.id) {
+      toast.error("You can only edit bookings that you created", {
+        position: 'top-center',
+        duration: 3000,
+        icon: '⚠️'
+      })
+      return
+    }
+
+    setConfirmTitle("Edit Booking")
+    setConfirmMessage(`Do you want to edit "${booking.title}"?`)
+    setConfirmAction(() => () => {
+      // Redirect to update page with booking ID
+      window.location.href = `/staff/bookings/update?id=${booking.id}`
+      setIsConfirmDialogOpen(false)
+    })
+    setIsConfirmDialogOpen(true)
   }
 
   const handleCancel = async (id: string) => {
-    // Staff can only cancel bookings where they are the responsible person (checked by email)
     const booking = bookings.find(b => b.id === id)
     if (!booking) return
     
-    // Check by email instead of ID
-    const responsiblePersonEmail = booking.responsiblePerson?.email || ''
-    const currentUserEmail = user?.email || ''
-    const isResponsiblePerson = responsiblePersonEmail.toLowerCase().trim() === currentUserEmail.toLowerCase().trim()
-    
-    if (!booking.responsiblePerson || !isResponsiblePerson) {
-      toast.error('You can only cancel bookings where you are the responsible person', {
+    // Staff can only cancel bookings they created
+    if (booking.createdBy !== user?.id) {
+      toast.error("You can only cancel bookings that you created", {
         position: 'top-center',
         duration: 3000,
-        icon: '🚫'
+        icon: '⚠️'
       })
       return
     }
@@ -1729,15 +1729,9 @@ export function StaffBookingManagement() {
     setIsCancellationDialog(true)
   }
 
-  const handleShowCancellationReason = async (booking: Booking) => {
-    console.log(`🔍 handleShowCancellationReason called for booking ${booking.id}:`, {
-      hasCancellation: !!booking.cancellation,
-      cancellation: booking.cancellation,
-      status: booking.status
-    })
-    
-    // If cancellation data is already loaded, use it
+  const handleShowCancellationReason = (booking: Booking) => {
     if (booking.cancellation) {
+      // Ensure cancellation_reason is properly set
       const cancellationWithReason = {
         ...booking.cancellation,
         cancellation_reason: booking.cancellation.cancellation_reason || 
@@ -1745,71 +1739,13 @@ export function StaffBookingManagement() {
                            ''
       }
       
-      console.log(`✅ Using existing cancellation data:`, cancellationWithReason)
+      console.log(`🔍 Showing cancellation reason for booking ${booking.id}:`, {
+        cancellation: cancellationWithReason,
+        reason: cancellationWithReason.cancellation_reason
+      })
+      
       setSelectedCancellation(cancellationWithReason)
       setIsCancellationReasonDialogOpen(true)
-      return
-    }
-    
-    // If cancellation data is not loaded, try to fetch it
-    console.log(`⚠️ Cancellation data not found in booking, fetching from database...`)
-    try {
-      const cancellationResponse = await placeManagementAPI.getTableData('booking_cancellations', {
-        filters: [
-          { field: 'booking_id', operator: '=', value: booking.id }
-        ],
-        limit: 1,
-        sortBy: 'cancelled_at',
-        sortOrder: 'desc'
-      })
-      
-      console.log(`📥 Cancellation API response:`, cancellationResponse)
-      
-      // Handle different response formats
-      let cancellations: any[] = []
-      if (Array.isArray(cancellationResponse)) {
-        cancellations = cancellationResponse
-      } else if (cancellationResponse && cancellationResponse.data && Array.isArray(cancellationResponse.data)) {
-        cancellations = cancellationResponse.data
-      } else if (cancellationResponse && cancellationResponse.success && Array.isArray(cancellationResponse.data)) {
-        cancellations = cancellationResponse.data
-      }
-      
-      if (cancellations.length > 0) {
-        const cancellation = cancellations[0]
-        const reason = cancellation.cancellation_reason || 
-                     cancellation['cancellation_reason'] ||
-                     cancellation.cancellationReason ||
-                     cancellation.reason ||
-                     ''
-        
-        const cancellationData: BookingCancellation = {
-          id: cancellation.id,
-          booking_id: cancellation.booking_id || cancellation.bookingId || booking.id,
-          cancelled_by: cancellation.cancelled_by || cancellation.cancelledBy,
-          cancellation_reason: String(reason).trim(),
-          cancellation_type: cancellation.cancellation_type || cancellation.cancellationType || 'user_cancelled',
-          cancelled_at: cancellation.cancelled_at || cancellation.cancelledAt
-        }
-        
-        console.log(`✅ Fetched cancellation data:`, cancellationData)
-        setSelectedCancellation(cancellationData)
-        setIsCancellationReasonDialogOpen(true)
-      } else {
-        console.log(`❌ No cancellation data found in database for booking ${booking.id}`)
-        toast.error('Cancellation reason not found in database', {
-          position: 'top-center',
-          duration: 3000,
-          icon: '⚠️'
-        })
-      }
-    } catch (error) {
-      console.error('❌ Error fetching cancellation data:', error)
-      toast.error('Failed to load cancellation data', {
-        position: 'top-center',
-        duration: 3000,
-        icon: '⚠️'
-      })
     }
   }
 
@@ -1829,10 +1765,8 @@ export function StaffBookingManagement() {
     if (!booking) return
 
     try {
-      // Get current user ID from localStorage
-      const userData = localStorage.getItem('userData')
-      const currentUser = userData ? JSON.parse(userData) : null
-      const cancelledBy = currentUser?.id || 'system'
+      // Get current user ID
+      const cancelledBy = user?.id || 'system'
 
       // Update booking status
       await placeManagementAPI.updateRecord('bookings', 
@@ -1849,7 +1783,7 @@ export function StaffBookingManagement() {
         booking_id: bookingToCancel,
         cancelled_by: cancelledBy,
         cancellation_reason: cancellationReason.trim(),
-        cancellation_type: 'admin_cancelled',
+        cancellation_type: 'user_cancelled',
         cancelled_at: new Date().toISOString()
       }
 
@@ -2396,158 +2330,8 @@ export function StaffBookingManagement() {
     }
   }
 
-  // Helper function to send booking email using new simplified API
-  const sendBookingEmailFromFrontend = async (bookingData: {
-    meetingName: string
-    date: string
-    startTime: string
-    endTime: string
-    place?: string
-    description?: string
-    participantEmails: string[]
-    emailType?: string
-    customMessage?: string
-  }) => {
-    try {
-      console.log('📧 ==========================================')
-      console.log('📧 SEND BOOKING EMAIL FROM FRONTEND (NEW API) - STAFF')
-      console.log('📧 ==========================================')
-      console.log('📧 Booking Data:', bookingData)
-
-      // Get token from localStorage (check all possible keys)
-      const token = localStorage.getItem('authToken') || 
-                    localStorage.getItem('jwt_token') || 
-                    localStorage.getItem('token') || 
-                    ''
-
-      if (!token) {
-        console.error('❌ No authentication token found')
-        toast.error('Authentication required. Please log in again.', {
-          position: 'top-center',
-          duration: 3000
-        })
-        return null
-      }
-
-      // Prepare full API request details
-      const apiUrl = '/api/booking-email/send-from-frontend'
-      const requestMethod = 'POST'
-      const requestHeaders = {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      }
-      const requestBody = JSON.stringify(bookingData)
-      
-      console.log('📧 ==========================================')
-      console.log('📧 FULL API REQUEST - FRONTEND (STAFF)')
-      console.log('📧 ==========================================')
-      console.log('📧 REQUEST URL:', apiUrl)
-      console.log('📧 REQUEST METHOD:', requestMethod)
-      console.log('📧 REQUEST HEADERS:', JSON.stringify(requestHeaders, null, 2))
-      console.log('📧 AUTHORIZATION HEADER:', requestHeaders['Authorization'] ? `Bearer ${token.substring(0, 30)}...` : '❌ Missing')
-      console.log('📧 REQUEST BODY:', requestBody)
-      console.log('📧 ==========================================')
-
-      const requestStartTime = Date.now()
-      console.log('📧 Sending fetch request at:', new Date().toISOString())
-      
-      const response = await fetch(apiUrl, {
-        method: requestMethod,
-        headers: requestHeaders,
-        body: requestBody
-      })
-
-      const requestDuration = Date.now() - requestStartTime
-      console.log('📧 Request Duration:', requestDuration + 'ms')
-      console.log('📧 Response Status:', response.status)
-      console.log('📧 Response OK:', response.ok)
-
-      // Handle non-OK responses
-      if (!response.ok) {
-        let errorData
-        try {
-          errorData = await response.json()
-        } catch (parseError) {
-          const errorText = await response.text()
-          console.error('❌ Backend returned non-JSON error:', errorText)
-          toast.error(`Error: ${response.status} ${response.statusText}`, {
-            position: 'top-center',
-            duration: 3000
-          })
-          return null
-        }
-        
-        console.error('❌ ==========================================')
-        console.error('❌ API ERROR RESPONSE')
-        console.error('❌ ==========================================')
-        console.error('❌ Status:', response.status)
-        console.error('❌ Status Text:', response.statusText)
-        console.error('❌ Error Message:', errorData.message)
-        console.error('❌ Error Details:', errorData.error)
-        console.error('❌ Full Error Response:', JSON.stringify(errorData, null, 2))
-        console.error('❌ ==========================================')
-        
-        if (response.status === 401) {
-          console.error('❌ Unauthorized: Token expired or invalid')
-          toast.error(errorData.message || 'Authentication failed. Please log in again.', {
-            position: 'top-center',
-            duration: 3000
-          })
-        } else {
-          toast.error(errorData.message || `Failed to send emails (Status: ${response.status})`, {
-            position: 'top-center',
-            duration: 3000
-          })
-        }
-        return null
-      }
-
-      const result = await response.json()
-      console.log('📧 ==========================================')
-      console.log('📧 RESPONSE RESULT')
-      console.log('📧 ==========================================')
-      console.log('📧 Full Result:', JSON.stringify(result, null, 2))
-      console.log('📧 Success:', result.success)
-      console.log('📧 Message:', result.message)
-      console.log('📧 ==========================================')
-
-      if (result.success) {
-        console.log('✅ Email sending success:', result)
-        return result
-      } else {
-        console.error('❌ Email sending failed:', result)
-        toast.error(result.message || 'Failed to send emails', {
-          position: 'top-center',
-          duration: 3000
-        })
-        return null
-      }
-    } catch (error: any) {
-      console.error('❌ ==========================================')
-      console.error('❌ FRONTEND - EMAIL SENDING EXCEPTION (STAFF)')
-      console.error('❌ ==========================================')
-      console.error('❌ Error Type:', error.constructor.name)
-      console.error('❌ Error Message:', error.message)
-      console.error('❌ Error Stack:', error.stack)
-      console.error('❌ Full Error:', error)
-
-      toast.error('Failed to send emails. Please try again.', {
-        position: 'top-center',
-        duration: 3000
-      })
-      return null
-    }
-  }
-
   const sendEmailNotifications = async () => {
-    console.log('📧 ==========================================')
-    console.log('📧 EMAIL SENDING FUNCTION CALLED (STAFF)')
-    console.log('📧 ==========================================')
-    
     if (!selectedBookingForEmail || selectedEmailParticipants.length === 0) {
-      console.error('❌ EMAIL SEND ERROR: No booking or participants selected')
-      console.error('❌ selectedBookingForEmail:', selectedBookingForEmail)
-      console.error('❌ selectedEmailParticipants.length:', selectedEmailParticipants.length)
       toast.error('Please select participants to send emails to')
       return
     }
@@ -2555,151 +2339,41 @@ export function StaffBookingManagement() {
     try {
       setIsSendingEmails(true)
       
-      // Get token from localStorage (check all possible keys)
-      const token = localStorage.getItem('authToken') || 
-                    localStorage.getItem('jwt_token') || 
-                    localStorage.getItem('token') || 
-                    ''
+      console.log('📧 Using NEW Booking Email API to send emails')
+      console.log('📧 Selected participants:', selectedEmailParticipants)
+      console.log('📧 Email type:', emailType)
+      console.log('📧 Custom message:', customMessage)
+      console.log('📧 Booking ID:', selectedBookingForEmail.id)
+      console.log('📧 Token available:', !!localStorage.getItem('token'))
+
+      // Use the NEW Booking Email API
+      console.log('📧 Using NEW Booking Email API...')
       
-      if (!token) {
-        console.error('❌ No authentication token found')
-        toast.error('Authentication required. Please log in again.', {
-          position: 'top-center',
-          duration: 3000
+      const response = await fetch(`/api/booking-email/${selectedBookingForEmail.id}/send-details`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+        },
+        body: JSON.stringify({
+          participantIds: selectedEmailParticipants,
+          emailType: emailType,
+          customMessage: customMessage
         })
-        return
-      }
-      
-      console.log('📧 ==========================================')
-      console.log('📧 EMAIL SENDING - INITIAL DATA (NEW SIMPLIFIED API) - STAFF')
-      console.log('📧 ==========================================')
-      console.log('📧 Booking Title:', selectedBookingForEmail.title)
-      console.log('📧 Booking Date:', selectedBookingForEmail.date)
-      console.log('📧 Selected Participants Count:', selectedEmailParticipants.length)
-      console.log('📧 Email Type:', emailType)
-      console.log('📧 Custom Message:', customMessage || '(none)')
-      console.log('📧 Token Available:', !!token)
-      
-      if (!selectedEmailParticipants || selectedEmailParticipants.length === 0) {
-        console.error('❌ NO PARTICIPANTS SELECTED')
-        toast.error('Please select at least one participant to send emails to', {
-          position: 'top-center',
-          duration: 3000
-        })
-        return
-      }
-      
-      // Get selected participants with valid emails (NEW APPROACH - extract emails directly)
-      const selectedParticipantsWithEmails = bookingParticipants.filter(p => 
-        selectedEmailParticipants.includes(p.id) && 
-        p.email && 
-        p.email.trim() !== '' &&
-        p.has_email === 1
-      )
-      
-      if (selectedParticipantsWithEmails.length === 0) {
-        console.error('❌ NO PARTICIPANTS WITH VALID EMAILS FOUND!')
-        toast.error('No participants with valid emails found. Please select participants with email addresses.', {
-          position: 'top-center',
-          duration: 3000
-        })
-        return
-      }
-      
-      // Extract participant emails
-      const participantEmails = selectedParticipantsWithEmails
-        .map(p => p.email)
-        .filter((email): email is string => !!email && email.trim() !== '')
-      
-      console.log('📧 ==========================================')
-      console.log('📧 SELECTED PARTICIPANTS WITH VALID EMAILS')
-      console.log('📧 ==========================================')
-      selectedParticipantsWithEmails.forEach((p, index) => {
-        console.log(`📧   ${index + 1}. ${p.full_name} (${p.email})`)
       })
-      console.log('📧 Total emails to send:', participantEmails.length)
-      
-      // Format time - ensure it has seconds (HH:MM:SS)
-      const formatTime = (time: string): string => {
-        if (!time) return ''
-        // If time is in HH:MM format, add :00 for seconds
-        if (time.split(':').length === 2) {
-          return time + ':00'
-        }
-        // If already in HH:MM:SS format, return as is
-        return time
-      }
-      
-      // Format date - ensure YYYY-MM-DD format
-      const formatDate = (date: string): string => {
-        if (!date) return ''
-        // If date is already in YYYY-MM-DD format, return as is
-        if (date.match(/^\d{4}-\d{2}-\d{2}$/)) {
-          return date
-        }
-        // Try to parse and format if needed
-        try {
-          const dateObj = new Date(date)
-          const year = dateObj.getFullYear()
-          const month = String(dateObj.getMonth() + 1).padStart(2, '0')
-          const day = String(dateObj.getDate()).padStart(2, '0')
-          return `${year}-${month}-${day}`
-        } catch (e) {
-          return date
-        }
-      }
-      
-      // Prepare booking data for NEW SIMPLIFIED API (no booking ID needed!)
-      const bookingData = {
-        meetingName: selectedBookingForEmail.title || 'Meeting',
-        date: formatDate(selectedBookingForEmail.date),
-        startTime: formatTime(selectedBookingForEmail.startTime),
-        endTime: formatTime(selectedBookingForEmail.endTime),
-        place: selectedBookingForEmail.place || '',
-        description: selectedBookingForEmail.description || '',
-        participantEmails: participantEmails,
-        emailType: emailType || 'booking_details',
-        customMessage: customMessage || ''
-      }
-      
-      console.log('📧 ==========================================')
-      console.log('📧 PREPARED BOOKING DATA FOR NEW SIMPLIFIED API')
-      console.log('📧 ==========================================')
-      console.log('📧 meetingName:', bookingData.meetingName)
-      console.log('📧 date:', bookingData.date)
-      console.log('📧 startTime:', bookingData.startTime)
-      console.log('📧 endTime:', bookingData.endTime)
-      console.log('📧 place:', bookingData.place || '(not provided)')
-      console.log('📧 description:', bookingData.description || '(not provided)')
-      console.log('📧 participantEmails:', participantEmails)
-      console.log('📧 participantEmails count:', participantEmails.length)
-      console.log('📧 emailType:', bookingData.emailType)
-      console.log('📧 customMessage:', bookingData.customMessage || '(not provided)')
-      console.log('📧 ==========================================')
-      console.log('📧 USING NEW SIMPLIFIED API - NO BOOKING ID NEEDED!')
-      console.log('📧 ==========================================')
-      
-      // Use the new simplified API function
-      const result = await sendBookingEmailFromFrontend(bookingData)
-      
-      if (result && result.success) {
-        console.log('📧 ==========================================')
-        console.log('📧 EMAIL SENDING SUCCESS')
-        console.log('📧 ==========================================')
-        console.log('📧 Emails Sent:', result.data?.emailsSent)
-        console.log('📧 Emails Failed:', result.data?.emailsFailed)
-        console.log('📧 Total Participants:', result.data?.totalParticipants)
-        
-        if (result.data?.emailsFailed && result.data.emailsFailed > 0) {
-          toast.success(`✅ Emails sent to ${result.data.emailsSent} participants, ${result.data.emailsFailed} failed`, {
-            position: 'top-center',
-            duration: 3000
-          })
+
+      console.log('📧 Response status:', response.status)
+      console.log('📧 Response ok:', response.ok)
+
+      const result = await response.json()
+      console.log('📧 NEW API Response:', result)
+
+      if (result.success) {
+        const { emailsSent, emailsFailed } = result.data || {}
+        if (emailsFailed > 0) {
+          toast.success(`Emails sent successfully to ${emailsSent} participants, ${emailsFailed} failed`)
         } else {
-          toast.success(`✅ Emails sent successfully to ${result.data?.emailsSent || participantEmails.length} participants`, {
-            position: 'top-center',
-            duration: 3000
-          })
+          toast.success(`Emails sent successfully to ${emailsSent} participants`)
         }
         
         // Close dialog
@@ -2709,32 +2383,15 @@ export function StaffBookingManagement() {
         setBookingParticipants([])
         setCustomMessage('')
       } else {
-        console.error('❌ ==========================================')
-        console.error('❌ EMAIL SENDING FAILED')
-        console.error('❌ ==========================================')
-        console.error('❌ Result:', result)
-        toast.error(result?.message || 'Failed to send emails. Please try again.', {
-          position: 'top-center',
-          duration: 3000
-        })
+        toast.error(result.message || 'Failed to send emails')
       }
       
-      console.log('📧 ==========================================')
-      console.log('📧 EMAIL SENDING FUNCTION COMPLETED')
-      console.log('📧 ==========================================')
       
     } catch (error: any) {
-      console.error('❌ ==========================================')
-      console.error('❌ EMAIL SENDING EXCEPTION')
-      console.error('❌ ==========================================')
-      console.error('❌ Error Type:', error.constructor.name)
-      console.error('❌ Error Message:', error.message)
-      console.error('❌ Error Stack:', error.stack)
-      console.error('❌ Full Error Object:', error)
+      console.error('❌ Error sending emails:', error)
       toast.error(`Failed to send email notifications: ${error.message}`)
     } finally {
       setIsSendingEmails(false)
-      console.log('📧 Email sending state reset (isSendingEmails = false)')
     }
   }
 
@@ -2796,12 +2453,12 @@ export function StaffBookingManagement() {
 
         {/* New Booking Button */}
         <Button 
-          onClick={() => window.location.href = '/staff/bookings/new'}
+          onClick={() => window.location.href = '/staff/bookings/new'} 
           className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-lg"
         >
-          <Plus className="h-4 w-4" />
-          New Booking
-        </Button>
+              <Plus className="h-4 w-4" />
+              New Booking
+            </Button>
       </div>
 
       {/* Hidden dialog - kept for edit functionality */}
@@ -3060,42 +2717,102 @@ export function StaffBookingManagement() {
               </div>
 
               <div className="space-y-4">
-                <div className="flex items-center gap-2">
                 <Label>Responsible Person *</Label>
+                <div className="relative">
+                  <Input
+                    placeholder="Search for responsible person..."
+                    value={responsibleSearch}
+                    onChange={(e) => {
+                      setResponsibleSearch(e.target.value)
+                      setShowResponsibleDropdown(true)
+                    }}
+                    onFocus={() => setShowResponsibleDropdown(true)}
+                    className="pr-10"
+                  />
+                  <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+
+                  {showResponsibleDropdown && responsibleSearch && (
+                    <div className="absolute z-50 w-full mt-1 bg-background border rounded-md shadow-lg max-h-60 overflow-auto">
+                      {isLoadingUsers ? (
+                        <div className="p-4 text-center">
+                          <Loader2 className="h-4 w-4 animate-spin mx-auto mb-2" />
+                          <p className="text-sm">Loading users...</p>
+                        </div>
+                      ) : users.length === 0 ? (
+                        <div className="p-4 text-center text-muted-foreground">
+                          <p className="text-sm">No users found</p>
+                        </div>
+                      ) : (
+                        users
+                        .filter(
+                            (user) =>
+                              user.full_name.toLowerCase().includes(responsibleSearch.toLowerCase()) ||
+                              user.email.toLowerCase().includes(responsibleSearch.toLowerCase()) ||
+                              user.role.toLowerCase().includes(responsibleSearch.toLowerCase()),
+                        )
+                        .slice(0, 10)
+                          .map((user) => (
+                          <div
+                              key={user.id}
+                            className="p-3 hover:bg-muted cursor-pointer border-b last:border-b-0"
+                              onClick={() => {
+                                // Convert UserProfile to Employee format
+                                const employeeData: Employee = {
+                                  id: user.id,
+                                  name: user.full_name,
+                                  email: user.email,
+                                  department: user.role === 'admin' ? 'Administration' : 'General',
+                                  role: user.role,
+                                  phone: ''
+                                }
+                                handleResponsiblePersonSelect(employeeData)
+                              }}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div>
+                                  <p className="font-medium">{user.full_name}</p>
+                                <p className="text-sm text-muted-foreground">
+                                    {user.email} • {user.role}
+                                </p>
+                              </div>
                               <Badge variant="outline" className="text-xs">
-                    <Lock className="h-3 w-3 mr-1" />
-                    Locked
+                                  {user.role}
                               </Badge>
                             </div>
-                <p className="text-xs text-muted-foreground mb-2">
-                  You are the responsible person for this booking and cannot be changed
-                </p>
-                {formData.responsiblePerson ? (
-                  <div className="p-3 bg-primary/5 border-2 border-primary/20 rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <Avatar className="h-10 w-10 border-2 border-primary">
-                        <AvatarFallback className="bg-primary text-primary-foreground font-semibold text-sm">
+                          </div>
+                          ))
+                      )}
+                      {!isLoadingUsers && users.filter(
+                        (user) =>
+                          user.full_name.toLowerCase().includes(responsibleSearch.toLowerCase()) ||
+                          user.email.toLowerCase().includes(responsibleSearch.toLowerCase()) ||
+                          user.role.toLowerCase().includes(responsibleSearch.toLowerCase()),
+                      ).length === 0 && <div className="p-3 text-center text-muted-foreground">No users found</div>}
+                    </div>
+                  )}
+                </div>
+
+                {formData.responsiblePerson && (
+                  <div className="mt-2">
+                    <div className="flex items-center gap-2 p-2 bg-muted rounded-md">
+                      <Avatar className="h-6 w-6">
+                        <AvatarFallback className="text-xs">
                           {formData.responsiblePerson.name
                             .split(" ")
                             .map((n) => n[0])
-                            .join("")
-                            .substring(0, 2)
-                            .toUpperCase()}
+                            .join("")}
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <p className="text-sm font-semibold">{formData.responsiblePerson.name}</p>
-                          <Lock className="h-3 w-3 text-muted-foreground" />
+                        <p className="text-sm font-medium">{formData.responsiblePerson.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {formData.responsiblePerson.department} • {formData.responsiblePerson.role}
+                        </p>
                       </div>
-                        <p className="text-xs text-muted-foreground">{formData.responsiblePerson.email}</p>
-                        <Badge variant="outline" className="mt-1 text-xs">{formData.responsiblePerson.role}</Badge>
+                      <Button type="button" variant="ghost" size="sm" onClick={handleResponsiblePersonRemove}>
+                        <X className="h-3 w-3" />
+                      </Button>
                     </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="p-3 bg-muted/50 border-2 border-dashed rounded-lg text-center">
-                    <p className="text-sm text-muted-foreground">No responsible person set</p>
                   </div>
                 )}
               </div>
@@ -3516,38 +3233,10 @@ export function StaffBookingManagement() {
                         <Badge {...getStatusBadgeProps(booking.status)}>{booking.status}</Badge>
                       </TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          {/* Check if responsible person email matches current user email */}
-                          {(() => {
-                            // Get responsible person email
-                            const responsiblePersonEmail = booking.responsiblePerson?.email || ''
-                            // Get current user email
-                            const currentUserEmail = user?.email || ''
-                            
-                            // Check if emails match (case-insensitive)
-                            const isResponsiblePerson = responsiblePersonEmail.toLowerCase().trim() === currentUserEmail.toLowerCase().trim()
-                            
-                            // If user is the responsible person, show Mail, Cancel, and Edit buttons
-                            if (isResponsiblePerson) {
-                              // Check if booking is cancelled or completed
-                              const isCancelledOrCompleted = booking.status === "cancelled" || booking.status === "completed"
-                              
-                              return (
-                                <>
-                                  {/* Mail Button - Only show if NOT cancelled or completed */}
-                                  {!isCancelledOrCompleted && (
-                                    <Button 
-                                      variant="outline" 
-                                      size="sm" 
-                                      onClick={() => handleSendEmailClick(booking)}
-                                      className="text-blue-600 border-blue-600 hover:bg-blue-50"
-                                      title="Send email to participants"
-                                    >
-                                      <Mail className="h-4 w-4" />
-                                    </Button>
-                                  )}
-                                  
-                                  {/* Edit Button */}
+                        <div className="flex items-center gap-2">
+                          {/* Staff can only edit/cancel bookings they created */}
+                          {booking.createdBy === user?.id && (
+                            <>
                               <Button 
                                 variant="outline" 
                                 size="sm" 
@@ -3562,7 +3251,6 @@ export function StaffBookingManagement() {
                                 <Edit className="h-4 w-4" />
                               </Button>
                               
-                                  {/* Cancel Button */}
                               <Button
                                 variant="outline"
                                 size="sm"
@@ -3578,55 +3266,19 @@ export function StaffBookingManagement() {
                                 <Trash2 className="h-4 w-4" />
                               </Button>
                             </>
-                              )
-                            }
-                            
-                            // For other bookings, show only cancellation reason view button (if cancelled)
-                            return null
-                          })()}
+                          )}
 
-                          {/* Always show cancellation reason button for ALL cancelled bookings */}
-                          {(() => {
-                            // Check if booking is cancelled (handle all case variations)
-                            const bookingStatus = String(booking.status || '').toLowerCase().trim()
-                            const isCancelled = bookingStatus === 'cancelled'
-                            
-                            if (!isCancelled) return null
-                            
-                            // Get cancellation reason with fallbacks
-                            const reason = booking.cancellation?.cancellation_reason || 
-                                         booking.cancellation?.['cancellation_reason'] ||
-                                         booking.cancellation?.cancellationReason ||
-                                         booking.cancellation?.reason ||
-                                         ''
-                            
-                            const hasReason = reason && String(reason).trim().length > 0
-                            
-                            return (
-                              <div className="flex items-center gap-2 min-w-[150px]">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => handleShowCancellationReason(booking)}
-                                  className="text-blue-600 hover:text-blue-700 hover:border-blue-600"
-                                  title={hasReason ? `View cancellation reason: ${String(reason).substring(0, 50)}...` : "View cancellation details"}
-                                >
-                                  <Info className="h-4 w-4" />
-                                </Button>
-                                {hasReason ? (
-                                  <span 
-                                    className="text-xs text-muted-foreground max-w-[200px] truncate cursor-pointer hover:text-foreground"
-                                    onClick={() => handleShowCancellationReason(booking)}
-                                    title={String(reason)}
-                                  >
-                                    {String(reason)}
-                                  </span>
-                                ) : (
-                                  <span className="text-xs text-muted-foreground">No reason</span>
-                                )}
-                              </div>
-                            )
-                          })()}
+                          {booking.status === "cancelled" && booking.cancellation && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleShowCancellationReason(booking)}
+                              className="text-blue-600 hover:text-blue-700 hover:border-blue-600"
+                              title="View cancellation reason"
+                            >
+                              <Info className="h-4 w-4" />
+                            </Button>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -3679,30 +3331,15 @@ export function StaffBookingManagement() {
                           </div>
                           <div className="flex items-center gap-2">
                             <div className="flex items-center gap-2">
-                              {(() => {
-                                // Check if user is the responsible person
-                                const responsiblePersonEmail = booking.responsiblePerson?.email || ''
-                                const currentUserEmail = user?.email || ''
-                                const isResponsiblePerson = responsiblePersonEmail.toLowerCase().trim() === currentUserEmail.toLowerCase().trim()
-                                const isCancelledOrCompleted = booking.status === "cancelled" || booking.status === "completed"
-                                
-                                // Only show Mail button if user is responsible person AND booking is NOT cancelled or completed
-                                if (isResponsiblePerson && !isCancelledOrCompleted) {
-                                  return (
                               <Button
                                 onClick={() => handleSendEmailClick(booking)}
                                 size="sm"
                                 variant="outline"
                                 className="flex items-center gap-1 text-blue-600 border-blue-600 hover:bg-blue-50"
-                                      title="Send email to participants"
                               >
                                 <Mail className="h-4 w-4" />
                                 Send Email
                               </Button>
-                                  )
-                                }
-                                return null
-                              })()}
                             </div>
                             <Badge {...getStatusBadgeProps(booking.status)}>{booking.status}</Badge>
                           </div>
@@ -3812,7 +3449,21 @@ export function StaffBookingManagement() {
                   <Label className="text-sm font-semibold">Cancellation Reason</Label>
                   <div className="p-3 bg-gray-50 rounded-lg border">
                     <p className="text-sm text-foreground whitespace-pre-wrap">
-                      {selectedCancellation.cancellation_reason}
+                      {(() => {
+                        // Directly access cancellation_reason with fallbacks
+                        const reason = selectedCancellation.cancellation_reason || 
+                                     selectedCancellation['cancellation_reason'] ||
+                                     ''
+                        
+                        console.log(`🎨 Displaying cancellation reason in dialog:`, {
+                          cancellation_reason: selectedCancellation.cancellation_reason,
+                          bracket_access: selectedCancellation['cancellation_reason'],
+                          final_reason: reason,
+                          full_object: JSON.stringify(selectedCancellation, null, 2)
+                        })
+                        
+                        return reason || 'No reason provided'
+                      })()}
                     </p>
                   </div>
                 </div>
@@ -3858,6 +3509,10 @@ export function StaffBookingManagement() {
       {/* Email Notification Dialog */}
       <Dialog open={isEmailDialogOpen} onOpenChange={setIsEmailDialogOpen}>
         <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
+          {(() => {
+            console.log('🔍 Dialog is rendering, isEmailDialogOpen:', isEmailDialogOpen)
+            return null
+          })()}
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Mail className="h-5 w-5 text-blue-600" />
@@ -3935,6 +3590,13 @@ export function StaffBookingManagement() {
 
                 {/* Participants List */}
                 <div className="space-y-3 max-h-60 overflow-y-auto">
+                  {(() => {
+                    console.log('🔍 Dialog rendering check:')
+                    console.log('  - isLoadingParticipants:', isLoadingParticipants)
+                    console.log('  - bookingParticipants.length:', bookingParticipants.length)
+                    console.log('  - bookingParticipants:', bookingParticipants)
+                    return null
+                  })()}
                   {isLoadingParticipants ? (
                     <div className="text-center py-8">
                       <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />

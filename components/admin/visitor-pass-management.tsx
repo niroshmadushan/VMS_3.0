@@ -979,22 +979,26 @@ export function VisitorPassManagement() {
             </div>
           ) : (
             <div className="border rounded-lg overflow-hidden">
-              <div className="overflow-x-auto">
+              <div className="relative overflow-x-auto">
                 <table className="w-full min-w-[1200px]">
                   <thead className="bg-gradient-to-r from-blue-100 to-purple-100">
                     <tr>
-                      <th className="text-left p-3 font-semibold text-sm">Date</th>
-                      <th className="text-left p-3 font-semibold text-sm">Time</th>
-                      <th className="text-left p-3 font-semibold text-sm">Visitor</th>
-                      <th className="text-left p-3 font-semibold text-sm">Reference</th>
-                      <th className="text-left p-3 font-semibold text-sm">Booking</th>
-                      <th className="text-left p-3 font-semibold text-sm">Place</th>
-                      <th className="text-center p-3 font-semibold text-sm">Pass</th>
-                      <th className="text-center p-3 font-semibold text-sm">History</th>
-                      <th className="text-center p-3 font-semibold text-sm">Status</th>
-                      <th className="text-center p-3 font-semibold text-sm">Actions</th>
+                      <th className="text-left p-3 font-semibold text-sm min-w-[120px]">Date</th>
+                      <th className="text-left p-3 font-semibold text-sm min-w-[120px]">Time</th>
+                      <th className="text-left p-3 font-semibold text-sm min-w-[200px]">Visitor</th>
+                      <th className="text-left p-3 font-semibold text-sm min-w-[150px]">Reference</th>
+                      <th className="text-left p-3 font-semibold text-sm min-w-[180px]">Booking</th>
+                      <th className="text-left p-3 font-semibold text-sm min-w-[150px]">Place</th>
+                      <th className="text-center p-3 font-semibold text-sm min-w-[120px]">Pass</th>
+                      <th className="text-center p-3 font-semibold text-sm min-w-[120px]">History</th>
+                      <th className="text-center p-3 font-semibold text-sm min-w-[100px]">Status</th>
+                      <th className="text-center p-3 font-semibold text-sm min-w-[120px]">Actions</th>
                     </tr>
                   </thead>
+                </table>
+              </div>
+              <div className="max-h-[450px] overflow-y-auto overflow-x-auto">
+                <table className="w-full min-w-[1200px]">
                   <tbody>
                     {filteredVisitors.map((visitor, idx) => (
                       <tr 
@@ -1003,7 +1007,7 @@ export function VisitorPassManagement() {
                           idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'
                         } ${visitor.is_blacklisted ? 'bg-red-50 border-l-4 border-l-red-500' : ''}`}
                       >
-                        <td className="p-3">
+                        <td className="p-3 min-w-[120px]">
                           <div className="space-y-1">
                             <p className="font-bold">
                               {new Date(visitor.booking_date).toLocaleDateString('en-US', { 
@@ -1018,14 +1022,14 @@ export function VisitorPassManagement() {
                           </div>
                         </td>
                         
-                        <td className="p-3">
+                        <td className="p-3 min-w-[120px]">
                           <div className="flex items-center gap-2">
                             <Clock className="h-4 w-4 text-blue-600" />
                             <p className="font-mono font-bold text-sm">{visitor.time_slot}</p>
                           </div>
                         </td>
                         
-                        <td className="p-3">
+                        <td className="p-3 min-w-[200px]">
                           <div className="space-y-1">
                             <p className="font-bold text-sm">{visitor.visitor_name}</p>
                             <p className="text-xs flex items-center gap-1">
@@ -1045,7 +1049,7 @@ export function VisitorPassManagement() {
                           </div>
                         </td>
                         
-                        <td className="p-3">
+                        <td className="p-3 min-w-[150px]">
                           <Badge variant="outline" className="font-mono font-bold text-xs">
                             {visitor.reference_type}
                           </Badge>
@@ -1054,7 +1058,7 @@ export function VisitorPassManagement() {
                           </p>
                         </td>
                         
-                        <td className="p-3">
+                        <td className="p-3 min-w-[180px]">
                           <p className="font-bold text-sm">{visitor.booking_title}</p>
                           {visitor.booking_ref_id && (
                             <Badge variant="outline" className="text-xs mt-1">
@@ -1063,14 +1067,14 @@ export function VisitorPassManagement() {
                           )}
                         </td>
                         
-                        <td className="p-3">
+                        <td className="p-3 min-w-[150px]">
                           <div className="flex items-center gap-2">
                             <MapPin className="h-4 w-4 text-green-600" />
                             <p className="font-medium text-sm">{visitor.place_name}</p>
                           </div>
                         </td>
                         
-                        <td className="p-3 text-center">
+                        <td className="p-3 text-center min-w-[120px]">
                           <div className="space-y-1">
                             {visitor.assigned_pass_number ? (
                               <Badge className="bg-green-500 text-white px-3 py-1 font-bold">
@@ -1100,7 +1104,7 @@ export function VisitorPassManagement() {
                           </div>
                         </td>
                         
-                        <td className="p-3 text-center">
+                        <td className="p-3 text-center min-w-[120px]">
                           <div className="space-y-1">
                             {visitor.historical_assignments && visitor.historical_assignments.length > 0 && (
                               <Button
@@ -1138,13 +1142,13 @@ export function VisitorPassManagement() {
                           </div>
                         </td>
                         
-                        <td className="p-3 text-center">
+                        <td className="p-3 text-center min-w-[100px]">
                           <Badge className={`px-3 py-1 font-bold text-xs ${getStatusColor(visitor.current_status)}`}>
                             {visitor.current_status.toUpperCase()}
                           </Badge>
                         </td>
                         
-                        <td className="p-3 text-center">
+                        <td className="p-3 text-center min-w-[120px]">
                           <div className="flex gap-1 justify-center">
                             {visitor.assigned_pass_id ? (
                               <Button 

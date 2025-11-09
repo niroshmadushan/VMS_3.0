@@ -263,7 +263,6 @@ export function AdminOverview() {
   ]
 
   const quickActions = [
-    { icon: Calendar, label: "New Booking", href: "/admin/bookings/new", color: "blue" },
     { icon: Users, label: "Manage Users", href: "/admin/users", color: "green" },
     { icon: MapPin, label: "Manage Places", href: "/admin/places", color: "purple" },
     { icon: CreditCard, label: "Visitor Passes", href: "/admin/passes", color: "orange" },

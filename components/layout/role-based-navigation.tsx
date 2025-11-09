@@ -24,27 +24,24 @@ const navigationConfig = {
   admin: [
     { name: "Dashboard", href: "/admin", icon: LayoutDashboard },
     { name: "Bookings", href: "/admin/bookings", icon: Calendar },
-    { name: "Create New Booking", href: "/admin/bookings/new", icon: UserPlus },
     { name: "User Management", href: "/admin/users", icon: Users },
     { name: "Place Management", href: "/admin/places", icon: MapPin },
     { name: "Visitor Passes", href: "/admin/passes", icon: CreditCard },
     { name: "External Members", href: "/admin/external-members", icon: UserCheck },
-    { name: "Feedback", href: "/admin/feedback", icon: MessageSquare },
+    // { name: "Feedback", href: "/admin/feedback", icon: MessageSquare }, // Temporarily hidden - will be developed in a few days
     { name: "Pass History", href: "/admin/pass-history", icon: History },
     { name: "Pass Types", href: "/admin/pass-types", icon: FileText },
     { name: "Availability", href: "/admin/availability", icon: Clock },
-    { name: "Calendar", href: "/admin/calendar", icon: CalendarDays },
     { name: "Timeline", href: "/admin/timeline", icon: BarChart3 },
     { name: "Settings", href: "/admin/settings", icon: Settings },
   ],
   staff: [
     { name: "Dashboard", href: "/staff", icon: LayoutDashboard },
     { name: "Bookings", href: "/staff/bookings", icon: Calendar },
-    { name: "Create New Booking", href: "/staff/bookings/new", icon: UserPlus },
     { name: "Timeline", href: "/staff/timeline", icon: BarChart3 },
     { name: "Availability", href: "/staff/availability", icon: Clock },
     { name: "External Members", href: "/staff/external-members", icon: UserCheck },
-    { name: "Feedback", href: "/staff/feedback", icon: MessageSquare },
+    // { name: "Feedback", href: "/staff/feedback", icon: MessageSquare }, // Temporarily hidden - will be developed in a few days
     { name: "Settings", href: "/staff/settings", icon: Settings },
   ],
   assistant: [

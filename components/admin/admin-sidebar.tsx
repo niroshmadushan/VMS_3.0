@@ -9,7 +9,6 @@ import {
   LayoutDashboard,
   MapPin,
   Users,
-  Calendar,
   CreditCard,
   UserCheck,
   MessageSquare,
@@ -41,11 +40,6 @@ const navigation = [
     icon: Users,
   },
   {
-    name: "Bookings",
-    href: "/admin/bookings",
-    icon: Calendar,
-  },
-  {
     name: "Availability",
     href: "/admin/availability",
     icon: Clock,
@@ -70,11 +64,11 @@ const navigation = [
     href: "/admin/external-members",
     icon: UserCheck,
   },
-  {
-    name: "Feedback",
-    href: "/admin/feedback",
-    icon: MessageSquare,
-  },
+  // {
+  //   name: "Feedback",
+  //   href: "/admin/feedback",
+  //   icon: MessageSquare,
+  // }, // Temporarily hidden - will be developed in a few days
 ]
 
 export function AdminSidebar() {

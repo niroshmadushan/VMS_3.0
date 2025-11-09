@@ -287,47 +287,49 @@ export function PassTypeManagement() {
           <CardDescription>Manage all visitor pass types</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            {passTypes.map((passType) => (
-              <div key={passType.id} className="flex items-center justify-between p-4 border rounded-lg">
-                <div className="flex items-center space-x-4">
-                  <div
-                    className={`h-12 w-12 rounded-lg flex items-center justify-center ${getColorClass(passType.color)}`}
-                  >
-                    <span className="font-bold text-lg">{passType.passNumber}</span>
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="font-semibold text-foreground">{passType.title}</h3>
-                      <Badge
-                        className={passType.isActive ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"}
-                      >
-                        {passType.isActive ? "Active" : "Inactive"}
-                      </Badge>
+          <div className="max-h-[450px] overflow-y-auto">
+            <div className="space-y-4">
+              {passTypes.map((passType) => (
+                <div key={passType.id} className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="flex items-center space-x-4">
+                    <div
+                      className={`h-12 w-12 rounded-lg flex items-center justify-center ${getColorClass(passType.color)}`}
+                    >
+                      <span className="font-bold text-lg">{passType.passNumber}</span>
                     </div>
-                    <p className="text-sm text-muted-foreground mb-1">{passType.description}</p>
-                    <p className="text-xs text-muted-foreground">
-                      Total Issued: {passType.totalIssued} • Currently Active: {passType.currentlyActive}
-                    </p>
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 className="font-semibold text-foreground">{passType.title}</h3>
+                        <Badge
+                          className={passType.isActive ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"}
+                        >
+                          {passType.isActive ? "Active" : "Inactive"}
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground mb-1">{passType.description}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Total Issued: {passType.totalIssued} • Currently Active: {passType.currentlyActive}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" onClick={() => handleEditPassType(passType)}>
+                      <Edit className="h-4 w-4 mr-2" />
+                      Edit
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-red-600 hover:text-red-700 bg-transparent"
+                      onClick={() => handleDeletePassType(passType.id)}
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete
+                    </Button>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Button variant="outline" size="sm" onClick={() => handleEditPassType(passType)}>
-                    <Edit className="h-4 w-4 mr-2" />
-                    Edit
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="text-red-600 hover:text-red-700 bg-transparent"
-                    onClick={() => handleDeletePassType(passType.id)}
-                  >
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Delete
-                  </Button>
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </CardContent>
       </Card>

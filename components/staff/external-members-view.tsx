@@ -287,66 +287,72 @@ export function StaffExternalMembersView() {
             {isLoading ? <div className="text-center py-8">Loading...</div> : 
              filteredMembers.length === 0 ? <div className="text-center py-8">No members</div> :
              <div className="border rounded-lg overflow-hidden">
-              <table className="w-full text-sm">
-                <thead className="bg-gradient-to-r from-gray-100 to-gray-200">
-                  <tr>
-                    <th className="text-left p-3 font-semibold">Name</th>
-                    <th className="text-left p-3 font-semibold">Contact</th>
-                    <th className="text-left p-3 font-semibold">Company</th>
-                    <th className="text-center p-3 font-semibold">Visits</th>
-                    <th className="text-center p-3 font-semibold">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredMembers.map((m) => (
-                    <tr key={m.id} className="border-t hover:bg-muted/50 transition-colors">
-                      <td className="p-3">
-                        <p className="font-bold">{m.full_name}</p>
-                        <p className="text-xs text-muted-foreground">{m.designation || 'No designation'}</p>
-                      </td>
-                      <td className="p-3">
-                        <div className="flex items-center gap-1 mb-1">
-                          <Mail className="h-3 w-3 text-muted-foreground" />
-                          <span className="text-xs">{m.email}</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Phone className="h-3 w-3 text-muted-foreground" />
-                          <span className="text-xs">{m.phone}</span>
-                        </div>
-                      </td>
-                      <td className="p-3">
-                        {m.company_name ? (
-                          <div className="flex items-center gap-1">
-                            <Building2 className="h-3 w-3 text-muted-foreground" />
-                            <span>{m.company_name}</span>
-                          </div>
-                        ) : (
-                          <span className="text-muted-foreground text-xs">No company</span>
-                        )}
-                      </td>
-                      <td className="p-3 text-center">
-                        <Badge variant="outline" className="bg-purple-50">
-                          <Calendar className="h-3 w-3 mr-1" />
-                          {m.visit_count}
-                        </Badge>
-                      </td>
-                      <td className="p-3 text-center">
-                        {m.is_blacklisted ? (
-                          <Badge variant="destructive" className="text-xs">
-                            <ShieldAlert className="h-3 w-3 mr-1" />Blacklisted
-                          </Badge>
-                        ) : m.is_active ? (
-                          <Badge className="bg-green-500 text-white text-xs">
-                            <CheckCircle className="h-3 w-3 mr-1" />Active
-                          </Badge>
-                        ) : (
-                          <Badge variant="secondary" className="text-xs">Inactive</Badge>
-                        )}
-                      </td>
+              <div className="relative overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-gradient-to-r from-gray-100 to-gray-200">
+                    <tr>
+                      <th className="text-left p-3 font-semibold min-w-[200px]">Name</th>
+                      <th className="text-left p-3 font-semibold min-w-[180px]">Contact</th>
+                      <th className="text-left p-3 font-semibold min-w-[150px]">Company</th>
+                      <th className="text-center p-3 font-semibold min-w-[100px]">Visits</th>
+                      <th className="text-center p-3 font-semibold min-w-[120px]">Status</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                </table>
+              </div>
+              <div className="max-h-[450px] overflow-y-auto overflow-x-auto">
+                <table className="w-full text-sm">
+                  <tbody>
+                    {filteredMembers.map((m) => (
+                      <tr key={m.id} className="border-t hover:bg-muted/50 transition-colors">
+                        <td className="p-3 min-w-[200px]">
+                          <p className="font-bold">{m.full_name}</p>
+                          <p className="text-xs text-muted-foreground">{m.designation || 'No designation'}</p>
+                        </td>
+                        <td className="p-3 min-w-[180px]">
+                          <div className="flex items-center gap-1 mb-1">
+                            <Mail className="h-3 w-3 text-muted-foreground" />
+                            <span className="text-xs">{m.email}</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Phone className="h-3 w-3 text-muted-foreground" />
+                            <span className="text-xs">{m.phone}</span>
+                          </div>
+                        </td>
+                        <td className="p-3 min-w-[150px]">
+                          {m.company_name ? (
+                            <div className="flex items-center gap-1">
+                              <Building2 className="h-3 w-3 text-muted-foreground" />
+                              <span>{m.company_name}</span>
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground text-xs">No company</span>
+                          )}
+                        </td>
+                        <td className="p-3 text-center min-w-[100px]">
+                          <Badge variant="outline" className="bg-purple-50">
+                            <Calendar className="h-3 w-3 mr-1" />
+                            {m.visit_count}
+                          </Badge>
+                        </td>
+                        <td className="p-3 text-center min-w-[120px]">
+                          {m.is_blacklisted ? (
+                            <Badge variant="destructive" className="text-xs">
+                              <ShieldAlert className="h-3 w-3 mr-1" />Blacklisted
+                            </Badge>
+                          ) : m.is_active ? (
+                            <Badge className="bg-green-500 text-white text-xs">
+                              <CheckCircle className="h-3 w-3 mr-1" />Active
+                            </Badge>
+                          ) : (
+                            <Badge variant="secondary" className="text-xs">Inactive</Badge>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>}
           </CardContent>
         </Card>

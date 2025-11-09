@@ -15,7 +15,6 @@ import {
 } from "lucide-react"
 import { placeManagementAPI } from "@/lib/place-management-api"
 import toast from "react-hot-toast"
-import { requireAuth } from "@/lib/auth"
 
 interface PassType {
   id: string
@@ -796,14 +795,14 @@ function PassTypesContent() {
   )
 }
 
-export default function PassTypesPage() {
-  useEffect(() => {
-    requireAuth(["admin"])
-  }, [])
+import { RouteProtection } from "@/components/auth/route-protection"
 
+export default function PassTypesPage() {
   return (
-    <DashboardLayout title="Pass Types" subtitle="Manage pass types and pass ranges">
-      <PassTypesContent />
-    </DashboardLayout>
+    <RouteProtection requiredRole="admin">
+      <DashboardLayout title="Pass Types" subtitle="Manage pass types and pass ranges">
+        <PassTypesContent />
+      </DashboardLayout>
+    </RouteProtection>
   )
 }

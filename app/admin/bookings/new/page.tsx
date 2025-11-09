@@ -9,7 +9,8 @@ import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ArrowLeft, Calendar, MapPin, Users, X, Search, Clock, Utensils, Save } from "lucide-react"
+import { ArrowLeft, Calendar, MapPin, Users, X, Search, Clock, Utensils, Save, Edit, ExternalLink } from "lucide-react"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { placeManagementAPI } from "@/lib/place-management-api"
 import toast from "react-hot-toast"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -158,6 +159,24 @@ export default function NewBookingPage() {
   const [memberSearch, setMemberSearch] = useState("")
   const [searchedMembers, setSearchedMembers] = useState<any[]>([])
   const [showMemberDropdown, setShowMemberDropdown] = useState(false)
+  
+  // External Member Edit state
+  const [isEditMemberDialogOpen, setIsEditMemberDialogOpen] = useState(false)
+  const [editingExternalMember, setEditingExternalMember] = useState<ExternalParticipant | null>(null)
+  const [editingMemberFormData, setEditingMemberFormData] = useState({
+    full_name: "",
+    email: "",
+    phone: "",
+    company_name: "",
+    designation: "",
+    reference_type: "NIC",
+    reference_value: "",
+    address: "",
+    city: "",
+    country: "Sri Lanka",
+    notes: ""
+  })
+  const [isUpdatingMember, setIsUpdatingMember] = useState(false)
   
   // Email Notification State
   const [selectedEmailParticipants, setSelectedEmailParticipants] = useState<string[]>([])
@@ -1060,6 +1079,126 @@ export default function NewBookingPage() {
     })
   }
 
+  // Edit external member
+  const handleEditExternalMember = async (participant: ExternalParticipant) => {
+    // Check if this is a database member (UUID format) or temporary ID
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(participant.id)
+    
+    if (isUUID) {
+      // Load full member data from database
+      try {
+        const response = await placeManagementAPI.getTableData('external_members', {
+          id: participant.id,
+          is_deleted: 'false'
+        })
+        const members = Array.isArray(response) ? response : response.data || []
+        const member = members[0]
+        
+        if (member) {
+          setEditingMemberFormData({
+            full_name: member.full_name || participant.fullName,
+            email: member.email || participant.email,
+            phone: member.phone || participant.phone,
+            company_name: member.company_name || "",
+            designation: member.designation || "",
+            reference_type: member.reference_type || participant.referenceType,
+            reference_value: member.reference_value || participant.referenceValue,
+            address: member.address || "",
+            city: member.city || "",
+            country: member.country || "Sri Lanka",
+            notes: member.notes || ""
+          })
+          setEditingExternalMember(participant)
+          setIsEditMemberDialogOpen(true)
+        } else {
+          toast.error('Member not found in database')
+        }
+      } catch (error) {
+        console.error('Error loading member:', error)
+        toast.error('Failed to load member details')
+      }
+    } else {
+      // Temporary participant - edit inline
+      setEditingMemberFormData({
+        full_name: participant.fullName,
+        email: participant.email,
+        phone: participant.phone,
+        company_name: "",
+        designation: "",
+        reference_type: participant.referenceType,
+        reference_value: participant.referenceValue,
+        address: "",
+        city: "",
+        country: "Sri Lanka",
+        notes: ""
+      })
+      setEditingExternalMember(participant)
+      setIsEditMemberDialogOpen(true)
+    }
+  }
+
+  const handleUpdateExternalMember = async () => {
+    if (!editingExternalMember) return
+    
+    // Validate
+    if (!editingMemberFormData.full_name?.trim() || !editingMemberFormData.phone?.trim() || !editingMemberFormData.reference_value?.trim()) {
+      toast.error('Please fill in all required fields', { position: 'top-center' })
+      return
+    }
+    
+    setIsUpdatingMember(true)
+    
+    try {
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(editingExternalMember.id)
+      
+      if (isUUID) {
+        // Update in database
+        await placeManagementAPI.updateRecord('external_members', { id: editingExternalMember.id }, {
+          full_name: editingMemberFormData.full_name.trim(),
+          email: editingMemberFormData.email?.trim() || null,
+          phone: editingMemberFormData.phone.trim(),
+          company_name: editingMemberFormData.company_name?.trim() || null,
+          designation: editingMemberFormData.designation?.trim() || null,
+          reference_type: editingMemberFormData.reference_type,
+          reference_value: editingMemberFormData.reference_value.trim(),
+          address: editingMemberFormData.address?.trim() || null,
+          city: editingMemberFormData.city?.trim() || null,
+          country: editingMemberFormData.country?.trim() || 'Sri Lanka',
+          notes: editingMemberFormData.notes?.trim() || null
+        })
+        
+        toast.success('External member updated successfully!', { position: 'top-center' })
+      }
+      
+      // Update participant in form
+      const updatedParticipants = formData.externalParticipants.map(p => 
+        p.id === editingExternalMember.id 
+          ? {
+              ...p,
+              fullName: editingMemberFormData.full_name.trim(),
+              email: editingMemberFormData.email?.trim() || "",
+              phone: editingMemberFormData.phone.trim(),
+              referenceType: editingMemberFormData.reference_type as "NIC" | "Passport" | "Employee ID",
+              referenceValue: editingMemberFormData.reference_value.trim()
+            }
+          : p
+      )
+      
+      setFormData({
+        ...formData,
+        externalParticipants: updatedParticipants
+      })
+      
+      setIsEditMemberDialogOpen(false)
+      setEditingExternalMember(null)
+    } catch (error: any) {
+      console.error('Error updating member:', error)
+      toast.error(error.message || 'Failed to update member', { position: 'top-center' })
+    } finally {
+      setIsUpdatingMember(false)
+    }
+  }
+
   // Refreshments management
   const addRefreshmentItem = (item: string) => {
     if (!formData.refreshments.items.includes(item)) {
@@ -1718,20 +1857,37 @@ export default function NewBookingPage() {
                 <div className="space-y-2 max-h-60 overflow-y-auto">
                   {formData.externalParticipants.map((participant) => (
                     <div key={participant.id} className="flex items-center justify-between p-3 bg-muted rounded-md">
-                      <div>
+                      <div className="flex-1">
                         <p className="font-medium text-sm">{participant.fullName}</p>
                         <p className="text-xs text-muted-foreground">
                           {participant.referenceType}: {participant.referenceValue} • {participant.phone}
                         </p>
+                        {participant.email && (
+                          <p className="text-xs text-muted-foreground">{participant.email}</p>
+                        )}
                       </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeExternalParticipant(participant.id)}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEditExternalMember(participant)}
+                          title="Edit member details"
+                          className="h-8 w-8 p-0"
+                        >
+                          <Edit className="h-4 w-4 text-blue-600" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeExternalParticipant(participant.id)}
+                          title="Remove participant"
+                          className="h-8 w-8 p-0"
+                        >
+                          <X className="h-4 w-4 text-red-500" />
+                        </Button>
+                      </div>
                     </div>
                   ))}
                   {formData.externalParticipants.length === 0 && (
@@ -2001,6 +2157,149 @@ export default function NewBookingPage() {
           </Button>
         </div>
       </form>
+
+      {/* Edit External Member Dialog */}
+      <Dialog open={isEditMemberDialogOpen} onOpenChange={setIsEditMemberDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit External Member</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Full Name *</Label>
+                <Input
+                  value={editingMemberFormData.full_name}
+                  onChange={(e) => setEditingMemberFormData({...editingMemberFormData, full_name: e.target.value})}
+                  required
+                />
+              </div>
+              <div>
+                <Label>Email</Label>
+                <Input
+                  type="email"
+                  value={editingMemberFormData.email}
+                  onChange={(e) => setEditingMemberFormData({...editingMemberFormData, email: e.target.value})}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Phone *</Label>
+                <Input
+                  value={editingMemberFormData.phone}
+                  onChange={(e) => setEditingMemberFormData({...editingMemberFormData, phone: e.target.value})}
+                  placeholder="+94771234567"
+                  required
+                />
+              </div>
+              <div>
+                <Label>Company</Label>
+                <Input
+                  value={editingMemberFormData.company_name}
+                  onChange={(e) => setEditingMemberFormData({...editingMemberFormData, company_name: e.target.value})}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Designation</Label>
+                <Input
+                  value={editingMemberFormData.designation}
+                  onChange={(e) => setEditingMemberFormData({...editingMemberFormData, designation: e.target.value})}
+                />
+              </div>
+              <div>
+                <Label>Reference Type *</Label>
+                <Select
+                  value={editingMemberFormData.reference_type}
+                  onValueChange={(v) => setEditingMemberFormData({...editingMemberFormData, reference_type: v})}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="NIC">NIC</SelectItem>
+                    <SelectItem value="Passport">Passport</SelectItem>
+                    <SelectItem value="Driving License">Driving License</SelectItem>
+                    <SelectItem value="Employee ID">Employee ID</SelectItem>
+                    <SelectItem value="Other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div>
+              <Label>Reference Value *</Label>
+              <Input
+                value={editingMemberFormData.reference_value}
+                onChange={(e) => setEditingMemberFormData({...editingMemberFormData, reference_value: e.target.value})}
+                placeholder="NIC: 199012345678"
+                required
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>City</Label>
+                <Input
+                  value={editingMemberFormData.city}
+                  onChange={(e) => setEditingMemberFormData({...editingMemberFormData, city: e.target.value})}
+                />
+              </div>
+              <div>
+                <Label>Country</Label>
+                <Input
+                  value={editingMemberFormData.country}
+                  onChange={(e) => setEditingMemberFormData({...editingMemberFormData, country: e.target.value})}
+                />
+              </div>
+            </div>
+            <div>
+              <Label>Address</Label>
+              <Textarea
+                value={editingMemberFormData.address}
+                onChange={(e) => setEditingMemberFormData({...editingMemberFormData, address: e.target.value})}
+                rows={2}
+              />
+            </div>
+            <div>
+              <Label>Notes</Label>
+              <Textarea
+                value={editingMemberFormData.notes}
+                onChange={(e) => setEditingMemberFormData({...editingMemberFormData, notes: e.target.value})}
+                rows={2}
+              />
+            </div>
+            <div className="flex gap-2 justify-end pt-4 border-t">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setIsEditMemberDialogOpen(false)
+                  setEditingExternalMember(null)
+                }}
+                disabled={isUpdatingMember}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                onClick={handleUpdateExternalMember}
+                disabled={isUpdatingMember}
+                className="min-w-[100px]"
+              >
+                {isUpdatingMember ? (
+                  <>
+                    <span className="animate-spin mr-2">⏳</span>
+                    Updating...
+                  </>
+                ) : (
+                  'Update Member'
+                )}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

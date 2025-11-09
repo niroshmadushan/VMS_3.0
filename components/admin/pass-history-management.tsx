@@ -628,22 +628,26 @@ export function PassHistoryManagement() {
             </div>
           ) : (
             <div className="border rounded-lg overflow-hidden shadow-sm">
-              <div className="overflow-x-auto">
+              <div className="relative overflow-x-auto">
                 <table className="w-full text-[12px]">
                   <thead className="bg-gradient-to-r from-blue-100 to-purple-100">
                     <tr>
-                      <th className="text-left p-2 font-semibold">Pass</th>
-                      <th className="text-left p-2 font-semibold">Action</th>
-                      <th className="text-left p-2 font-semibold">Holder</th>
-                      <th className="text-left p-2 font-semibold">Booking</th>
-                      <th className="text-left p-2 font-semibold">Assigned</th>
-                      <th className="text-left p-2 font-semibold">Returned</th>
-                      <th className="text-left p-2 font-semibold">Duration</th>
-                      <th className="text-left p-2 font-semibold">By</th>
-                      <th className="text-center p-2 font-semibold">Status</th>
-                      <th className="text-center p-2 font-semibold">Actions</th>
+                      <th className="text-left p-2 font-semibold min-w-[120px]">Pass</th>
+                      <th className="text-left p-2 font-semibold min-w-[100px]">Action</th>
+                      <th className="text-left p-2 font-semibold min-w-[180px]">Holder</th>
+                      <th className="text-left p-2 font-semibold min-w-[150px]">Booking</th>
+                      <th className="text-left p-2 font-semibold min-w-[140px]">Assigned</th>
+                      <th className="text-left p-2 font-semibold min-w-[140px]">Returned</th>
+                      <th className="text-left p-2 font-semibold min-w-[100px]">Duration</th>
+                      <th className="text-left p-2 font-semibold min-w-[120px]">By</th>
+                      <th className="text-center p-2 font-semibold min-w-[100px]">Status</th>
+                      <th className="text-center p-2 font-semibold min-w-[140px]">Actions</th>
                     </tr>
                   </thead>
+                </table>
+              </div>
+              <div className="max-h-[450px] overflow-y-auto overflow-x-auto">
+                <table className="w-full text-[12px]">
                   <tbody>
                     {filteredAssignments.map((assignment, idx) => {
                       const isActive = assignment.action_type === 'assigned' && !assignment.actual_return_date
@@ -657,7 +661,7 @@ export function PassHistoryManagement() {
                             idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'
                           } ${isActive ? 'border-l-2 border-l-green-500' : ''}`}
                         >
-                          <td className="p-2">
+                          <td className="p-2 min-w-[120px]">
                             <Badge className="bg-blue-600 text-white font-mono font-bold text-[12px] px-2 py-0.5">
                               {assignment.pass_display_name || `#${assignment.pass_number}`}
                             </Badge>
@@ -666,11 +670,11 @@ export function PassHistoryManagement() {
                             </p>
                           </td>
                           
-                          <td className="p-2">
+                          <td className="p-2 min-w-[100px]">
                             {getActionBadge(assignment.action_type)}
                           </td>
                           
-                          <td className="p-2">
+                          <td className="p-2 min-w-[180px]">
                             <div className="space-y-0.5">
                               <p className="font-bold">{assignment.holder_name}</p>
                               {assignment.holder_contact && (
@@ -684,7 +688,7 @@ export function PassHistoryManagement() {
                             </div>
                           </td>
                           
-                          <td className="p-2">
+                          <td className="p-2 min-w-[150px]">
                             {assignment.booking_title ? (
                               <p className="font-medium">{assignment.booking_title}</p>
                             ) : (
@@ -692,7 +696,7 @@ export function PassHistoryManagement() {
                             )}
                           </td>
                           
-                          <td className="p-2">
+                          <td className="p-2 min-w-[140px]">
                             <div className="flex items-center gap-1.5">
                               <Calendar className="h-3.5 w-3.5 text-blue-600" />
                               <div>
@@ -721,7 +725,7 @@ export function PassHistoryManagement() {
                             </div>
                           </td>
                           
-                          <td className="p-2">
+                          <td className="p-2 min-w-[140px]">
                             {assignment.action_type === 'returned' ? (
                               <div className="flex items-center gap-1.5">
                                 <CheckCircle className="h-3.5 w-3.5 text-green-600" />
@@ -755,20 +759,20 @@ export function PassHistoryManagement() {
                             )}
                           </td>
                           
-                          <td className="p-2">
+                          <td className="p-2 min-w-[100px]">
                             <p className="font-medium">
                               {calculateDuration(assignment.assigned_date, assignment.actual_return_date)}
                             </p>
                           </td>
                           
-                          <td className="p-2">
+                          <td className="p-2 min-w-[120px]">
                             <div className="flex items-center gap-1.5">
                               <User className="h-3.5 w-3.5 text-purple-600" />
                               <p className="text-[12px]">{assignment.assigned_by_name}</p>
                             </div>
                           </td>
                           
-                          <td className="p-2 text-center">
+                          <td className="p-2 text-center min-w-[100px]">
                             {isActive ? (
                               <Badge className="bg-green-500 text-white px-2.5 py-0.5 flex items-center gap-1 justify-center w-fit mx-auto text-[11px]">
                                 <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
@@ -789,7 +793,7 @@ export function PassHistoryManagement() {
                             )}
                           </td>
                           
-                          <td className="p-2 text-center">
+                          <td className="p-2 text-center min-w-[140px]">
                             {assignment.is_overdue && (
                               <Button
                                 size="sm"

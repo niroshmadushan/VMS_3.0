@@ -671,7 +671,7 @@ export function AvailabilityChecker() {
                 <p className="text-xs text-muted-foreground">Current bookings for this date and place</p>
               </CardHeader>
               <CardContent className="pt-4">
-                <div className="space-y-3">
+                <div className="max-h-[450px] overflow-y-auto space-y-3 pr-2">
                   {existingBookings
                     .sort((a, b) => a.start_time.localeCompare(b.start_time))
                     .map((booking) => (

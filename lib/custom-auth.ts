@@ -190,7 +190,7 @@ export async function verifyOTP(email: string, otpCode: string): Promise<AuthRes
       localStorage.setItem('userData', JSON.stringify(response.data.user))
     }
   }
-
+  
   return response
 }
 

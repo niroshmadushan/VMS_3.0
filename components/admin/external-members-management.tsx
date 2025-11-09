@@ -334,51 +334,53 @@ export function ExternalMembersManagement() {
           <CardDescription>Manage external contacts and their information</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            {filteredMembers.map((member) => (
-              <div key={member.id} className="flex items-center justify-between p-4 border rounded-lg">
-                <div className="flex items-center space-x-4">
-                  <div className="h-12 w-12 bg-primary/10 rounded-lg flex items-center justify-center">
-                    <Users className="h-6 w-6 text-primary" />
+          <div className="max-h-[450px] overflow-y-auto">
+            <div className="space-y-4">
+              {filteredMembers.map((member) => (
+                <div key={member.id} className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="flex items-center space-x-4">
+                    <div className="h-12 w-12 bg-primary/10 rounded-lg flex items-center justify-center">
+                      <Users className="h-6 w-6 text-primary" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 className="font-semibold text-foreground">{member.name}</h3>
+                        <Badge className={getStatusColor(member.status)}>{member.status}</Badge>
+                        <Badge className={getCategoryColor(member.category)}>{member.category}</Badge>
+                      </div>
+                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                        <div className="flex items-center gap-1">
+                          <Building className="h-3 w-3" />
+                          {member.company} • {member.position}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Mail className="h-3 w-3" />
+                          {member.email}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Phone className="h-3 w-3" />
+                          {member.phone}
+                        </div>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {member.totalVisits} visits • Last visit:{" "}
+                        {member.lastVisit ? new Date(member.lastVisit).toLocaleDateString() : "Never"}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="font-semibold text-foreground">{member.name}</h3>
-                      <Badge className={getStatusColor(member.status)}>{member.status}</Badge>
-                      <Badge className={getCategoryColor(member.category)}>{member.category}</Badge>
-                    </div>
-                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                      <div className="flex items-center gap-1">
-                        <Building className="h-3 w-3" />
-                        {member.company} • {member.position}
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Mail className="h-3 w-3" />
-                        {member.email}
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Phone className="h-3 w-3" />
-                        {member.phone}
-                      </div>
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {member.totalVisits} visits • Last visit:{" "}
-                      {member.lastVisit ? new Date(member.lastVisit).toLocaleDateString() : "Never"}
-                    </p>
+                  <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm">
+                      <Edit className="h-4 w-4 mr-2" />
+                      Edit
+                    </Button>
+                    <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700 bg-transparent">
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete
+                    </Button>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Button variant="outline" size="sm">
-                    <Edit className="h-4 w-4 mr-2" />
-                    Edit
-                  </Button>
-                  <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700 bg-transparent">
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Delete
-                  </Button>
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </CardContent>
       </Card>

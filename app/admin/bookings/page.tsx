@@ -1,18 +1,15 @@
 "use client"
 
-import { useEffect } from "react"
 import { DashboardLayout } from "@/components/layout/dashboard-layout"
 import { BookingManagement } from "@/components/admin/booking-management"
-import { requireAuth } from "@/lib/auth"
+import { RouteProtection } from "@/components/auth/route-protection"
 
 export default function BookingsPage() {
-  useEffect(() => {
-    requireAuth(["admin"])
-  }, [])
-
   return (
-    <DashboardLayout title="Booking Management" subtitle="Manage meetings and reservations">
-      <BookingManagement />
-    </DashboardLayout>
+    <RouteProtection requiredRole="admin">
+      <DashboardLayout title="Booking Management" subtitle="Manage meetings and reservations">
+        <BookingManagement />
+      </DashboardLayout>
+    </RouteProtection>
   )
 }

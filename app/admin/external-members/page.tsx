@@ -14,11 +14,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { 
   Users, Search, Plus, Edit, Trash2, AlertTriangle, Building2, Mail, Phone, 
   Calendar, ShieldAlert, CheckCircle, XCircle, TrendingUp, Eye, Activity,
-  MapPin, Clock, BarChart3
+  MapPin, Clock, BarChart3, Loader2
 } from "lucide-react"
 import { placeManagementAPI } from "@/lib/place-management-api"
 import toast from "react-hot-toast"
-import { requireAuth } from "@/lib/auth"
 
 interface ExternalMember {
   id: string
@@ -52,6 +51,7 @@ function ExternalMembersContent() {
   const [isBlacklistDialogOpen, setIsBlacklistDialogOpen] = useState(false)
   const [blacklistMember, setBlacklistMember] = useState<ExternalMember | null>(null)
   const [blacklistReason, setBlacklistReason] = useState("")
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const [formData, setFormData] = useState({
     full_name: "", email: "", phone: "", company_name: "", designation: "",
@@ -116,49 +116,166 @@ function ExternalMembersContent() {
   }
 
   const checkDuplicate = async (email: string, phone: string, currentId?: string): Promise<boolean> => {
+    // Check in loaded members first
     const duplicates = members.filter(m => {
       if (currentId && m.id === currentId) return false
-      return (m.email === email || m.phone === phone)
+      return (m.email.toLowerCase().trim() === email.toLowerCase().trim() || 
+              m.phone.trim() === phone.trim())
     })
+    
     if (duplicates.length > 0) {
       const dup = duplicates[0]
-      toast.error(dup.email === email ? `Email exists: ${dup.full_name}` : `Phone exists: ${dup.full_name}`)
+      toast.error(dup.email.toLowerCase().trim() === email.toLowerCase().trim() 
+        ? `Email already exists: ${dup.full_name}` 
+        : `Phone number already exists: ${dup.full_name}`, {
+        position: 'top-center',
+        duration: 4000
+      })
       return true
     }
-    if (formData.company_name) {
+    
+    // Also check against database for more accurate validation
+    try {
+      const response = await placeManagementAPI.getTableData('external_members', {
+        is_deleted: 'false'
+      })
+      const allMembers = Array.isArray(response) ? response : response.data || []
+      
+      const dbDuplicate = allMembers.find((m: any) => {
+        if (currentId && m.id === currentId) return false
+        return (m.email?.toLowerCase().trim() === email.toLowerCase().trim() || 
+                m.phone?.trim() === phone.trim())
+      })
+      
+      if (dbDuplicate) {
+        toast.error(dbDuplicate.email?.toLowerCase().trim() === email.toLowerCase().trim()
+          ? `Email already exists in database: ${dbDuplicate.full_name}`
+          : `Phone number already exists in database: ${dbDuplicate.full_name}`, {
+          position: 'top-center',
+          duration: 4000
+        })
+        return true
+      }
+    } catch (error) {
+      console.error('Error checking duplicates in database:', error)
+      // Continue with local check if database check fails
+    }
+    
+    // Check company + email combination if company is provided
+    if (formData.company_name && formData.company_name.trim()) {
       const companyDup = members.find(m => 
-        m.company_name === formData.company_name && m.email === email && (!currentId || m.id !== currentId)
+        m.company_name?.toLowerCase().trim() === formData.company_name.toLowerCase().trim() && 
+        m.email?.toLowerCase().trim() === email.toLowerCase().trim() && 
+        (!currentId || m.id !== currentId)
       )
       if (companyDup) {
-        toast.error(`Email exists in ${formData.company_name}`)
+        toast.error(`Email already exists for company ${formData.company_name}: ${companyDup.full_name}`, {
+          position: 'top-center',
+          duration: 4000
+        })
         return true
       }
     }
+    
     return false
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!formData.full_name || !formData.email || !formData.phone || !formData.reference_value) {
-      toast.error('Fill required fields')
+    
+    // Validate required fields
+    if (!formData.full_name || !formData.full_name.trim()) {
+      toast.error('Full name is required', { position: 'top-center' })
       return
     }
-    const isDup = await checkDuplicate(formData.email, formData.phone, editingMember?.id)
-    if (isDup) return
-
+    if (!formData.email || !formData.email.trim()) {
+      toast.error('Email is required', { position: 'top-center' })
+      return
+    }
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(formData.email.trim())) {
+      toast.error('Please enter a valid email address', { position: 'top-center' })
+      return
+    }
+    if (!formData.phone || !formData.phone.trim()) {
+      toast.error('Phone number is required', { position: 'top-center' })
+      return
+    }
+    if (!formData.reference_value || !formData.reference_value.trim()) {
+      toast.error('Reference value is required', { position: 'top-center' })
+      return
+    }
+    
+    setIsSubmitting(true)
+    
     try {
-      const data = { ...formData, is_active: true, is_deleted: false, visit_count: editingMember?.visit_count || 0 }
-      if (editingMember) {
-        await placeManagementAPI.updateRecord('external_members', { id: editingMember.id }, data)
-        toast.success('Updated')
-      } else {
-        await placeManagementAPI.insertRecord('external_members', { id: crypto.randomUUID(), ...data, created_at: new Date().toISOString() })
-        toast.success('Added')
+      // Check for duplicates
+      const isDup = await checkDuplicate(formData.email.trim(), formData.phone.trim(), editingMember?.id)
+      if (isDup) {
+        setIsSubmitting(false)
+        return
       }
+
+      // Prepare data with trimmed values
+      const data = {
+        full_name: formData.full_name.trim(),
+        email: formData.email.trim().toLowerCase(),
+        phone: formData.phone.trim(),
+        company_name: formData.company_name?.trim() || null,
+        designation: formData.designation?.trim() || null,
+        reference_type: formData.reference_type,
+        reference_value: formData.reference_value.trim(),
+        address: formData.address?.trim() || null,
+        city: formData.city?.trim() || null,
+        country: formData.country?.trim() || 'Sri Lanka',
+        notes: formData.notes?.trim() || null,
+        is_active: editingMember?.is_active !== undefined ? editingMember.is_active : true,
+        is_deleted: false,
+        visit_count: editingMember?.visit_count || 0,
+        is_blacklisted: editingMember?.is_blacklisted || false,
+        blacklist_reason: editingMember?.blacklist_reason || null
+      }
+      
+      if (editingMember) {
+        // Update existing member
+        await placeManagementAPI.updateRecord('external_members', { id: editingMember.id }, data)
+        toast.success(`Member "${data.full_name}" updated successfully!`, {
+          position: 'top-center',
+          duration: 3000
+        })
+      } else {
+        // Create new member
+        const newId = crypto.randomUUID()
+        await placeManagementAPI.insertRecord('external_members', { 
+          id: newId, 
+          ...data, 
+          created_at: new Date().toISOString() 
+        })
+        toast.success(`Member "${data.full_name}" added successfully!`, {
+          position: 'top-center',
+          duration: 3000
+        })
+      }
+      
       setIsDialogOpen(false)
-      loadMembers()
+      // Reset form
+      setFormData({
+        full_name: "", email: "", phone: "", company_name: "", designation: "",
+        reference_type: "NIC", reference_value: "", address: "", city: "",
+        country: "Sri Lanka", notes: ""
+      })
+      setEditingMember(null)
+      // Reload members
+      await loadMembers()
     } catch (error: any) {
-      toast.error(error.message || 'Failed')
+      console.error('Error saving external member:', error)
+      toast.error(error.message || 'Failed to save member. Please try again.', {
+        position: 'top-center',
+        duration: 4000
+      })
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -480,9 +597,37 @@ function ExternalMembersContent() {
           </div>
           <div><Label>Address</Label><Textarea value={formData.address} onChange={(e) => setFormData({...formData, address: e.target.value})} rows={2} /></div>
           <div><Label>Notes</Label><Textarea value={formData.notes} onChange={(e) => setFormData({...formData, notes: e.target.value})} rows={2} /></div>
-          <div className="flex gap-2 justify-end">
-            <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
-            <Button type="submit">{editingMember ? 'Update' : 'Create'}</Button>
+          <div className="flex gap-2 justify-end pt-4 border-t">
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={() => {
+                setIsDialogOpen(false)
+                setEditingMember(null)
+                setFormData({
+                  full_name: "", email: "", phone: "", company_name: "", designation: "",
+                  reference_type: "NIC", reference_value: "", address: "", city: "",
+                  country: "Sri Lanka", notes: ""
+                })
+              }}
+              disabled={isSubmitting}
+            >
+              Cancel
+            </Button>
+            <Button 
+              type="submit" 
+              disabled={isSubmitting}
+              className="min-w-[100px]"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  {editingMember ? 'Updating...' : 'Creating...'}
+                </>
+              ) : (
+                editingMember ? 'Update Member' : 'Create Member'
+              )}
+            </Button>
           </div>
         </form>
       </DialogContent>
@@ -577,15 +722,15 @@ function ExternalMembersContent() {
   )
 }
 
-export default function ExternalMembersPage() {
-  useEffect(() => {
-    requireAuth(["admin"])
-  }, [])
+import { RouteProtection } from "@/components/auth/route-protection"
 
+export default function ExternalMembersPage() {
   return (
-    <DashboardLayout title="External Members" subtitle="Manage external visitors and participants">
-      <ExternalMembersContent />
-    </DashboardLayout>
+    <RouteProtection requiredRole="admin">
+      <DashboardLayout title="External Members" subtitle="Manage external visitors and participants">
+        <ExternalMembersContent />
+      </DashboardLayout>
+    </RouteProtection>
   )
 }
 

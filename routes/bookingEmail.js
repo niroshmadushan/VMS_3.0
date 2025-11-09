@@ -5,11 +5,20 @@ const {
     getBookingParticipants,
     sendBookingDetailsEmail,
     sendBookingReminderEmail,
-    getBookingEmailHistory
+    getBookingEmailHistory,
+    sendBookingEmailFromFrontend
 } = require('../controllers/bookingEmailController');
 
 // Apply authentication middleware to all routes
 router.use(authenticateToken);
+
+/**
+ * @route POST /api/booking-email/send-from-frontend
+ * @desc Send booking email with all details from frontend (no database queries)
+ * @access Private
+ * @note This route must be defined BEFORE parameterized routes to avoid route matching conflicts
+ */
+router.post('/send-from-frontend', sendBookingEmailFromFrontend);
 
 /**
  * @route GET /api/booking-email/:bookingId/participants

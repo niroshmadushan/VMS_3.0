@@ -100,13 +100,20 @@ export class BookingEmailAPI {
   private async makeRequest(endpoint: string, options: RequestInit = {}): Promise<Response> {
     const url = `${this.baseURL}${endpoint}`
     
+    // Get required headers from environment (same as OTP email sending)
+    const appId = process.env.NEXT_PUBLIC_APP_ID || 'default_app_id'
+    const serviceKey = process.env.NEXT_PUBLIC_SERVICE_KEY || 'default_service_key'
+    
     const headers = {
       'Content-Type': 'application/json',
+      'X-App-Id': appId,
+      'X-Service-Key': serviceKey,
       ...(this.token && { 'Authorization': `Bearer ${this.token}` }),
       ...options.headers,
     }
 
     console.log(`📧 Booking Email API: ${options.method || 'GET'} ${url}`)
+    console.log(`🔑 Headers: X-App-Id=${appId}, X-Service-Key=${serviceKey ? '✅ Set' : '❌ Missing'}, Authorization=${this.token ? '✅ Set' : '❌ Missing'}`)
 
     const response = await fetch(url, {
       ...options,
@@ -255,6 +262,139 @@ export class BookingEmailAPI {
 
 // Export a default instance
 export const bookingEmailAPI = new BookingEmailAPI()
+
+/**
+ * Send booking email with all details from frontend (simplified API - no database queries)
+ * This is a simpler alternative that accepts all booking data directly from the frontend
+ */
+export async function sendBookingEmailFromFrontend(data: {
+  meetingName: string
+  date: string
+  startTime: string
+  endTime: string
+  place?: string
+  description?: string
+  participantEmails: string[]
+  emailType?: 'booking_details' | 'booking_confirmation'
+  customMessage?: string
+}): Promise<{
+  success: boolean
+  message: string
+  data?: {
+    meetingName: string
+    totalParticipants: number
+    emailsSent: number
+    emailsFailed: number
+    results: Array<{
+      participantEmail: string
+      success: boolean
+      message: string
+    }>
+  }
+  error?: string
+}> {
+  try {
+    console.log('📧 ==========================================')
+    console.log('📧 LIBRARY - SEND BOOKING EMAIL FROM FRONTEND')
+    console.log('📧 ==========================================')
+    console.log('📧 Meeting Name:', data.meetingName)
+    console.log('📧 Date:', data.date)
+    console.log('📧 Start Time:', data.startTime)
+    console.log('📧 End Time:', data.endTime)
+    console.log('📧 Place:', data.place || 'Not specified')
+    console.log('📧 Description:', data.description || 'Not specified')
+    console.log('📧 Participant Emails Count:', data.participantEmails.length)
+    console.log('📧 Participant Emails:', data.participantEmails)
+    console.log('📧 Email Type:', data.emailType || 'booking_details')
+    console.log('📧 Custom Message:', data.customMessage || '(none)')
+
+    // Get token from localStorage
+    const token = typeof window !== 'undefined' 
+      ? (localStorage.getItem('authToken') || 
+         localStorage.getItem('jwt_token') || 
+         localStorage.getItem('token') || 
+         '')
+      : ''
+
+    console.log('📧 Token Available:', !!token)
+    console.log('📧 Token Preview:', token ? token.substring(0, 20) + '...' : 'NO TOKEN')
+
+    if (!token) {
+      console.error('❌ Authentication token not found')
+      throw new Error('Authentication token not found')
+    }
+
+    console.log('📧 ==========================================')
+    console.log('📧 SENDING API REQUEST')
+    console.log('📧 ==========================================')
+    console.log('📧 API URL: /api/booking-email/send-from-frontend')
+    console.log('📧 Method: POST')
+    console.log('📧 Headers:', {
+      'Content-Type': 'application/json',
+      'Authorization': token ? 'Bearer ' + token.substring(0, 20) + '...' : '❌ Missing'
+    })
+
+    const requestStartTime = Date.now()
+    const response = await fetch('/api/booking-email/send-from-frontend', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify(data)
+    })
+
+    const requestDuration = Date.now() - requestStartTime
+    console.log('📧 ==========================================')
+    console.log('📧 API RESPONSE RECEIVED')
+    console.log('📧 ==========================================')
+    console.log('📧 Response Status:', response.status)
+    console.log('📧 Response OK:', response.ok)
+    console.log('📧 Request Duration:', requestDuration + 'ms')
+
+    if (response.status === 401) {
+      console.error('❌ Authentication failed (401)')
+      throw new Error('Authentication failed')
+    }
+
+    const result = await response.json()
+    console.log('📧 ==========================================')
+    console.log('📧 LIBRARY - EMAIL SENDING RESULT')
+    console.log('📧 ==========================================')
+    console.log('📧 Success:', result.success)
+    console.log('📧 Message:', result.message)
+    if (result.data) {
+      console.log('📧 Meeting Name:', result.data.meetingName)
+      console.log('📧 Total Participants:', result.data.totalParticipants)
+      console.log('📧 Emails Sent:', result.data.emailsSent)
+      console.log('📧 Emails Failed:', result.data.emailsFailed)
+      console.log('📧 Success Rate:', result.data.totalParticipants > 0 
+        ? `${((result.data.emailsSent / result.data.totalParticipants) * 100).toFixed(1)}%` 
+        : 'N/A')
+    }
+    if (result.error) {
+      console.error('❌ Error:', result.error)
+    }
+    console.log('📧 ==========================================')
+
+    return result
+  } catch (error: any) {
+    console.error('❌ ==========================================')
+    console.error('❌ LIBRARY - EMAIL SENDING ERROR')
+    console.error('❌ ==========================================')
+    console.error('❌ Error Type:', error.constructor.name)
+    console.error('❌ Error Message:', error.message)
+    console.error('❌ Error Stack:', error.stack)
+    console.error('❌ Full Error:', error)
+    console.error('❌ ==========================================')
+
+    return {
+      success: false,
+      message: error.message || 'Failed to send booking emails',
+      error: error.message
+    }
+  }
+}
 
 // Export utility functions
 export const formatBookingTime = (startTime: string, endTime: string): string => {

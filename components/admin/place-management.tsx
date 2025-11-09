@@ -855,83 +855,89 @@ export function PlaceManagement() {
               No places found matching your criteria.
             </div>
           ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Location</TableHead>
-                  <TableHead>Capacity</TableHead>
-                <TableHead>Status</TableHead>
-                  <TableHead>Created</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-                {filteredPlaces.map((place) => (
-                <TableRow key={place.id}>
-                  <TableCell>
-                    <div>
-                        <div className="font-medium">{place.name}</div>
-                        <div className="text-sm text-muted-foreground">{place.description}</div>
-                    </div>
-                  </TableCell>
-                    <TableCell>{getTypeBadge(place.place_type)}</TableCell>
-                  <TableCell>
-                      <div className="flex items-center gap-1 text-sm">
-                        <MapPin className="h-3 w-3" />
-                        {place.city}, {place.state}
-                      </div>
-                  </TableCell>
-                  <TableCell>
-                      <div className="flex items-center gap-1">
-                        <Users className="h-3 w-3" />
-                        {place.capacity}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                        {getStatusBadge(place)}
-                      <Switch
-                          checked={place.is_active}
-                        onCheckedChange={() => toggleStatus(place.id)}
-                      />
-                    </div>
-                  </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1 text-sm">
-                        <Calendar className="h-3 w-3" />
-                        {format(new Date(place.created_at), 'MMM dd, yyyy')}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Button 
-                          variant="ghost" 
-                          size="sm"
-                          onClick={() => handleOpenConfig(place)}
-                          title="Configure availability & hours"
-                        >
-                          <Clock className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={() => handleEdit(place)} title="Edit place">
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-red-600 hover:text-red-700"
-                          onClick={() => handleDeletePlace(place.id)}
-                          title="Delete place (soft delete)"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+            <div className="relative overflow-x-auto">
+              <Table className="w-full">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="min-w-[200px]">Name</TableHead>
+                    <TableHead className="min-w-[100px]">Type</TableHead>
+                    <TableHead className="min-w-[150px]">Location</TableHead>
+                    <TableHead className="min-w-[100px]">Capacity</TableHead>
+                    <TableHead className="min-w-[120px]">Status</TableHead>
+                    <TableHead className="min-w-[120px]">Created</TableHead>
+                    <TableHead className="min-w-[150px]">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+              </Table>
+              <div className="max-h-[450px] overflow-y-auto">
+                <Table className="w-full">
+                  <TableBody>
+                    {filteredPlaces.map((place) => (
+                      <TableRow key={place.id}>
+                        <TableCell className="min-w-[200px]">
+                          <div>
+                            <div className="font-medium">{place.name}</div>
+                            <div className="text-sm text-muted-foreground">{place.description}</div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="min-w-[100px]">{getTypeBadge(place.place_type)}</TableCell>
+                        <TableCell className="min-w-[150px]">
+                          <div className="flex items-center gap-1 text-sm">
+                            <MapPin className="h-3 w-3" />
+                            {place.city}, {place.state}
+                          </div>
+                        </TableCell>
+                        <TableCell className="min-w-[100px]">
+                          <div className="flex items-center gap-1">
+                            <Users className="h-3 w-3" />
+                            {place.capacity}
+                          </div>
+                        </TableCell>
+                        <TableCell className="min-w-[120px]">
+                          <div className="flex items-center gap-2">
+                            {getStatusBadge(place)}
+                            <Switch
+                              checked={place.is_active}
+                              onCheckedChange={() => toggleStatus(place.id)}
+                            />
+                          </div>
+                        </TableCell>
+                        <TableCell className="min-w-[120px]">
+                          <div className="flex items-center gap-1 text-sm">
+                            <Calendar className="h-3 w-3" />
+                            {format(new Date(place.created_at), 'MMM dd, yyyy')}
+                          </div>
+                        </TableCell>
+                        <TableCell className="min-w-[150px]">
+                          <div className="flex items-center gap-2">
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              onClick={() => handleOpenConfig(place)}
+                              title="Configure availability & hours"
+                            >
+                              <Clock className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="sm" onClick={() => handleEdit(place)} title="Edit place">
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-red-600 hover:text-red-700"
+                              onClick={() => handleDeletePlace(place.id)}
+                              title="Delete place (soft delete)"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
           )}
         </CardContent>
       </Card>

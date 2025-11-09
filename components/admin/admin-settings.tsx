@@ -452,34 +452,34 @@ export function AdminSettings() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3 max-w-4xl mx-auto">
       {/* Profile Header Card */}
-      <Card className="border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-purple-50">
-          <CardHeader>
+      <Card className="border border-blue-200 bg-gradient-to-br from-blue-50 to-purple-50">
+          <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="h-20 w-20 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-3xl font-bold shadow-lg">
+            <div className="flex items-center gap-3">
+              <div className="h-12 w-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-lg font-bold shadow">
                 {(profile.first_name?.charAt(0) || 'U').toUpperCase()}
               </div>
               <div>
-                <CardTitle className="text-2xl">
+                <CardTitle className="text-lg">
                   {profile.first_name && profile.last_name 
                     ? `${profile.first_name} ${profile.last_name}` 
                     : 'No Name Set'}
                 </CardTitle>
-                <div className="flex items-center gap-2 mt-2">
+                <div className="flex items-center gap-2 mt-1">
                   {profile.role && (
-                    <Badge className={`${getRoleBadgeColor(profile.role)} font-bold`}>
+                    <Badge className={`${getRoleBadgeColor(profile.role)} text-xs px-2 py-0.5`}>
                       {profile.role.toUpperCase()}
                     </Badge>
                   )}
                   {profile.is_email_verified ? (
-                    <Badge className="bg-green-500 text-white">
+                    <Badge className="bg-green-500 text-white text-xs px-2 py-0.5">
                       <CheckCircle className="h-3 w-3 mr-1" />
                       Verified
                     </Badge>
                   ) : (
-                    <Badge className="bg-red-500 text-white">
+                    <Badge className="bg-red-500 text-white text-xs px-2 py-0.5">
                       <X className="h-3 w-3 mr-1" />
                       Not Verified
                     </Badge>
@@ -492,36 +492,36 @@ export function AdminSettings() {
       </Card>
 
       {/* Tabs for Settings Sections */}
-      <Tabs defaultValue="profile" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="profile">👤 Profile</TabsTrigger>
-          <TabsTrigger value="security">🔒 Security</TabsTrigger>
-          <TabsTrigger value="preferences">⚙️ Preferences</TabsTrigger>
+      <Tabs defaultValue="profile" className="space-y-3">
+        <TabsList className="grid w-full grid-cols-3 h-9">
+          <TabsTrigger value="profile" className="text-sm">👤 Profile</TabsTrigger>
+          <TabsTrigger value="security" className="text-sm">🔒 Security</TabsTrigger>
+          <TabsTrigger value="preferences" className="text-sm">⚙️ Preferences</TabsTrigger>
         </TabsList>
 
         {/* Profile Tab */}
-        <TabsContent value="profile" className="space-y-6">
-          <Card className="border-2 shadow-lg">
-            <CardHeader className="bg-gradient-to-r from-blue-50 to-purple-50 border-b-2">
+        <TabsContent value="profile" className="space-y-3">
+          <Card className="border shadow">
+            <CardHeader className="bg-gradient-to-r from-blue-50 to-purple-50 border-b pb-3 pt-3">
               <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-                  <User className="h-5 w-5 text-blue-600" />
+            <CardTitle className="flex items-center gap-2 text-base">
+                  <User className="h-4 w-4 text-blue-600" />
               Profile Information
             </CardTitle>
                 {!isEditing && (
-                  <Button onClick={() => setIsEditing(true)} className="gap-2">
-                    <Edit className="h-4 w-4" />
+                  <Button onClick={() => setIsEditing(true)} className="gap-2 h-8 text-sm" size="sm">
+                    <Edit className="h-3 w-3" />
                     Edit Profile
                   </Button>
                 )}
               </div>
           </CardHeader>
-            <CardContent className="pt-6">
-              <div className="space-y-6">
+            <CardContent className="pt-4 pb-4">
+              <div className="space-y-4">
                 {/* Full Name */}
             <div className="space-y-2">
-                  <Label htmlFor="full_name" className="flex items-center gap-2">
-                    <User className="h-4 w-4 text-muted-foreground" />
+                  <Label htmlFor="full_name" className="flex items-center gap-2 text-sm">
+                    <User className="h-3.5 w-3.5 text-muted-foreground" />
                     Full Name
                   </Label>
                   {isEditing ? (
@@ -531,10 +531,10 @@ export function AdminSettings() {
                       onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
                       placeholder="Enter your full name"
                       disabled={isSaving}
-                      className="border-2"
+                      className="h-9"
                     />
                   ) : (
-                    <p className="text-lg font-medium p-3 bg-gray-50 rounded-lg border">
+                    <p className="text-sm font-medium p-2 bg-gray-50 rounded border">
                       {profile.first_name && profile.last_name 
                         ? `${profile.first_name} ${profile.last_name}` 
                         : 'Not set'}
@@ -546,8 +546,8 @@ export function AdminSettings() {
 
                 {/* Email */}
             <div className="space-y-2">
-                  <Label htmlFor="email" className="flex items-center gap-2">
-                    <Mail className="h-4 w-4 text-muted-foreground" />
+                  <Label htmlFor="email" className="flex items-center gap-2 text-sm">
+                    <Mail className="h-3.5 w-3.5 text-muted-foreground" />
                     Email Address
                   </Label>
                   {isEditing ? (
@@ -558,10 +558,10 @@ export function AdminSettings() {
                       onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                       placeholder="Enter your email"
                       disabled={isSaving}
-                      className="border-2"
+                      className="h-9"
                     />
                   ) : (
-                    <p className="text-lg font-medium p-3 bg-gray-50 rounded-lg border">
+                    <p className="text-sm font-medium p-2 bg-gray-50 rounded border">
                       {profile.email || 'Not set'}
                     </p>
                   )}
@@ -571,8 +571,8 @@ export function AdminSettings() {
 
                 {/* Phone */}
             <div className="space-y-2">
-                  <Label htmlFor="phone" className="flex items-center gap-2">
-                    <Phone className="h-4 w-4 text-muted-foreground" />
+                  <Label htmlFor="phone" className="flex items-center gap-2 text-sm">
+                    <Phone className="h-3.5 w-3.5 text-muted-foreground" />
                     Phone Number
                   </Label>
                   {isEditing ? (
@@ -583,10 +583,10 @@ export function AdminSettings() {
                       onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                       placeholder="Enter your phone number"
                       disabled={isSaving}
-                      className="border-2"
+                      className="h-9"
                     />
                   ) : (
-                    <p className="text-lg font-medium p-3 bg-gray-50 rounded-lg border">
+                    <p className="text-sm font-medium p-2 bg-gray-50 rounded border">
                       {profile.phone || 'Not set'}
                     </p>
                   )}
@@ -596,20 +596,21 @@ export function AdminSettings() {
                 {isEditing && (
                   <>
                     <Separator />
-                    <div className="flex gap-3">
+                    <div className="flex gap-2">
                       <Button
                         onClick={handleSaveProfile}
                         disabled={isSaving}
-                        className="flex-1 gap-2"
+                        className="flex-1 gap-2 h-9 text-sm"
+                        size="sm"
                       >
                         {isSaving ? (
                           <>
-                            <Loader2 className="h-4 w-4 animate-spin" />
+                            <Loader2 className="h-3 w-3 animate-spin" />
                             Saving...
                           </>
                         ) : (
                           <>
-                            <Save className="h-4 w-4" />
+                            <Save className="h-3 w-3" />
                             Save Changes
                           </>
                         )}
@@ -618,9 +619,10 @@ export function AdminSettings() {
                         onClick={handleCancelEdit}
                         disabled={isSaving}
                         variant="outline"
-                        className="flex-1 gap-2"
+                        className="flex-1 gap-2 h-9 text-sm"
+                        size="sm"
                       >
-                        <X className="h-4 w-4" />
+                        <X className="h-3 w-3" />
                         Cancel
                       </Button>
                     </div>
@@ -631,59 +633,59 @@ export function AdminSettings() {
         </Card>
 
           {/* Account Information Card */}
-          <Card className="border-2">
-            <CardHeader className="bg-gradient-to-r from-green-50 to-blue-50 border-b-2">
-            <CardTitle className="flex items-center gap-2">
-                <Shield className="h-5 w-5 text-green-600" />
+          <Card className="border">
+            <CardHeader className="bg-gradient-to-r from-green-50 to-blue-50 border-b pb-3 pt-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+                <Shield className="h-4 w-4 text-green-600" />
                 Account Information
             </CardTitle>
           </CardHeader>
-            <CardContent className="pt-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <Label className="flex items-center gap-2 text-muted-foreground">
-                    <Shield className="h-4 w-4" />
+            <CardContent className="pt-4 pb-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label className="flex items-center gap-2 text-muted-foreground text-xs">
+                    <Shield className="h-3 w-3" />
                     User Role
                   </Label>
-                  <Badge className={`${getRoleBadgeColor(profile.role || 'employee')} text-base px-4 py-2`}>
+                  <Badge className={`${getRoleBadgeColor(profile.role || 'employee')} text-xs px-2 py-1`}>
                     {(profile.role || 'employee').toUpperCase()}
                   </Badge>
                 </div>
 
-            <div className="space-y-2">
-                  <Label className="flex items-center gap-2 text-muted-foreground">
-                    <CheckCircle className="h-4 w-4" />
+            <div className="space-y-1.5">
+                  <Label className="flex items-center gap-2 text-muted-foreground text-xs">
+                    <CheckCircle className="h-3 w-3" />
                     Email Status
                   </Label>
                   {profile.is_email_verified ? (
-                    <Badge className="bg-green-500 text-white text-base px-4 py-2">
-                      <CheckCircle className="h-4 w-4 mr-2" />
+                    <Badge className="bg-green-500 text-white text-xs px-2 py-1">
+                      <CheckCircle className="h-3 w-3 mr-1" />
                       Verified
                     </Badge>
                   ) : (
-                    <Badge className="bg-red-500 text-white text-base px-4 py-2">
-                      <X className="h-4 w-4 mr-2" />
+                    <Badge className="bg-red-500 text-white text-xs px-2 py-1">
+                      <X className="h-3 w-3 mr-1" />
                       Not Verified
                     </Badge>
                   )}
             </div>
 
-            <div className="space-y-2">
-                  <Label className="flex items-center gap-2 text-muted-foreground">
-                    <Calendar className="h-4 w-4" />
+            <div className="space-y-1.5">
+                  <Label className="flex items-center gap-2 text-muted-foreground text-xs">
+                    <Calendar className="h-3 w-3" />
                     Account Created
                   </Label>
-                  <p className="text-sm font-medium p-3 bg-gray-50 rounded-lg border">
+                  <p className="text-xs font-medium p-2 bg-gray-50 rounded border">
                     {formatDate(profile.user_created_at)}
                   </p>
             </div>
 
-            <div className="space-y-2">
-                  <Label className="flex items-center gap-2 text-muted-foreground">
-                    <Calendar className="h-4 w-4" />
+            <div className="space-y-1.5">
+                  <Label className="flex items-center gap-2 text-muted-foreground text-xs">
+                    <Calendar className="h-3 w-3" />
                     Last Login
                   </Label>
-                  <p className="text-sm font-medium p-3 bg-gray-50 rounded-lg border">
+                  <p className="text-xs font-medium p-2 bg-gray-50 rounded border">
                     {profile.last_login ? formatDate(profile.last_login) : 'Never'}
                   </p>
                 </div>
@@ -693,18 +695,18 @@ export function AdminSettings() {
         </TabsContent>
 
         {/* Security Tab */}
-        <TabsContent value="security" className="space-y-6">
-          <Card className="border-2 shadow-lg">
-            <CardHeader className="bg-gradient-to-r from-red-50 to-orange-50 border-b-2">
-              <CardTitle className="flex items-center gap-2">
-                <Key className="h-5 w-5 text-red-600" />
+        <TabsContent value="security" className="space-y-3">
+          <Card className="border shadow">
+            <CardHeader className="bg-gradient-to-r from-red-50 to-orange-50 border-b pb-3 pt-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Key className="h-4 w-4 text-red-600" />
                 Password Management
               </CardTitle>
             </CardHeader>
-            <CardContent className="pt-6">
-              <div className="space-y-4">
-                <div className="p-4 bg-blue-50 border-2 border-blue-200 rounded-lg">
-                  <p className="text-sm text-blue-900 mb-2">
+            <CardContent className="pt-4 pb-4">
+              <div className="space-y-3">
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-xs text-blue-900 mb-1">
                     <strong>Password Reset:</strong> Click the button below to receive a password reset link via email.
                   </p>
                   <p className="text-xs text-blue-700">
@@ -714,13 +716,14 @@ export function AdminSettings() {
 
                 <Button 
                   onClick={handlePasswordReset}
-                  className="w-full gap-2 bg-red-600 hover:bg-red-700"
+                  className="w-full gap-2 bg-red-600 hover:bg-red-700 h-9 text-sm"
+                  size="sm"
                 >
-                  <Key className="h-4 w-4" />
+                  <Key className="h-3 w-3" />
                   Send Password Reset Email
                 </Button>
 
-                <div className="p-4 bg-yellow-50 border-2 border-yellow-200 rounded-lg">
+                <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
                   <p className="text-xs text-yellow-800">
                     <strong>Note:</strong> For security reasons, you cannot change your password directly here. 
                     A secure reset link will be sent to your registered email address.
@@ -732,39 +735,39 @@ export function AdminSettings() {
         </TabsContent>
 
         {/* Preferences Tab */}
-        <TabsContent value="preferences" className="space-y-6">
-          <Card className="border-2 shadow-lg">
-            <CardHeader className="bg-gradient-to-r from-purple-50 to-pink-50 border-b-2">
-          <CardTitle className="flex items-center gap-2">
-                <Palette className="h-5 w-5 text-purple-600" />
+        <TabsContent value="preferences" className="space-y-3">
+          <Card className="border shadow">
+            <CardHeader className="bg-gradient-to-r from-purple-50 to-pink-50 border-b pb-3 pt-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+                <Palette className="h-4 w-4 text-purple-600" />
                 Theme Preferences
           </CardTitle>
         </CardHeader>
-            <CardContent className="pt-6">
-              <div className="space-y-4">
-                <Label className="text-base font-medium">Choose Your Theme</Label>
+            <CardContent className="pt-4 pb-4">
+              <div className="space-y-3">
+                <Label className="text-sm font-medium">Choose Your Theme</Label>
                 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   {/* Light Theme */}
                   <button
                     onClick={() => handleThemeChange('light')}
-                    className={`p-6 border-2 rounded-lg transition-all hover:shadow-lg ${
+                    className={`p-4 border rounded-lg transition-all hover:shadow ${
                       theme === 'light' 
-                        ? 'border-blue-500 bg-blue-50 shadow-md' 
+                        ? 'border-blue-500 bg-blue-50 shadow' 
                         : 'border-gray-200 hover:border-blue-300'
                     }`}
                   >
-                    <div className="flex flex-col items-center gap-3">
-                      <div className="p-4 bg-white rounded-full shadow-md">
-                        <Sun className="h-8 w-8 text-yellow-500" />
+                    <div className="flex flex-col items-center gap-2">
+                      <div className="p-3 bg-white rounded-full shadow">
+                        <Sun className="h-6 w-6 text-yellow-500" />
                       </div>
                       <div className="text-center">
-                        <p className="font-bold text-lg">Light</p>
+                        <p className="font-bold text-sm">Light</p>
                         <p className="text-xs text-muted-foreground">Bright and clear</p>
                       </div>
                       {theme === 'light' && (
-                        <Badge className="bg-blue-500 text-white">
-                          <CheckCircle className="h-3 w-3 mr-1" />
+                        <Badge className="bg-blue-500 text-white text-xs px-2 py-0.5">
+                          <CheckCircle className="h-2.5 w-2.5 mr-1" />
                           Active
                         </Badge>
                       )}
@@ -774,23 +777,23 @@ export function AdminSettings() {
                   {/* Dark Theme */}
                   <button
                     onClick={() => handleThemeChange('dark')}
-                    className={`p-6 border-2 rounded-lg transition-all hover:shadow-lg ${
+                    className={`p-4 border rounded-lg transition-all hover:shadow ${
                       theme === 'dark' 
-                        ? 'border-blue-500 bg-blue-50 shadow-md' 
+                        ? 'border-blue-500 bg-blue-50 shadow' 
                         : 'border-gray-200 hover:border-blue-300'
                     }`}
                   >
-                    <div className="flex flex-col items-center gap-3">
-                      <div className="p-4 bg-gray-800 rounded-full shadow-md">
-                        <Moon className="h-8 w-8 text-blue-300" />
+                    <div className="flex flex-col items-center gap-2">
+                      <div className="p-3 bg-gray-800 rounded-full shadow">
+                        <Moon className="h-6 w-6 text-blue-300" />
                       </div>
                       <div className="text-center">
-                        <p className="font-bold text-lg">Dark</p>
+                        <p className="font-bold text-sm">Dark</p>
                         <p className="text-xs text-muted-foreground">Easy on the eyes</p>
                       </div>
                       {theme === 'dark' && (
-                        <Badge className="bg-blue-500 text-white">
-                          <CheckCircle className="h-3 w-3 mr-1" />
+                        <Badge className="bg-blue-500 text-white text-xs px-2 py-0.5">
+                          <CheckCircle className="h-2.5 w-2.5 mr-1" />
                           Active
                         </Badge>
                       )}
@@ -800,23 +803,23 @@ export function AdminSettings() {
                   {/* System Theme */}
                   <button
                     onClick={() => handleThemeChange('system')}
-                    className={`p-6 border-2 rounded-lg transition-all hover:shadow-lg ${
+                    className={`p-4 border rounded-lg transition-all hover:shadow ${
                       theme === 'system' 
-                        ? 'border-blue-500 bg-blue-50 shadow-md' 
+                        ? 'border-blue-500 bg-blue-50 shadow' 
                         : 'border-gray-200 hover:border-blue-300'
                     }`}
                   >
-                    <div className="flex flex-col items-center gap-3">
-                      <div className="p-4 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full shadow-md">
-                        <Monitor className="h-8 w-8 text-white" />
+                    <div className="flex flex-col items-center gap-2">
+                      <div className="p-3 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full shadow">
+                        <Monitor className="h-6 w-6 text-white" />
             </div>
                       <div className="text-center">
-                        <p className="font-bold text-lg">System</p>
+                        <p className="font-bold text-sm">System</p>
                         <p className="text-xs text-muted-foreground">Match device</p>
           </div>
                       {theme === 'system' && (
-                        <Badge className="bg-blue-500 text-white">
-                          <CheckCircle className="h-3 w-3 mr-1" />
+                        <Badge className="bg-blue-500 text-white text-xs px-2 py-0.5">
+                          <CheckCircle className="h-2.5 w-2.5 mr-1" />
                           Active
                         </Badge>
                       )}
@@ -824,8 +827,8 @@ export function AdminSettings() {
                   </button>
           </div>
 
-                <div className="p-4 bg-purple-50 border-2 border-purple-200 rounded-lg mt-4">
-                  <p className="text-sm text-purple-900">
+                <div className="p-3 bg-purple-50 border border-purple-200 rounded-lg">
+                  <p className="text-xs text-purple-900">
                     <strong>Current Theme:</strong> {theme.charAt(0).toUpperCase() + theme.slice(1)}
                   </p>
                   <p className="text-xs text-purple-700 mt-1">
@@ -843,17 +846,17 @@ export function AdminSettings() {
       {/* OTP Verification Dialog */}
       {showOtpDialog && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <Card className="w-full max-w-md border-2 shadow-2xl">
-            <CardHeader className="bg-gradient-to-r from-blue-50 to-purple-50 border-b-2">
-              <CardTitle className="flex items-center gap-2">
-                <Mail className="h-5 w-5 text-blue-600" />
+          <Card className="w-full max-w-md border shadow-xl">
+            <CardHeader className="bg-gradient-to-r from-blue-50 to-purple-50 border-b pb-3 pt-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Mail className="h-4 w-4 text-blue-600" />
                 Verify New Email
               </CardTitle>
             </CardHeader>
-            <CardContent className="pt-6">
-              <div className="space-y-4">
-                <div className="p-4 bg-blue-50 border-2 border-blue-200 rounded-lg">
-                  <p className="text-sm text-blue-900 mb-2">
+            <CardContent className="pt-4 pb-4">
+              <div className="space-y-3">
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-xs text-blue-900 mb-1">
                     <strong>📧 Verification Code Sent!</strong>
                   </p>
                   <p className="text-xs text-blue-700">
@@ -865,7 +868,7 @@ export function AdminSettings() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="otpCode">Enter 6-Digit Code</Label>
+                  <Label htmlFor="otpCode" className="text-sm">Enter 6-Digit Code</Label>
                   <Input
                     id="otpCode"
                     type="text"
@@ -873,7 +876,7 @@ export function AdminSettings() {
                     value={otpCode}
                     onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
                     placeholder="000000"
-                    className="text-center text-2xl tracking-widest font-mono border-2"
+                    className="text-center text-xl tracking-widest font-mono h-12"
                     disabled={isVerifyingOtp}
                     autoFocus
                   />
@@ -883,16 +886,17 @@ export function AdminSettings() {
                   <Button
                     onClick={handleVerifyEmailOtp}
                     disabled={isVerifyingOtp || otpCode.length !== 6}
-                    className="w-full gap-2"
+                    className="w-full gap-2 h-9 text-sm"
+                    size="sm"
                   >
                     {isVerifyingOtp ? (
                       <>
-                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <Loader2 className="h-3 w-3 animate-spin" />
                         Verifying...
                       </>
                     ) : (
                       <>
-                        <CheckCircle className="h-4 w-4" />
+                        <CheckCircle className="h-3 w-3" />
                         Verify Code
                       </>
                     )}
@@ -902,14 +906,15 @@ export function AdminSettings() {
                     onClick={handleCancelOtp}
                     disabled={isVerifyingOtp}
                     variant="outline"
-                    className="w-full gap-2"
+                    className="w-full gap-2 h-9 text-sm"
+                    size="sm"
                   >
-                    <X className="h-4 w-4" />
+                    <X className="h-3 w-3" />
                     Cancel
                   </Button>
                 </div>
 
-                <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <div className="p-2 bg-yellow-50 border border-yellow-200 rounded-lg">
                   <p className="text-xs text-yellow-800">
                     <strong>Didn't receive the code?</strong> Check your spam folder or wait a few minutes.
                   </p>
