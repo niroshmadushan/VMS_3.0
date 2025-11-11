@@ -1356,6 +1356,74 @@ export function UserManagement() {
                   {showCreatePassword ? <EyeOff className="h-4 w-4" /> : <EyeIcon className="h-4 w-4" />}
                 </button>
               </div>
+              
+              {/* Password Validation Rules */}
+              <div className="mt-2 p-3 bg-muted/50 rounded-md border border-border">
+                <p className="text-xs font-semibold text-foreground mb-2">Password Requirements:</p>
+                <ul className="space-y-1.5 text-xs">
+                  <li className="flex items-center gap-2">
+                    {createUserFormData.password.length >= 6 ? (
+                      <CheckCircle className="h-3.5 w-3.5 text-green-600 flex-shrink-0" />
+                    ) : (
+                      <XCircle className="h-3.5 w-3.5 text-red-500 flex-shrink-0" />
+                    )}
+                    <span className={`${createUserFormData.password.length >= 6 ? "text-green-700 dark:text-green-400 font-medium" : "text-muted-foreground"}`}>
+                      <strong>Required:</strong> At least 6 characters long {createUserFormData.password.length > 0 && `(${createUserFormData.password.length}/6)`}
+                    </span>
+                  </li>
+                  <li className="pt-1 border-t border-border/50">
+                    <p className="text-xs font-semibold text-muted-foreground mb-1.5">Recommended for better security:</p>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    {createUserFormData.password.length > 0 && /[a-z]/.test(createUserFormData.password) ? (
+                      <CheckCircle className="h-3.5 w-3.5 text-green-600 flex-shrink-0" />
+                    ) : createUserFormData.password.length > 0 ? (
+                      <XCircle className="h-3.5 w-3.5 text-red-500 flex-shrink-0" />
+                    ) : (
+                      <div className="h-3.5 w-3.5 rounded-full border-2 border-muted-foreground/30 flex-shrink-0" />
+                    )}
+                    <span className={`${createUserFormData.password.length > 0 && /[a-z]/.test(createUserFormData.password) ? "text-green-700 dark:text-green-400" : "text-muted-foreground"}`}>
+                      Contains at least one lowercase letter
+                    </span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    {createUserFormData.password.length > 0 && /[A-Z]/.test(createUserFormData.password) ? (
+                      <CheckCircle className="h-3.5 w-3.5 text-green-600 flex-shrink-0" />
+                    ) : createUserFormData.password.length > 0 ? (
+                      <XCircle className="h-3.5 w-3.5 text-red-500 flex-shrink-0" />
+                    ) : (
+                      <div className="h-3.5 w-3.5 rounded-full border-2 border-muted-foreground/30 flex-shrink-0" />
+                    )}
+                    <span className={`${createUserFormData.password.length > 0 && /[A-Z]/.test(createUserFormData.password) ? "text-green-700 dark:text-green-400" : "text-muted-foreground"}`}>
+                      Contains at least one uppercase letter
+                    </span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    {createUserFormData.password.length > 0 && /[0-9]/.test(createUserFormData.password) ? (
+                      <CheckCircle className="h-3.5 w-3.5 text-green-600 flex-shrink-0" />
+                    ) : createUserFormData.password.length > 0 ? (
+                      <XCircle className="h-3.5 w-3.5 text-red-500 flex-shrink-0" />
+                    ) : (
+                      <div className="h-3.5 w-3.5 rounded-full border-2 border-muted-foreground/30 flex-shrink-0" />
+                    )}
+                    <span className={`${createUserFormData.password.length > 0 && /[0-9]/.test(createUserFormData.password) ? "text-green-700 dark:text-green-400" : "text-muted-foreground"}`}>
+                      Contains at least one number
+                    </span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    {createUserFormData.password.length > 0 && /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(createUserFormData.password) ? (
+                      <CheckCircle className="h-3.5 w-3.5 text-green-600 flex-shrink-0" />
+                    ) : createUserFormData.password.length > 0 ? (
+                      <XCircle className="h-3.5 w-3.5 text-red-500 flex-shrink-0" />
+                    ) : (
+                      <div className="h-3.5 w-3.5 rounded-full border-2 border-muted-foreground/30 flex-shrink-0" />
+                    )}
+                    <span className={`${createUserFormData.password.length > 0 && /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(createUserFormData.password) ? "text-green-700 dark:text-green-400" : "text-muted-foreground"}`}>
+                      Contains at least one special character
+                    </span>
+                  </li>
+                </ul>
+              </div>
             </div>
 
             <div className="space-y-2">

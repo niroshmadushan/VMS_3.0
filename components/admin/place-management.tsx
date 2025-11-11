@@ -243,8 +243,12 @@ export function PlaceManagement() {
     setConfirmAction(() => async () => {
       try {
         // Clean the form data - remove undefined values and convert empty strings to null
+        // Also set email, phone, and city to null for new places (these fields are not in the form)
         const cleanData = Object.entries(formData).reduce((acc, [key, value]) => {
-          if (value !== undefined && value !== '') {
+          // For new places, set email, phone, and city to null (not shown in form)
+          if (!editingPlace && (key === 'email' || key === 'phone' || key === 'city')) {
+            acc[key] = null
+          } else if (value !== undefined && value !== '') {
             acc[key] = value
           } else if (value === '') {
             acc[key] = null
@@ -731,25 +735,14 @@ export function PlaceManagement() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="address">Address *</Label>
-                  <Input
-                    id="address"
-                    value={formData.address}
-                    onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="city">City *</Label>
-                  <Input
-                    id="city"
-                    value={formData.city}
-                    onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                    required
-                  />
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="address">Address *</Label>
+                <Input
+                  id="address"
+                  value={formData.address}
+                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                  required
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -794,28 +787,6 @@ export function PlaceManagement() {
                     onChange={(e) => setFormData({ ...formData, area_sqft: parseInt(e.target.value) || 0 })}
                     required
                     min="1"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="phone">Phone *</Label>
-                  <Input
-                    id="phone"
-                    value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email *</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    required
                   />
                 </div>
               </div>
