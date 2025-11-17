@@ -782,6 +782,9 @@ export function BookingManagement() {
           }))
           
           // Parse refreshments
+          // Check refreshments_required field from bookings table first
+          const refreshmentsRequired = booking.refreshments_required === 1 || booking.refreshments_required === true
+          
           let refreshmentDetails: RefreshmentDetails = {
             required: false,
             type: '',
@@ -791,7 +794,10 @@ export function BookingManagement() {
             estimatedCount: 0
           }
           
-          if (refreshments.length > 0) {
+          // Only set refreshments as required if:
+          // 1. refreshments_required is 1/true in bookings table
+          // 2. AND there's a record in booking_refreshments table
+          if (refreshmentsRequired && refreshments.length > 0) {
             const r = refreshments[0]
             refreshmentDetails = {
               required: true,
@@ -4274,29 +4280,7 @@ export function BookingManagement() {
               )}
 
               {/* Action Buttons */}
-              <div className="flex justify-between items-center pt-4 border-t">
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => sendReminderEmails('24_hours')}
-                    disabled={isSendingEmails}
-                    className="flex items-center gap-2"
-                  >
-                    <Clock className="h-4 w-4" />
-                    24h Reminder
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => sendReminderEmails('1_hour')}
-                    disabled={isSendingEmails}
-                    className="flex items-center gap-2"
-                  >
-                    <Clock className="h-4 w-4" />
-                    1h Reminder
-                  </Button>
-                </div>
+              <div className="flex justify-end items-center pt-4 border-t">
                 <div className="flex gap-2">
                   <Button
                     variant="outline"

@@ -114,6 +114,8 @@ export function PlaceManagement() {
   // Place Configuration State
   const [isConfigDialogOpen, setIsConfigDialogOpen] = useState(false)
   const [selectedPlaceForConfig, setSelectedPlaceForConfig] = useState<Place | null>(null)
+  const [configExists, setConfigExists] = useState(false) // Track if configuration already exists
+  const [existingConfigId, setExistingConfigId] = useState<string | null>(null) // Store config ID if exists
   const [configFormData, setConfigFormData] = useState({
     available_monday: true,
     available_tuesday: true,
@@ -392,30 +394,61 @@ export function PlaceManagement() {
       console.log('⚙️ Loading configuration for place:', place.id, place.name)
       
       // Fetch configuration for this specific place
-      const configResponse = await placeManagementAPI.getTableData('place_configuration', {
-        filters: [{
-          column: 'place_id',
-          operator: 'equals',
-          value: place.id
-        }],
-        limit: 1
-      })
+      // Try multiple query approaches to find configuration
+      let configResponse: any = null
+      let config: any = null
       
-      console.log('📦 Configuration response:', configResponse)
+      try {
+        // Method 1: Query with filters
+        configResponse = await placeManagementAPI.getTableData('place_configuration', {
+          filters: [{
+            column: 'place_id',
+            operator: 'equals',
+            value: place.id
+          }],
+          limit: 1
+        })
+        
+        console.log('📦 Configuration response (filtered):', configResponse)
+        
+        // Handle different response formats
+        if (Array.isArray(configResponse)) {
+          config = configResponse.length > 0 ? configResponse[0] : null
+        } else if (configResponse?.data && Array.isArray(configResponse.data)) {
+          config = configResponse.data.length > 0 ? configResponse.data[0] : null
+        } else if (configResponse?.data && !Array.isArray(configResponse.data)) {
+          config = configResponse.data
+        } else {
+          config = null
+        }
+      } catch (queryError) {
+        console.warn('⚠️ Failed to query configuration with filters, trying alternative method:', queryError)
+        // If filtered query fails, try getting all configs and filter manually
+        try {
+          const allConfigs = await placeManagementAPI.getTableData('place_configuration', { limit: 1000 })
+          const configsArray = Array.isArray(allConfigs) ? allConfigs : (allConfigs?.data || [])
+          config = configsArray.find((c: any) => c.place_id === place.id) || null
+          console.log('📦 Found config via manual filter:', config)
+        } catch (fallbackError) {
+          console.error('❌ Failed to get configurations:', fallbackError)
+          config = null
+        }
+      }
       
-      if (configResponse && configResponse.length > 0) {
-        const config = configResponse[0]
+      if (config && config.place_id === place.id) {
         console.log('✅ Configuration found for', place.name, ':', config)
+        setConfigExists(true) // Mark that configuration exists
+        setExistingConfigId(config.id || null) // Store config ID for updates
         
         // Load configuration data into form
         setConfigFormData({
-          available_monday: config.available_monday || false,
-          available_tuesday: config.available_tuesday || false,
-          available_wednesday: config.available_wednesday || false,
-          available_thursday: config.available_thursday || false,
-          available_friday: config.available_friday || false,
-          available_saturday: config.available_saturday || false,
-          available_sunday: config.available_sunday || false,
+          available_monday: config.available_monday !== undefined ? config.available_monday : true,
+          available_tuesday: config.available_tuesday !== undefined ? config.available_tuesday : true,
+          available_wednesday: config.available_wednesday !== undefined ? config.available_wednesday : true,
+          available_thursday: config.available_thursday !== undefined ? config.available_thursday : true,
+          available_friday: config.available_friday !== undefined ? config.available_friday : true,
+          available_saturday: config.available_saturday !== undefined ? config.available_saturday : false,
+          available_sunday: config.available_sunday !== undefined ? config.available_sunday : false,
           start_time: config.start_time ? config.start_time.substring(0, 5) : '08:00',
           end_time: config.end_time ? config.end_time.substring(0, 5) : '17:00',
           allow_bookings: config.allow_bookings !== false,
@@ -423,7 +456,9 @@ export function PlaceManagement() {
           booking_slot_duration: config.booking_slot_duration || 60
         })
       } else {
-        console.log('⚠️ No configuration found for', place.name, '- using defaults')
+        console.log('⚠️ No configuration found for', place.name, '- using defaults (will create new)')
+        setConfigExists(false) // Mark that configuration does not exist
+        setExistingConfigId(null) // Clear config ID
         
         // No configuration exists - use defaults
         setConfigFormData({
@@ -445,10 +480,28 @@ export function PlaceManagement() {
       setIsConfigDialogOpen(true)
     } catch (error) {
       console.error('❌ Failed to load configuration:', error)
-      toast.error('Failed to load configuration', {
+      // If loading fails, assume no config exists and use defaults
+      setConfigExists(false)
+      setExistingConfigId(null)
+      setConfigFormData({
+        available_monday: true,
+        available_tuesday: true,
+        available_wednesday: true,
+        available_thursday: true,
+        available_friday: true,
+        available_saturday: false,
+        available_sunday: false,
+        start_time: '08:00',
+        end_time: '17:00',
+        allow_bookings: true,
+        max_bookings_per_day: 10,
+        booking_slot_duration: 60
+      })
+      setIsConfigDialogOpen(true)
+      toast.error('Failed to load configuration. Using defaults.', {
         position: 'top-center',
         duration: 3000,
-        icon: '❌'
+        icon: '⚠️'
       })
     } finally {
       setIsLoading(false)
@@ -458,77 +511,110 @@ export function PlaceManagement() {
   const handleSaveConfiguration = async () => {
     if (!selectedPlaceForConfig) return
     
-    setConfirmMessage(`Are you sure you want to save the configuration for "${selectedPlaceForConfig.name}"?`)
+    setConfirmMessage(`Are you sure you want to ${configExists ? 'update' : 'create'} the configuration for "${selectedPlaceForConfig.name}"?`)
     setConfirmAction(() => async () => {
       try {
-        // Clean the configuration data - remove undefined values and empty strings
-        const cleanConfigData = Object.entries(configFormData).reduce((acc, [key, value]) => {
-          if (value !== undefined && value !== '') {
-            acc[key] = value
-          } else if (value === '') {
-            acc[key] = null
-          }
-          return acc
-        }, {} as Record<string, any>)
+        // Prepare configuration data with place_id
+        const configData = {
+          place_id: selectedPlaceForConfig.id,
+          available_monday: configFormData.available_monday,
+          available_tuesday: configFormData.available_tuesday,
+          available_wednesday: configFormData.available_wednesday,
+          available_thursday: configFormData.available_thursday,
+          available_friday: configFormData.available_friday,
+          available_saturday: configFormData.available_saturday,
+          available_sunday: configFormData.available_sunday,
+          start_time: configFormData.start_time + ':00', // Add seconds for time format
+          end_time: configFormData.end_time + ':00',
+          allow_bookings: configFormData.allow_bookings,
+          max_bookings_per_day: configFormData.max_bookings_per_day,
+          booking_slot_duration: configFormData.booking_slot_duration
+        }
         
-        console.log('🧹 Cleaned config data:', cleanConfigData)
+        console.log('📦 Configuration data to save:', configData)
+        console.log('📦 Config exists?', configExists)
         
-        // Use UPDATE API with place_id as WHERE condition
-        await placeManagementAPI.updateRecord('place_configuration', 
-          { place_id: selectedPlaceForConfig.id }, 
-          cleanConfigData
-        )
-        
-        console.log('✅ Configuration saved successfully')
-        toast.success(`Configuration for "${selectedPlaceForConfig.name}" saved successfully!`, {
-          position: 'top-center',
-          duration: 3000,
-          icon: '⏰'
-        })
-        setIsConfigDialogOpen(false)
-      } catch (error) {
-        console.error('❌ Failed to save configuration:', error)
-        // If update fails (record doesn't exist), try insert
-        if (error instanceof Error && error.message.includes('No records updated')) {
+        if (configExists && existingConfigId) {
+          // Configuration exists - UPDATE it using config ID
+          console.log('🔄 Updating existing configuration with ID:', existingConfigId)
           try {
-            console.log('🔄 Configuration not found, creating new one...')
-            const cleanConfigData = Object.entries({
-              place_id: selectedPlaceForConfig.id,
-              ...configFormData
-            }).reduce((acc, [key, value]) => {
-              if (value !== undefined && value !== '') {
-                acc[key] = value
-              }
-              return acc
-            }, {} as Record<string, any>)
-            
-            await placeManagementAPI.insertRecord('place_configuration', cleanConfigData)
-            console.log('✅ Configuration created successfully')
-            toast.success(`Configuration for "${selectedPlaceForConfig.name}" created successfully!`, {
+            await placeManagementAPI.updateRecord('place_configuration', 
+              { id: existingConfigId }, 
+              configData
+            )
+            console.log('✅ Configuration updated successfully')
+            toast.success(`Configuration for "${selectedPlaceForConfig.name}" updated successfully!`, {
               position: 'top-center',
               duration: 3000,
-              icon: '⏰'
+              icon: '✅'
             })
             setIsConfigDialogOpen(false)
-          } catch (insertError) {
-            console.error('❌ Failed to create configuration:', insertError)
-            const errorMessage = insertError instanceof Error ? insertError.message : "Failed to save configuration"
-            setError(errorMessage)
-            toast.error(errorMessage, {
-              position: 'top-center',
-              duration: 4000,
-              icon: '❌'
-            })
+          } catch (updateError: any) {
+            console.error('❌ Update failed, error:', updateError)
+            // If update fails with "No records found", try insert instead
+            if (updateError?.message?.includes('No records found') || 
+                updateError?.message?.includes('No records updated') ||
+                updateError?.message?.includes('matching the WHERE conditions')) {
+              console.log('⚠️ Update failed (config may have been deleted), trying INSERT instead...')
+              // Fall through to INSERT logic
+              const configId = crypto.randomUUID()
+              const newConfigData = {
+                id: configId,
+                ...configData
+              }
+              console.log('📦 Inserting new config (fallback):', newConfigData)
+              await placeManagementAPI.insertRecord('place_configuration', newConfigData)
+              console.log('✅ Configuration created successfully with ID:', configId)
+              setConfigExists(true)
+              setExistingConfigId(configId)
+              toast.success(`Configuration for "${selectedPlaceForConfig.name}" created successfully!`, {
+                position: 'top-center',
+                duration: 3000,
+                icon: '✅'
+              })
+              setIsConfigDialogOpen(false)
+            } else {
+              throw updateError // Re-throw if it's a different error
+            }
           }
         } else {
-          const errorMessage = error instanceof Error ? error.message : "Failed to save configuration"
-          setError(errorMessage)
-          toast.error(errorMessage, {
+          // Configuration does not exist - INSERT new one
+          console.log('➕ Creating new configuration for place:', selectedPlaceForConfig.id)
+          // Generate UUID for new configuration
+          const configId = crypto.randomUUID()
+          const newConfigData = {
+            id: configId,
+            ...configData
+          }
+          console.log('📦 Inserting new config:', newConfigData)
+          console.log('📦 Config data keys:', Object.keys(newConfigData))
+          console.log('📦 Config data values:', Object.values(newConfigData))
+          
+          await placeManagementAPI.insertRecord('place_configuration', newConfigData)
+          console.log('✅ Configuration created successfully with ID:', configId)
+          setConfigExists(true) // Mark as existing for next time
+          setExistingConfigId(configId) // Store the new config ID
+          toast.success(`Configuration for "${selectedPlaceForConfig.name}" created successfully!`, {
             position: 'top-center',
-            duration: 4000,
-            icon: '❌'
+            duration: 3000,
+            icon: '✅'
           })
+          setIsConfigDialogOpen(false)
         }
+      } catch (error) {
+        console.error('❌ Failed to save configuration:', error)
+        console.error('❌ Error details:', {
+          message: error instanceof Error ? error.message : 'Unknown error',
+          stack: error instanceof Error ? error.stack : undefined,
+          error: error
+        })
+        const errorMessage = error instanceof Error ? error.message : "Failed to save configuration"
+        setError(errorMessage)
+        toast.error(errorMessage, {
+          position: 'top-center',
+          duration: 4000,
+          icon: '❌'
+        })
       }
     })
     setIsConfirmDialogOpen(true)
@@ -934,7 +1020,15 @@ export function PlaceManagement() {
       </Dialog>
 
       {/* Place Configuration Dialog */}
-      <Dialog open={isConfigDialogOpen} onOpenChange={setIsConfigDialogOpen}>
+      <Dialog open={isConfigDialogOpen} onOpenChange={(open) => {
+        setIsConfigDialogOpen(open)
+        if (!open) {
+          // Reset config state when dialog closes
+          setConfigExists(false)
+          setExistingConfigId(null)
+          setSelectedPlaceForConfig(null)
+        }
+      }}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -1068,7 +1162,12 @@ export function PlaceManagement() {
               </div>
 
               <DialogFooter>
-                <Button variant="outline" onClick={() => setIsConfigDialogOpen(false)}>
+                <Button variant="outline" onClick={() => {
+                  setIsConfigDialogOpen(false)
+                  setConfigExists(false)
+                  setExistingConfigId(null)
+                  setSelectedPlaceForConfig(null)
+                }}>
                   Cancel
                 </Button>
                 <Button onClick={handleSaveConfiguration}>

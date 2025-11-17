@@ -278,18 +278,27 @@ export default function UpdateBookingPage() {
         console.log('📋 Loaded ACTIVE external participants (is_deleted=false):', externals.length)
         console.log('📋 External participant data:', externals)
 
-        // Fetch refreshments
-        const refreshmentsResponse = await placeManagementAPI.getTableData('booking_refreshments', {
-          filters: [{ field: 'booking_id', operator: '=', value: bookingId }],
-          limit: 1
-        })
-        const refreshmentData = Array.isArray(refreshmentsResponse) && refreshmentsResponse.length > 0 ? refreshmentsResponse[0] : null
-        console.log('🍽️ Loaded refreshment data:', refreshmentData)
-        if (refreshmentData) {
-          console.log('🍽️ Refreshment serving_time:', refreshmentData.serving_time)
-          console.log('🍽️ Refreshment type:', refreshmentData.refreshment_type)
-          console.log('🍽️ Refreshment items field:', refreshmentData.items)
-          console.log('🍽️ Refreshment refreshments_details field:', refreshmentData.refreshments_details)
+        // Check if refreshments are required from bookings table first
+        const refreshmentsRequired = bookingData.refreshments_required === 1 || bookingData.refreshments_required === true
+        console.log('🍽️ Refreshments required from bookings table:', refreshmentsRequired)
+        
+        // Only fetch refreshments if they are required
+        let refreshmentData = null
+        if (refreshmentsRequired) {
+          const refreshmentsResponse = await placeManagementAPI.getTableData('booking_refreshments', {
+            filters: [{ field: 'booking_id', operator: '=', value: bookingId }],
+            limit: 1
+          })
+          refreshmentData = Array.isArray(refreshmentsResponse) && refreshmentsResponse.length > 0 ? refreshmentsResponse[0] : null
+          console.log('🍽️ Loaded refreshment data:', refreshmentData)
+          if (refreshmentData) {
+            console.log('🍽️ Refreshment serving_time:', refreshmentData.serving_time)
+            console.log('🍽️ Refreshment type:', refreshmentData.refreshment_type)
+            console.log('🍽️ Refreshment items field:', refreshmentData.items)
+            console.log('🍽️ Refreshment refreshments_details field:', refreshmentData.refreshments_details)
+          }
+        } else {
+          console.log('🍽️ Refreshments not required, skipping refreshment data fetch')
         }
 
         // Find responsible person from users
@@ -389,7 +398,7 @@ export default function UpdateBookingPage() {
           responsiblePerson: responsiblePersonData,
           selectedEmployees: selectedEmployees,
           externalParticipants: externalParticipantsData,
-          refreshments: refreshmentData ? {
+          refreshments: (refreshmentsRequired && refreshmentData) ? {
             required: true,
             type: refreshmentData.refreshment_type || 'beverages',
             items: (() => {

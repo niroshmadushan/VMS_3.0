@@ -12,6 +12,7 @@ import {
 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import toast from "react-hot-toast"
+import { placeManagementAPI } from "@/lib/place-management-api"
 
 interface DashboardStatistics {
   overview: {
@@ -143,15 +144,113 @@ export function AdminOverview() {
 
   const loadTodaysSchedule = async () => {
     try {
-      const response = await fetch(`${API_BASE}/api/dashboard/todays-schedule`, {
-        headers: getAuthHeaders()
+      // Get today's date in YYYY-MM-DD format
+      const today = new Date().toISOString().split('T')[0]
+      console.log('📅 Loading today\'s schedule for date:', today)
+      
+      // Fetch all bookings (not deleted)
+      const bookingsResponse = await placeManagementAPI.getTableData('bookings', {
+        filters: [
+          { field: 'is_deleted', operator: '=', value: 0 }
+        ],
+        limit: 200,
+        sortBy: 'start_time',
+        sortOrder: 'asc'
       })
-      const result = await response.json()
-      if (result.success) {
-        setSchedule(result.data.schedule || [])
-      }
+      
+      const allBookings = Array.isArray(bookingsResponse) ? bookingsResponse : []
+      console.log('📊 Total bookings fetched:', allBookings.length)
+      
+      // Filter bookings for today
+      const todaysBookings = allBookings.filter((booking: any) => {
+        let bookingDate = booking.booking_date
+        
+        // Normalize date format
+        if (bookingDate) {
+          if (typeof bookingDate === 'string') {
+            if (bookingDate.includes('T')) {
+              // ISO format with timezone - extract local date
+              const dateObj = new Date(bookingDate)
+              const year = dateObj.getFullYear()
+              const month = String(dateObj.getMonth() + 1).padStart(2, '0')
+              const day = String(dateObj.getDate()).padStart(2, '0')
+              bookingDate = `${year}-${month}-${day}`
+            } else if (bookingDate.includes(' ')) {
+              bookingDate = bookingDate.split(' ')[0]
+            }
+          } else if (bookingDate instanceof Date) {
+            const year = bookingDate.getFullYear()
+            const month = String(bookingDate.getMonth() + 1).padStart(2, '0')
+            const day = String(bookingDate.getDate()).padStart(2, '0')
+            bookingDate = `${year}-${month}-${day}`
+          }
+        }
+        
+        return bookingDate === today
+      })
+      
+      console.log('✅ Today\'s bookings found:', todaysBookings.length)
+      
+      // Fetch participants count for each booking
+      const participantsResponse = await placeManagementAPI.getTableData('booking_participants', {
+        limit: 500
+      })
+      const allParticipants = Array.isArray(participantsResponse) ? participantsResponse : []
+      
+      // Fetch external participants count
+      const externalResponse = await placeManagementAPI.getTableData('external_participants', {
+        limit: 500
+      })
+      const allExternals = Array.isArray(externalResponse) ? externalResponse : []
+      
+      // Transform to ScheduleItem format
+      const scheduleItems: ScheduleItem[] = todaysBookings.map((booking: any) => {
+        // Count participants for this booking
+        const participantsCount = allParticipants.filter((p: any) => 
+          p.booking_id === booking.id && (p.is_deleted === false || p.is_deleted === 0)
+        ).length
+        
+        const externalCount = allExternals.filter((p: any) => 
+          p.booking_id === booking.id && (p.is_deleted === false || p.is_deleted === 0)
+        ).length
+        
+        // Determine status color
+        let status = booking.status || 'upcoming'
+        let color = '#3b82f6' // default blue
+        
+        if (status === 'completed') {
+          color = '#3b82f6' // blue
+        } else if (status === 'ongoing' || status === 'in-progress') {
+          color = '#10b981' // green
+        } else if (status === 'upcoming' || status === 'pending') {
+          color = '#f59e0b' // orange
+        } else if (status === 'cancelled') {
+          color = '#ef4444' // red
+        }
+        
+        return {
+          id: booking.id,
+          title: booking.title || 'Untitled Booking',
+          place_name: booking.place_name || 'Unknown Place',
+          start_time: booking.start_time || '00:00:00',
+          end_time: booking.end_time || '00:00:00',
+          status: status,
+          responsible_person: booking.responsible_person_name || booking.responsible_person_email || 'N/A',
+          participants_count: participantsCount,
+          external_visitors_count: externalCount,
+          color: color
+        }
+      })
+      
+      console.log('✅ Schedule items created:', scheduleItems.length)
+      setSchedule(scheduleItems)
     } catch (error) {
-      console.error('Error loading schedule:', error)
+      console.error('❌ Error loading schedule:', error)
+      toast.error('Failed to load today\'s schedule', {
+        position: 'top-center',
+        duration: 3000,
+        icon: '❌'
+      })
     }
   }
 
@@ -269,7 +368,7 @@ export function AdminOverview() {
   ]
 
   return (
-    <div className="space-y-6 animate-fade-in max-w-full">
+    <div className="space-y-6 animate-fade-in max-w-full overflow-x-hidden">
       {/* System Alerts (if any) */}
       {alerts.filter(a => !a.resolved && a.severity === 'high').length > 0 && (
         <Card className="border-2 border-red-500 bg-red-50">
@@ -344,7 +443,7 @@ export function AdminOverview() {
                 <p className="text-sm text-muted-foreground">No recent activity</p>
               </div>
             ) : (
-              <div className="space-y-3 max-h-96 overflow-y-auto">
+              <div className="space-y-3 max-h-96 overflow-y-auto pr-2 scrollbar-thin">
                 {recentActivity.map((activity, index) => (
                   <div
                     key={activity.id || index}
@@ -380,7 +479,7 @@ export function AdminOverview() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-0 pt-4">
-            <div className="grid grid-cols-1 gap-3">
+            <div className="grid grid-cols-1 gap-3 max-h-96 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 hover:scrollbar-thumb-gray-400">
               {quickActions.map((action) => (
                 <Button
                   key={action.label}
@@ -420,7 +519,7 @@ export function AdminOverview() {
                 <p className="text-sm text-muted-foreground">No bookings scheduled for today</p>
               </div>
             ) : (
-              <div className="space-y-3 max-h-96 overflow-y-auto">
+              <div className="space-y-3 max-h-96 overflow-y-auto pr-2 scrollbar-thin">
                 {schedule.map((booking) => (
                   <div 
                     key={booking.id} 
@@ -475,7 +574,7 @@ export function AdminOverview() {
                 <p className="text-xs text-muted-foreground">No active alerts</p>
               </div>
             ) : (
-              <div className="space-y-3 max-h-96 overflow-y-auto">
+              <div className="space-y-3 max-h-96 overflow-y-auto pr-2 scrollbar-thin">
                 {alerts.filter(a => !a.resolved).map((alert) => (
                   <div 
                     key={alert.id} 

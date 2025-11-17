@@ -757,6 +757,9 @@ export function StaffBookingManagement() {
           console.log(`     Total: ${selectedEmployees.length + externalParticipantsList.length}`)
           
           // Parse refreshments
+          // Check refreshments_required field from bookings table first
+          const refreshmentsRequired = booking.refreshments_required === 1 || booking.refreshments_required === true
+          
           let refreshmentDetails: RefreshmentDetails = {
             required: false,
             type: '',
@@ -766,7 +769,10 @@ export function StaffBookingManagement() {
             estimatedCount: 0
           }
           
-          if (refreshments.length > 0) {
+          // Only set refreshments as required if:
+          // 1. refreshments_required is 1/true in bookings table
+          // 2. AND there's a record in booking_refreshments table
+          if (refreshmentsRequired && refreshments.length > 0) {
             const r = refreshments[0]
             refreshmentDetails = {
               required: true,
