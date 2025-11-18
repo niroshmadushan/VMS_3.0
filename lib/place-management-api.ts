@@ -3,6 +3,8 @@
  * Integrates with the secure-select API backend
  */
 
+import { API_BASE_URL } from './api-config'
+
 // JWT Token Manager
 class TokenManager {
   private token: string | null = null
@@ -79,7 +81,7 @@ class PlaceManagementAPI {
   private baseURL: string
   private tokenManager: TokenManager
 
-  constructor(baseURL: string = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000') {
+  constructor(baseURL: string = API_BASE_URL) {
     // Remove /api/secure-select from baseURL if it's included
     this.baseURL = baseURL.replace(/\/api\/secure-select$/, '')
     this.tokenManager = new TokenManager()

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { getBackendApiUrl, SITE_URL } from '@/lib/api-config'
 
 export async function POST(req: Request) {
   console.log('API route /api/admin/send-meeting-invitations called with method: POST')
@@ -115,7 +116,7 @@ export async function POST(req: Request) {
           
           <div style="text-align: center; margin: 30px 0;">
             <p style="color: #666;">Please mark your attendance using the Smart Assistant:</p>
-            <a href="${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/smart-assistant" class="button">
+            <a href="${SITE_URL}/smart-assistant" class="button">
               📱 Mark Attendance
             </a>
           </div>
@@ -140,7 +141,7 @@ ${booking.description ? `${booking.description}\n\n` : ''}Meeting Details:
 ${booking.responsiblePerson ? `- Organizer: ${booking.responsiblePerson}` : ''}
 ${booking.refId ? `- Meeting ID: ${booking.refId}` : ''}
 
-To mark your attendance, visit: ${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/smart-assistant
+To mark your attendance, visit: ${SITE_URL}/smart-assistant
 
 This is an automated message. Please do not reply to this email.
 If you have any questions, please contact the meeting organizer.
@@ -153,7 +154,8 @@ If you have any questions, please contact the meeting organizer.
       console.log(`📧 ==========================================`)
       console.log(`📧 Recipient Email: ${email}`)
       console.log(`📧 Email Subject: ${subject}`)
-      console.log(`📧 Backend API URL: ${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/api/send-email`)
+      const backendUrl = getBackendApiUrl('send-email')
+      console.log(`📧 Backend API URL: ${backendUrl}`)
       console.log(`📧 App-Id: ${process.env.NEXT_PUBLIC_APP_ID || 'default_app_id'}`)
       console.log(`📧 Service-Key: ${process.env.NEXT_PUBLIC_SERVICE_KEY ? '✅ Set' : '❌ Missing'}`)
       
@@ -161,7 +163,7 @@ If you have any questions, please contact the meeting organizer.
         const requestStartTime = Date.now()
         
         // Call your backend API to send the email (same as login OTP emails)
-        const backendResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/api/send-email`, {
+        const backendResponse = await fetch(backendUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

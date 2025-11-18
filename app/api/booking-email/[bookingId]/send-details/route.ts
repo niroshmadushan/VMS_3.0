@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getBackendApiUrl } from '@/lib/api-config'
 
 export async function POST(
   request: NextRequest,
@@ -65,7 +66,8 @@ export async function POST(
     console.log('📧 ==========================================')
     console.log('📧 FORWARDING TO BACKEND API')
     console.log('📧 ==========================================')
-    console.log('📧 Backend URL:', `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/api/booking-email/${bookingId}/send-details`)
+    const backendUrl = getBackendApiUrl(`booking-email/${bookingId}/send-details`)
+    console.log('📧 Backend URL:', backendUrl)
     console.log('📧 Backend Request Body:', JSON.stringify(backendRequestBody, null, 2))
     console.log('📧 Backend Headers:', {
       'Content-Type': 'application/json',
@@ -75,7 +77,7 @@ export async function POST(
     })
     
     // Call your backend API to send booking details
-    const backendResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/api/booking-email/${bookingId}/send-details`, {
+    const backendResponse = await fetch(backendUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

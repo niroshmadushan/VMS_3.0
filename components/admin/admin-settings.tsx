@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { API_BASE_URL } from '@/lib/api-config'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -87,7 +88,7 @@ export function AdminSettings() {
       
       // Get authToken from localStorage (user is already logged in)
       const token = localStorage.getItem('authToken')
-      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
+      const apiBase = API_BASE_URL
       
       if (!token) {
         console.error('❌ No authToken found in localStorage')
@@ -170,7 +171,7 @@ export function AdminSettings() {
       console.log('💾 Saving profile:', formData)
 
       const token = localStorage.getItem('authToken')
-      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
+      const apiBase = API_BASE_URL
 
       const nameParts = formData.full_name.trim().split(' ')
       const firstName = nameParts[0] || ''
@@ -277,7 +278,7 @@ export function AdminSettings() {
       console.log('🔐 Verifying OTP for email:', pendingEmail)
 
       const token = localStorage.getItem('authToken')
-      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
+      const apiBase = API_BASE_URL
 
       const response = await fetch(`${apiBase}/api/my-profile/verify-email-otp`, {
         method: 'POST',
@@ -364,7 +365,7 @@ export function AdminSettings() {
       console.log('🔑 Requesting password reset for:', profile.email)
 
       const token = localStorage.getItem('authToken')
-      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
+      const apiBase = API_BASE_URL
 
       // Use authenticated password reset endpoint (no body required)
       const response = await fetch(`${apiBase}/api/my-profile/request-password-reset`, {

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getBackendApiUrl } from '@/lib/api-config'
 
 export async function POST(
   request: NextRequest,
@@ -12,7 +13,8 @@ export async function POST(
     console.log('📧 Reminder type:', body.reminderType)
 
     // Call your backend API to send reminder
-    const backendResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/api/booking-email/${bookingId}/send-reminder`, {
+    const backendUrl = getBackendApiUrl(`booking-email/${bookingId}/send-reminder`)
+    const backendResponse = await fetch(backendUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

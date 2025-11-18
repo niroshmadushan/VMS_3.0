@@ -32,9 +32,7 @@ export interface AuthResponse {
 }
 
 // API Configuration
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
-const APP_ID = process.env.NEXT_PUBLIC_APP_ID || 'default_app_id'
-const SERVICE_KEY = process.env.NEXT_PUBLIC_SERVICE_KEY || 'default_service_key'
+import { API_BASE_URL, APP_ID, SERVICE_KEY } from './api-config'
 
 // Helper function to make API requests
 const apiRequest = async (endpoint: string, options: RequestInit = {}): Promise<AuthResponse> => {

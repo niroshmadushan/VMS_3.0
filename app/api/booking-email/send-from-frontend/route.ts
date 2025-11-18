@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getBackendApiUrl } from '@/lib/api-config'
 
 export async function POST(request: NextRequest) {
   try {
@@ -124,7 +125,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Prepare backend request with all required headers
-    const backendUrl = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/api/booking-email/send-from-frontend`
+    const backendUrl = getBackendApiUrl('booking-email/send-from-frontend')
     const backendMethod = 'POST'
     
     // Always include X-App-Id and X-Service-Key (backend requires these)

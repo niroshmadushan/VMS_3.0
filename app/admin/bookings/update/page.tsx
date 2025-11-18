@@ -488,9 +488,9 @@ export default function UpdateBookingPage() {
         })
         
         const usersArray = Array.isArray(usersData) ? usersData : []
-        const filteredUsers = usersArray.filter((user: any) => 
-          user.role === 'admin' || user.role === 'employee'
-        )
+        // Don't filter here - we'll filter by role in the UI components
+        // This allows us to show admins for responsible person and exclude staff from participants
+        const filteredUsers = usersArray
         
         setUsers(filteredUsers)
       } catch (error) {
@@ -908,7 +908,45 @@ export default function UpdateBookingPage() {
         internal_participants: formData.selectedEmployees.length,
         external_participants: formData.externalParticipants.length,
         refreshments_required: formData.refreshments.required ? 1 : 0,
-        refreshments_details: JSON.stringify(formData.refreshments)
+        refreshments_details: JSON.stringify(formData.refreshments),
+        updated_at: (() => {
+          const now = new Date()
+          const sriLankaTime = new Intl.DateTimeFormat('en-CA', {
+            timeZone: 'Asia/Colombo',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false
+          }).formatToParts(now)
+          
+          const year = parseInt(sriLankaTime.find(p => p.type === 'year')?.value || '0')
+          const month = parseInt(sriLankaTime.find(p => p.type === 'month')?.value || '0')
+          const day = parseInt(sriLankaTime.find(p => p.type === 'day')?.value || '0')
+          const hour = parseInt(sriLankaTime.find(p => p.type === 'hour')?.value || '0')
+          const minute = parseInt(sriLankaTime.find(p => p.type === 'minute')?.value || '0')
+          const second = parseInt(sriLankaTime.find(p => p.type === 'second')?.value || '0')
+          
+          // Create a Date object representing Sri Lanka local time
+          const sriLankaDate = new Date(year, month - 1, day, hour, minute, second)
+          
+          // Calculate UTC time that represents this Sri Lanka local time
+          // Sri Lanka is UTC+5:30, so subtract 5 hours 30 minutes to get UTC
+          const offsetMs = (5 * 60 + 30) * 60 * 1000
+          const utcDate = new Date(sriLankaDate.getTime() - offsetMs)
+          
+          // Format as MySQL DATETIME: YYYY-MM-DD HH:MM:SS (UTC)
+          const utcYear = utcDate.getUTCFullYear()
+          const utcMonth = String(utcDate.getUTCMonth() + 1).padStart(2, '0')
+          const utcDay = String(utcDate.getUTCDate()).padStart(2, '0')
+          const utcHour = String(utcDate.getUTCHours()).padStart(2, '0')
+          const utcMinute = String(utcDate.getUTCMinutes()).padStart(2, '0')
+          const utcSecond = String(utcDate.getUTCSeconds()).padStart(2, '0')
+          
+          return `${utcYear}-${utcMonth}-${utcDay} ${utcHour}:${utcMinute}:${utcSecond}`
+        })()
       }
 
       await placeManagementAPI.updateRecord('bookings', { id: bookingId! }, updatedBookingData)
@@ -979,7 +1017,11 @@ export default function UpdateBookingPage() {
           await placeManagementAPI.updateRecord('booking_participants', { id: deletedRecord.id }, {
             is_deleted: false,
             participation_status: 'invited',
-            updated_at: new Date().toISOString()
+            updated_at: (() => {
+              const now = new Date()
+              const sriLankaTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Colombo' }))
+              return sriLankaTime.toISOString()
+            })()
           })
         } else {
           // INSERT new record
@@ -1054,7 +1096,11 @@ export default function UpdateBookingPage() {
           await placeManagementAPI.updateRecord('external_participants', { id: deletedRecord.id }, {
             is_deleted: false,
             participation_status: 'invited',
-            updated_at: new Date().toISOString()
+            updated_at: (() => {
+              const now = new Date()
+              const sriLankaTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Colombo' }))
+              return sriLankaTime.toISOString()
+            })()
           })
         } else {
           // Need to insert new record - first handle member linking
@@ -1090,11 +1136,63 @@ export default function UpdateBookingPage() {
                 reference_type: participant.referenceType,
                 reference_value: participant.referenceValue,
                 visit_count: 1,
-                last_visit_date: new Date().toISOString(),
+                last_visit_date: (() => {
+                  const now = new Date()
+                  const sriLankaTimeString = now.toLocaleString('en-CA', { 
+                    timeZone: 'Asia/Colombo',
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                    hour12: false
+                  })
+                  const [datePart, timePart] = sriLankaTimeString.split(', ')
+                  const [year, month, day] = datePart.split('-')
+                  const [hours, minutes, seconds] = timePart.split(':')
+                  const sriLankaDate = new Date(
+                    parseInt(year),
+                    parseInt(month) - 1,
+                    parseInt(day),
+                    parseInt(hours),
+                    parseInt(minutes),
+                    parseInt(seconds)
+                  )
+                  const offsetMs = (5 * 60 + 30) * 60 * 1000
+                  const utcDate = new Date(sriLankaDate.getTime() - offsetMs)
+                  return utcDate.toISOString()
+                })(),
                 is_active: true,
                 is_deleted: false,
                 is_blacklisted: false,
-                created_at: new Date().toISOString()
+                created_at: (() => {
+                  const now = new Date()
+                  const sriLankaTimeString = now.toLocaleString('en-CA', { 
+                    timeZone: 'Asia/Colombo',
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                    hour12: false
+                  })
+                  const [datePart, timePart] = sriLankaTimeString.split(', ')
+                  const [year, month, day] = datePart.split('-')
+                  const [hours, minutes, seconds] = timePart.split(':')
+                  const sriLankaDate = new Date(
+                    parseInt(year),
+                    parseInt(month) - 1,
+                    parseInt(day),
+                    parseInt(hours),
+                    parseInt(minutes),
+                    parseInt(seconds)
+                  )
+                  const offsetMs = (5 * 60 + 30) * 60 * 1000
+                  const utcDate = new Date(sriLankaDate.getTime() - offsetMs)
+                  return utcDate.toISOString()
+                })()
               })
               console.log('✅ Created new member:', participant.fullName)
             }
@@ -1938,8 +2036,12 @@ export default function UpdateBookingPage() {
               <div className="max-h-60 overflow-y-auto border rounded-md">
                 {users
                   .filter(user =>
-                    user.full_name.toLowerCase().includes(responsibleSearch.toLowerCase()) ||
-                    user.email.toLowerCase().includes(responsibleSearch.toLowerCase())
+                    // Show both admin and staff as responsible person
+                    // System only has admin and staff roles
+                    (user.role === 'admin' || user.user_role === 'admin' || 
+                     user.role === 'staff' || user.user_role === 'staff') &&
+                    (user.full_name.toLowerCase().includes(responsibleSearch.toLowerCase()) ||
+                    user.email.toLowerCase().includes(responsibleSearch.toLowerCase()))
                   )
                   .map(user => (
                     <div
@@ -2030,8 +2132,12 @@ export default function UpdateBookingPage() {
                 <div className="max-h-60 overflow-y-auto border rounded-md">
                   {users
                     .filter(user =>
-                      user.full_name.toLowerCase().includes(employeeSearch.toLowerCase()) ||
-                      user.email.toLowerCase().includes(employeeSearch.toLowerCase())
+                      // Show both admin and staff as participants
+                      // System only has admin and staff roles
+                      (user.role === 'admin' || user.user_role === 'admin' || 
+                       user.role === 'staff' || user.user_role === 'staff') &&
+                      (user.full_name.toLowerCase().includes(employeeSearch.toLowerCase()) ||
+                      user.email.toLowerCase().includes(employeeSearch.toLowerCase()))
                     )
                     .filter(user => !formData.selectedEmployees.some(e => e.id === user.id))
                     .map(user => (

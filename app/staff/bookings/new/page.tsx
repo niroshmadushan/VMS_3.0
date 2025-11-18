@@ -785,6 +785,50 @@ export default function StaffNewBookingPage() {
 
       console.log('📝 Generated Booking Reference ID:', bookingRefId)
 
+      // Get current time in Sri Lanka timezone (UTC+5:30)
+      // Returns UTC time that represents the current Sri Lanka local time
+      const getSriLankaTimestamp = (): string => {
+        const now = new Date()
+        // Get Sri Lanka time components
+        const sriLankaTime = new Intl.DateTimeFormat('en-CA', {
+          timeZone: 'Asia/Colombo',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: false
+        }).formatToParts(now)
+        
+        const year = parseInt(sriLankaTime.find(p => p.type === 'year')?.value || '0')
+        const month = parseInt(sriLankaTime.find(p => p.type === 'month')?.value || '0')
+        const day = parseInt(sriLankaTime.find(p => p.type === 'day')?.value || '0')
+        const hour = parseInt(sriLankaTime.find(p => p.type === 'hour')?.value || '0')
+        const minute = parseInt(sriLankaTime.find(p => p.type === 'minute')?.value || '0')
+        const second = parseInt(sriLankaTime.find(p => p.type === 'second')?.value || '0')
+        
+        // Create a Date object representing Sri Lanka local time
+        const sriLankaDate = new Date(year, month - 1, day, hour, minute, second)
+        
+        // Calculate UTC time that represents this Sri Lanka local time
+        // Sri Lanka is UTC+5:30, so subtract 5 hours 30 minutes to get UTC
+        const offsetMs = (5 * 60 + 30) * 60 * 1000 // 5:30 in milliseconds
+        const utcDate = new Date(sriLankaDate.getTime() - offsetMs)
+        
+        // Format as MySQL DATETIME: YYYY-MM-DD HH:MM:SS (UTC)
+        const utcYear = utcDate.getUTCFullYear()
+        const utcMonth = String(utcDate.getUTCMonth() + 1).padStart(2, '0')
+        const utcDay = String(utcDate.getUTCDate()).padStart(2, '0')
+        const utcHour = String(utcDate.getUTCHours()).padStart(2, '0')
+        const utcMinute = String(utcDate.getUTCMinutes()).padStart(2, '0')
+        const utcSecond = String(utcDate.getUTCSeconds()).padStart(2, '0')
+        
+        return `${utcYear}-${utcMonth}-${utcDay} ${utcHour}:${utcMinute}:${utcSecond}`
+      }
+      
+      const currentTimestamp = getSriLankaTimestamp()
+
       // 🛡️ Sanitize all data before sending to API
       const sanitizedBookingData = sanitizeObject({
         id: bookingId,
@@ -805,7 +849,9 @@ export default function StaffNewBookingPage() {
         external_participants: formData.externalParticipants.length,
         refreshments_required: formData.refreshments.required ? 1 : 0,
         refreshments_details: JSON.stringify(sanitizeObject(formData.refreshments)),
-        is_deleted: 0
+        is_deleted: 0,
+        created_at: currentTimestamp,
+        updated_at: currentTimestamp
       })
 
       console.log('✅ Data sanitized, sending to API...')
@@ -847,7 +893,7 @@ export default function StaffNewBookingPage() {
             memberId = existingMember.id
             await placeManagementAPI.updateRecord('external_members', { id: memberId }, {
               visit_count: (existingMember.visit_count || 0) + 1,
-              last_visit_date: new Date().toISOString()
+              last_visit_date: getSriLankaTimestamp()
             })
           } else if (!participant.id.startsWith('existing_')) {
             // Create new member record
@@ -860,11 +906,11 @@ export default function StaffNewBookingPage() {
               reference_type: participant.referenceType,
               reference_value: sanitizeInput(participant.referenceValue),
               visit_count: 1,
-              last_visit_date: new Date().toISOString(),
+              last_visit_date: getSriLankaTimestamp(),
               is_active: true,
               is_deleted: false,
               is_blacklisted: false,
-              created_at: new Date().toISOString()
+              created_at: getSriLankaTimestamp()
             }))
           }
         } catch (error) {

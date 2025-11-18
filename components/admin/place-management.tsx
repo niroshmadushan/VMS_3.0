@@ -664,11 +664,11 @@ export function PlaceManagement() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-6 px-2 sm:px-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Place Management</h1>
-          <p className="text-muted-foreground">Manage places and their status</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Place Management</h1>
+          <p className="text-sm sm:text-base text-muted-foreground">Manage places and their status</p>
         </div>
       </div>
 
@@ -722,14 +722,14 @@ export function PlaceManagement() {
         </CardHeader>
         <CardContent>
           <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1">
+            <div className="flex-1 min-w-0">
               <div className="relative">
                 <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Search places..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
+                  className="pl-10 w-full"
                 />
           </div>
         </div>
@@ -770,13 +770,13 @@ export function PlaceManagement() {
         </Alert>
       )}
 
-      <div className="flex items-center justify-between">
-        <div></div>
+      <div className="flex items-center justify-end">
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button onClick={resetForm} className="flex items-center gap-2">
+            <Button onClick={resetForm} className="flex items-center gap-2 w-full sm:w-auto">
               <Plus className="h-4 w-4" />
-              Add Place
+              <span className="hidden sm:inline">Add Place</span>
+              <span className="sm:hidden">Add</span>
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">

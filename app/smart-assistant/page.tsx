@@ -13,6 +13,7 @@ import {
   UserCheck, CheckCircle, Building2, Phone, Mail, ArrowRight, ArrowLeft, AlertCircle, User
 } from "lucide-react"
 import { placeManagementAPI } from "@/lib/place-management-api"
+import { API_BASE_URL } from '@/lib/api-config'
 import toast from "react-hot-toast"
 import Link from "next/link"
 import { useAuth } from "@/lib/auth-context"
@@ -83,7 +84,7 @@ export default function SmartAssistantPage() {
       
       if (searchType === 'meetingId') {
         console.log('🔍 Searching for Meeting ID:', meetingId.toUpperCase())
-        console.log('🔗 API Base URL:', process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000')
+        console.log('🔗 API Base URL:', API_BASE_URL)
         
         // Get all bookings (not deleted)
         console.log('📡 Fetching bookings from database...')

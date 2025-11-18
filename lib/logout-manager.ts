@@ -3,10 +3,12 @@
  * Based on LOGOUT_IMPLEMENTATION_GUIDE.md
  */
 
+import { API_BASE_URL } from './api-config'
+
 export class LogoutManager {
   private baseURL: string
 
-  constructor(baseURL: string = 'http://localhost:3000/api') {
+  constructor(baseURL: string = `${API_BASE_URL}/api`) {
     this.baseURL = baseURL
   }
 

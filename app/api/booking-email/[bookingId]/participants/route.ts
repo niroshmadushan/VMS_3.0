@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getBackendApiUrl } from '@/lib/api-config'
 
 export async function GET(
   request: NextRequest,
@@ -10,7 +11,8 @@ export async function GET(
     console.log('📧 Getting participants for booking:', bookingId)
 
     // Call your backend API to get booking participants
-    const backendResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/api/booking-email/${bookingId}/participants`, {
+    const backendUrl = getBackendApiUrl(`booking-email/${bookingId}/participants`)
+    const backendResponse = await fetch(backendUrl, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',

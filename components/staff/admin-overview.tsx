@@ -68,7 +68,9 @@ interface Alert {
   resolved: boolean
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
+import { API_BASE_URL } from '@/lib/api-config'
+
+const API_BASE = API_BASE_URL
 
 const getAuthHeaders = () => {
   const token = localStorage.getItem('authToken')

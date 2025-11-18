@@ -14,12 +14,26 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Plus, Edit, Trash2, Calendar, Clock, MapPin, Users, X, Search, AlertTriangle, Loader2, Utensils, Mail, Send, Info, Lock } from "lucide-react"
+import { Plus, Edit, Trash2, Calendar, Clock, MapPin, Users, X, Search, AlertTriangle, Loader2, Utensils, Mail, Send, Info, Lock, CheckCircle } from "lucide-react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { placeManagementAPI } from "@/lib/place-management-api"
 import { bookingEmailAPI, type BookingParticipant } from "@/lib/booking-email-api"
 import toast from "react-hot-toast"
 import { useAuth } from "@/lib/auth-context"
+
+// UUID generator function (compatible with all environments)
+const generateUUID = (): string => {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID()
+  }
+  // Fallback UUID v4 generator
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0
+    const v = c === 'x' ? r : (r & 0x3 | 0x8)
+    return v.toString(16)
+  })
+}
+
 
 interface ExternalParticipant {
   id: string
@@ -369,12 +383,14 @@ export function StaffBookingManagement() {
   // Email notification state
   const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false)
   const [selectedBookingForEmail, setSelectedBookingForEmail] = useState<Booking | null>(null)
+  const [isEmailAlertDialogOpen, setIsEmailAlertDialogOpen] = useState(false)
+  const [emailAlertMessage, setEmailAlertMessage] = useState("")
+  const [emailAlertType, setEmailAlertType] = useState<"success" | "error">("success")
   const [selectedEmailParticipants, setSelectedEmailParticipants] = useState<string[]>([])
   const [isSendingEmails, setIsSendingEmails] = useState(false)
   const [bookingParticipants, setBookingParticipants] = useState<BookingParticipant[]>([])
   const [isLoadingParticipants, setIsLoadingParticipants] = useState(false)
-  const [emailType, setEmailType] = useState<'booking_details' | 'booking_confirmation'>('booking_details')
-  const [customMessage, setCustomMessage] = useState('')
+  const [emailType, setEmailType] = useState<'booking_details'>('booking_details')
   
   // Available Places State
   const [availablePlaces, setAvailablePlaces] = useState<AvailablePlace[]>([])
@@ -1561,7 +1577,45 @@ export function StaffBookingManagement() {
           responsible_person_name: formData.responsiblePerson?.name,
           responsible_person_email: formData.responsiblePerson?.email,
           refreshments_required: formData.refreshments.required ? 1 : 0,
-          refreshments_details: JSON.stringify(formData.refreshments)
+          refreshments_details: JSON.stringify(formData.refreshments),
+          updated_at: (() => {
+            const now = new Date()
+            const sriLankaTime = new Intl.DateTimeFormat('en-CA', {
+              timeZone: 'Asia/Colombo',
+              year: 'numeric',
+              month: '2-digit',
+              day: '2-digit',
+              hour: '2-digit',
+              minute: '2-digit',
+              second: '2-digit',
+              hour12: false
+            }).formatToParts(now)
+            
+            const year = parseInt(sriLankaTime.find(p => p.type === 'year')?.value || '0')
+            const month = parseInt(sriLankaTime.find(p => p.type === 'month')?.value || '0')
+            const day = parseInt(sriLankaTime.find(p => p.type === 'day')?.value || '0')
+            const hour = parseInt(sriLankaTime.find(p => p.type === 'hour')?.value || '0')
+            const minute = parseInt(sriLankaTime.find(p => p.type === 'minute')?.value || '0')
+            const second = parseInt(sriLankaTime.find(p => p.type === 'second')?.value || '0')
+            
+            // Create a Date object representing Sri Lanka local time
+            const sriLankaDate = new Date(year, month - 1, day, hour, minute, second)
+            
+            // Calculate UTC time that represents this Sri Lanka local time
+            // Sri Lanka is UTC+5:30, so subtract 5 hours 30 minutes to get UTC
+            const offsetMs = (5 * 60 + 30) * 60 * 1000
+            const utcDate = new Date(sriLankaDate.getTime() - offsetMs)
+            
+            // Format as MySQL DATETIME: YYYY-MM-DD HH:MM:SS (UTC)
+            const utcYear = utcDate.getUTCFullYear()
+            const utcMonth = String(utcDate.getUTCMonth() + 1).padStart(2, '0')
+            const utcDay = String(utcDate.getUTCDate()).padStart(2, '0')
+            const utcHour = String(utcDate.getUTCHours()).padStart(2, '0')
+            const utcMinute = String(utcDate.getUTCMinutes()).padStart(2, '0')
+            const utcSecond = String(utcDate.getUTCSeconds()).padStart(2, '0')
+            
+            return `${utcYear}-${utcMonth}-${utcDay} ${utcHour}:${utcMinute}:${utcSecond}`
+          })()
         }
 
         await placeManagementAPI.updateRecord('bookings', 
@@ -1579,7 +1633,49 @@ export function StaffBookingManagement() {
         await fetchBookings()
     } else {
         // INSERT new booking
+        // Get current time in Sri Lanka timezone (UTC+5:30)
+        // Returns UTC time that represents the current Sri Lanka local time
+        const getSriLankaTimestamp = (): string => {
+          const now = new Date()
+          const sriLankaTime = new Intl.DateTimeFormat('en-CA', {
+            timeZone: 'Asia/Colombo',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false
+          }).formatToParts(now)
+          
+          const year = parseInt(sriLankaTime.find(p => p.type === 'year')?.value || '0')
+          const month = parseInt(sriLankaTime.find(p => p.type === 'month')?.value || '0')
+          const day = parseInt(sriLankaTime.find(p => p.type === 'day')?.value || '0')
+          const hour = parseInt(sriLankaTime.find(p => p.type === 'hour')?.value || '0')
+          const minute = parseInt(sriLankaTime.find(p => p.type === 'minute')?.value || '0')
+          const second = parseInt(sriLankaTime.find(p => p.type === 'second')?.value || '0')
+          
+          // Create a Date object representing Sri Lanka local time
+          const sriLankaDate = new Date(year, month - 1, day, hour, minute, second)
+          
+          // Calculate UTC time that represents this Sri Lanka local time
+          // Sri Lanka is UTC+5:30, so subtract 5 hours 30 minutes to get UTC
+          const offsetMs = (5 * 60 + 30) * 60 * 1000 // 5:30 in milliseconds
+          const utcDate = new Date(sriLankaDate.getTime() - offsetMs)
+          
+          // Format as MySQL DATETIME: YYYY-MM-DD HH:MM:SS (UTC)
+          const utcYear = utcDate.getUTCFullYear()
+          const utcMonth = String(utcDate.getUTCMonth() + 1).padStart(2, '0')
+          const utcDay = String(utcDate.getUTCDate()).padStart(2, '0')
+          const utcHour = String(utcDate.getUTCHours()).padStart(2, '0')
+          const utcMinute = String(utcDate.getUTCMinutes()).padStart(2, '0')
+          const utcSecond = String(utcDate.getUTCSeconds()).padStart(2, '0')
+          
+          return `${utcYear}-${utcMonth}-${utcDay} ${utcHour}:${utcMinute}:${utcSecond}`
+        }
+        
         const bookingId = generateUUID()
+        const currentTimestamp = getSriLankaTimestamp()
         
         const newBookingData = {
           id: bookingId,
@@ -1600,7 +1696,9 @@ export function StaffBookingManagement() {
           refreshments_required: formData.refreshments.required ? 1 : 0,
           refreshments_details: JSON.stringify(formData.refreshments),
           is_deleted: 0,
-          created_by: user?.id || 'Unknown' // Set created_by to current user
+          created_by: user?.id || 'Unknown', // Set created_by to current user
+          created_at: currentTimestamp,
+          updated_at: currentTimestamp
         }
 
         console.log('📝 Creating new booking:', newBookingData)
@@ -1840,28 +1938,73 @@ export function StaffBookingManagement() {
       const currentUser = userData ? JSON.parse(userData) : null
       const cancelledBy = currentUser?.id || 'system'
 
+      // Get current time in Sri Lanka timezone (UTC+5:30)
+      // Returns UTC time that represents the current Sri Lanka local time
+      const getSriLankaTimestamp = (): string => {
+        const now = new Date()
+        const sriLankaTime = new Intl.DateTimeFormat('en-CA', {
+          timeZone: 'Asia/Colombo',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: false
+        }).formatToParts(now)
+        
+        const year = parseInt(sriLankaTime.find(p => p.type === 'year')?.value || '0')
+        const month = parseInt(sriLankaTime.find(p => p.type === 'month')?.value || '0')
+        const day = parseInt(sriLankaTime.find(p => p.type === 'day')?.value || '0')
+        const hour = parseInt(sriLankaTime.find(p => p.type === 'hour')?.value || '0')
+        const minute = parseInt(sriLankaTime.find(p => p.type === 'minute')?.value || '0')
+        const second = parseInt(sriLankaTime.find(p => p.type === 'second')?.value || '0')
+        
+        // Create a Date object representing Sri Lanka local time
+        const sriLankaDate = new Date(year, month - 1, day, hour, minute, second)
+        
+        // Calculate UTC time that represents this Sri Lanka local time
+        // Sri Lanka is UTC+5:30, so subtract 5 hours 30 minutes to get UTC
+        const offsetMs = (5 * 60 + 30) * 60 * 1000
+        const utcDate = new Date(sriLankaDate.getTime() - offsetMs)
+        
+        // Format as MySQL DATETIME: YYYY-MM-DD HH:MM:SS (UTC)
+        const utcYear = utcDate.getUTCFullYear()
+        const utcMonth = String(utcDate.getUTCMonth() + 1).padStart(2, '0')
+        const utcDay = String(utcDate.getUTCDate()).padStart(2, '0')
+        const utcHour = String(utcDate.getUTCHours()).padStart(2, '0')
+        const utcMinute = String(utcDate.getUTCMinutes()).padStart(2, '0')
+        const utcSecond = String(utcDate.getUTCSeconds()).padStart(2, '0')
+        
+        return `${utcYear}-${utcMonth}-${utcDay} ${utcHour}:${utcMinute}:${utcSecond}`
+      }
+      
+      const currentTimestamp = getSriLankaTimestamp()
+
       // Update booking status
       await placeManagementAPI.updateRecord('bookings', 
         { id: bookingToCancel }, 
         { 
           status: 'cancelled',
-          cancelled_at: new Date().toISOString()
+          cancelled_at: currentTimestamp,
+          updated_at: currentTimestamp
         }
       )
 
       // Save cancellation reason to booking_cancellations table
       const cancellationData = {
-        id: crypto.randomUUID(),
+        id: generateUUID(),
         booking_id: bookingToCancel,
         cancelled_by: cancelledBy,
         cancellation_reason: cancellationReason.trim(),
         cancellation_type: 'admin_cancelled',
-        cancelled_at: new Date().toISOString()
+        cancelled_at: currentTimestamp
       }
 
       await placeManagementAPI.insertRecord('booking_cancellations', cancellationData)
       
-      setBookings(bookings.map((b) => (b.id === bookingToCancel ? { ...b, status: "cancelled" } : b)))
+      // Refresh bookings to get the cancellation reason
+      await fetchBookings()
       
       toast.success('Booking cancelled successfully', {
         position: 'top-center',
@@ -2075,7 +2218,6 @@ export function StaffBookingManagement() {
     setSelectedBookingForEmail(booking)
     setSelectedEmailParticipants([])
     setEmailType('booking_details')
-    setCustomMessage('')
     setIsEmailDialogOpen(true)
     
     // Load participants for this booking
@@ -2369,7 +2511,7 @@ export function StaffBookingManagement() {
         },
         body: JSON.stringify({
           reminderType: reminderType,
-          customMessage: customMessage
+          customMessage: ''
         })
       })
 
@@ -2389,7 +2531,6 @@ export function StaffBookingManagement() {
         setSelectedBookingForEmail(null)
         setSelectedEmailParticipants([])
         setBookingParticipants([])
-        setCustomMessage('')
       } else {
         toast.error(result.message || 'Failed to send reminder emails')
       }
@@ -2412,7 +2553,6 @@ export function StaffBookingManagement() {
     description?: string
     participantEmails: string[]
     emailType?: string
-    customMessage?: string
   }) => {
     try {
       console.log('📧 ==========================================')
@@ -2583,7 +2723,6 @@ export function StaffBookingManagement() {
       console.log('📧 Booking Date:', selectedBookingForEmail.date)
       console.log('📧 Selected Participants Count:', selectedEmailParticipants.length)
       console.log('📧 Email Type:', emailType)
-      console.log('📧 Custom Message:', customMessage || '(none)')
       console.log('📧 Token Available:', !!token)
       
       if (!selectedEmailParticipants || selectedEmailParticipants.length === 0) {
@@ -2665,7 +2804,7 @@ export function StaffBookingManagement() {
         description: selectedBookingForEmail.description || '',
         participantEmails: participantEmails,
         emailType: emailType || 'booking_details',
-        customMessage: customMessage || ''
+        customMessage: ''
       }
       
       console.log('📧 ==========================================')
@@ -2680,7 +2819,6 @@ export function StaffBookingManagement() {
       console.log('📧 participantEmails:', participantEmails)
       console.log('📧 participantEmails count:', participantEmails.length)
       console.log('📧 emailType:', bookingData.emailType)
-      console.log('📧 customMessage:', bookingData.customMessage || '(not provided)')
       console.log('📧 ==========================================')
       console.log('📧 USING NEW SIMPLIFIED API - NO BOOKING ID NEEDED!')
       console.log('📧 ==========================================')
@@ -2696,33 +2834,29 @@ export function StaffBookingManagement() {
         console.log('📧 Emails Failed:', result.data?.emailsFailed)
         console.log('📧 Total Participants:', result.data?.totalParticipants)
         
+        // Show success alert popup
         if (result.data?.emailsFailed && result.data.emailsFailed > 0) {
-          toast.success(`✅ Emails sent to ${result.data.emailsSent} participants, ${result.data.emailsFailed} failed`, {
-            position: 'top-center',
-            duration: 3000
-          })
+          setEmailAlertMessage(`Emails sent to ${result.data.emailsSent} participants, ${result.data.emailsFailed} failed`)
         } else {
-          toast.success(`✅ Emails sent successfully to ${result.data?.emailsSent || participantEmails.length} participants`, {
-            position: 'top-center',
-            duration: 3000
-          })
+          setEmailAlertMessage(`Emails sent successfully to ${result.data?.emailsSent || participantEmails.length} participants`)
         }
+        setEmailAlertType("success")
+        setIsEmailAlertDialogOpen(true)
         
-        // Close dialog
+        // Close email dialog
         setIsEmailDialogOpen(false)
         setSelectedBookingForEmail(null)
         setSelectedEmailParticipants([])
         setBookingParticipants([])
-        setCustomMessage('')
       } else {
         console.error('❌ ==========================================')
         console.error('❌ EMAIL SENDING FAILED')
         console.error('❌ ==========================================')
         console.error('❌ Result:', result)
-        toast.error(result?.message || 'Failed to send emails. Please try again.', {
-          position: 'top-center',
-          duration: 3000
-        })
+        // Show error alert popup
+        setEmailAlertMessage(result?.message || 'Failed to send emails. Please try again.')
+        setEmailAlertType("error")
+        setIsEmailAlertDialogOpen(true)
       }
       
       console.log('📧 ==========================================')
@@ -2737,7 +2871,10 @@ export function StaffBookingManagement() {
       console.error('❌ Error Message:', error.message)
       console.error('❌ Error Stack:', error.stack)
       console.error('❌ Full Error Object:', error)
-      toast.error(`Failed to send email notifications: ${error.message}`)
+      // Show error alert popup
+      setEmailAlertMessage(`Failed to send email notifications: ${error.message}`)
+      setEmailAlertType("error")
+      setIsEmailAlertDialogOpen(true)
     } finally {
       setIsSendingEmails(false)
       console.log('📧 Email sending state reset (isSendingEmails = false)')
@@ -2759,55 +2896,59 @@ export function StaffBookingManagement() {
   }, [])
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 px-2 sm:px-4">
       {/* Compact Header with Filters and Actions in One Line */}
-      <div className="flex items-center gap-4 flex-wrap">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4">
         {/* Search */}
-        <div className="flex-1 min-w-[300px] relative">
+        <div className="flex-1 min-w-0 sm:min-w-[200px] relative">
           <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search by title, description, place, or responsible person..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
+            className="pl-10 w-full"
           />
         </div>
 
-        {/* Status Filter */}
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-[150px]">
-            <SelectValue placeholder="All Status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="upcoming">Upcoming</SelectItem>
-            <SelectItem value="ongoing">Ongoing</SelectItem>
-            <SelectItem value="completed">Completed</SelectItem>
-            <SelectItem value="cancelled">Cancelled</SelectItem>
-          </SelectContent>
-        </Select>
+        {/* Filters and Button Container */}
+        <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
+          {/* Status Filter */}
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-full sm:w-[150px]">
+              <SelectValue placeholder="All Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Status</SelectItem>
+              <SelectItem value="upcoming">Upcoming</SelectItem>
+              <SelectItem value="ongoing">Ongoing</SelectItem>
+              <SelectItem value="completed">Completed</SelectItem>
+              <SelectItem value="cancelled">Cancelled</SelectItem>
+            </SelectContent>
+          </Select>
 
-        {/* Place Filter */}
-        <Select value={placeFilter} onValueChange={setPlaceFilter}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="All Places" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Places</SelectItem>
-            {Array.from(new Set(bookings.map(b => b.place))).map(place => (
-              <SelectItem key={place} value={place}>{place}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          {/* Place Filter */}
+          <Select value={placeFilter} onValueChange={setPlaceFilter}>
+            <SelectTrigger className="w-full sm:w-[180px]">
+              <SelectValue placeholder="All Places" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Places</SelectItem>
+              {Array.from(new Set(bookings.map(b => b.place))).map(place => (
+                <SelectItem key={place} value={place}>{place}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
-        {/* New Booking Button */}
-        <Button 
-          onClick={() => window.location.href = '/staff/bookings/new'}
-          className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-lg"
-        >
-          <Plus className="h-4 w-4" />
-          New Booking
-        </Button>
+          {/* New Booking Button */}
+          <Button 
+            onClick={() => window.location.href = '/staff/bookings/new'}
+            className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-lg w-full sm:w-auto whitespace-nowrap"
+          >
+            <Plus className="h-4 w-4" />
+            <span className="hidden sm:inline">New Booking</span>
+            <span className="sm:hidden">New</span>
+          </Button>
+        </div>
       </div>
 
       {/* Hidden dialog - kept for edit functionality */}
@@ -3609,28 +3750,15 @@ export function StaffBookingManagement() {
                             const hasReason = reason && String(reason).trim().length > 0
                             
                             return (
-                              <div className="flex items-center gap-2 min-w-[150px]">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => handleShowCancellationReason(booking)}
-                                  className="text-blue-600 hover:text-blue-700 hover:border-blue-600"
-                                  title={hasReason ? `View cancellation reason: ${String(reason).substring(0, 50)}...` : "View cancellation details"}
-                                >
-                                  <Info className="h-4 w-4" />
-                                </Button>
-                                {hasReason ? (
-                                  <span 
-                                    className="text-xs text-muted-foreground max-w-[200px] truncate cursor-pointer hover:text-foreground"
-                                    onClick={() => handleShowCancellationReason(booking)}
-                                    title={String(reason)}
-                                  >
-                                    {String(reason)}
-                                  </span>
-                                ) : (
-                                  <span className="text-xs text-muted-foreground">No reason</span>
-                                )}
-                              </div>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleShowCancellationReason(booking)}
+                                className="text-blue-600 hover:text-blue-700 hover:border-blue-600"
+                                title={hasReason ? `View cancellation reason: ${String(reason).substring(0, 50)}...` : "View cancellation details"}
+                              >
+                                <Info className="h-4 w-4" />
+                              </Button>
                             )
                           })()}
                         </div>
@@ -3881,27 +4009,14 @@ export function StaffBookingManagement() {
               {/* Email Type Selection */}
               <div className="space-y-2">
                 <Label htmlFor="emailType">Email Type</Label>
-                <Select value={emailType} onValueChange={(value: 'booking_details' | 'booking_confirmation') => setEmailType(value)}>
+                <Select value={emailType} onValueChange={(value: 'booking_details') => setEmailType(value)} disabled>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="booking_details">Booking Details</SelectItem>
-                    <SelectItem value="booking_confirmation">Booking Confirmation</SelectItem>
                   </SelectContent>
                 </Select>
-              </div>
-
-              {/* Custom Message */}
-              <div className="space-y-2">
-                <Label htmlFor="customMessage">Custom Message (Optional)</Label>
-                <Textarea
-                  id="customMessage"
-                  placeholder="Add a custom message to include in the email..."
-                  value={customMessage}
-                  onChange={(e) => setCustomMessage(e.target.value)}
-                  rows={3}
-                />
               </div>
 
               {/* Participants Section */}
@@ -4026,7 +4141,6 @@ export function StaffBookingManagement() {
                       setSelectedBookingForEmail(null)
                       setSelectedEmailParticipants([])
                       setBookingParticipants([])
-                      setCustomMessage('')
                     }}
                     disabled={isSendingEmails}
                   >
@@ -4053,6 +4167,30 @@ export function StaffBookingManagement() {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Email Alert Dialog */}
+      <Dialog open={isEmailAlertDialogOpen} onOpenChange={setIsEmailAlertDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {emailAlertType === "success" ? (
+                <CheckCircle className="h-5 w-5 text-green-500" />
+              ) : (
+                <AlertTriangle className="h-5 w-5 text-red-500" />
+              )}
+              {emailAlertType === "success" ? "Email Sent Successfully" : "Email Sending Failed"}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-sm text-muted-foreground">{emailAlertMessage}</p>
+          </div>
+          <div className="flex justify-end">
+            <Button onClick={() => setIsEmailAlertDialogOpen(false)}>
+              OK
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

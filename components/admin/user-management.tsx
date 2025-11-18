@@ -113,7 +113,9 @@ interface Pagination {
   totalPages: number
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
+import { API_BASE_URL } from '@/lib/api-config'
+
+const API_BASE = API_BASE_URL
 
 const getAuthHeaders = () => {
   // Get token from localStorage (same as placeManagementAPI)
@@ -696,21 +698,21 @@ export function UserManagement() {
           {/* Filters and Search */}
           <Card className="border-2">
             <CardContent className="pt-6">
-              <div className="flex flex-col md:flex-row gap-4">
-                <div className="flex-1">
+              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+                <div className="flex-1 min-w-0">
                   <div className="relative">
                     <Search className="absolute left-3 top-3 h-5 w-5 text-muted-foreground" />
                     <Input
                       placeholder="Search by name, email..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10"
+                      className="pl-10 w-full"
                     />
                   </div>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <Select value={roleFilter || "all"} onValueChange={(value) => setRoleFilter(value === "all" ? "" : value)}>
-                    <SelectTrigger className="w-32">
+                    <SelectTrigger className="w-full sm:w-32">
                       <SelectValue placeholder="Role" />
                     </SelectTrigger>
                     <SelectContent>
@@ -721,7 +723,7 @@ export function UserManagement() {
                     </SelectContent>
                   </Select>
                   <Select value={statusFilter || "all"} onValueChange={(value) => setStatusFilter(value === "all" ? "" : value)}>
-                    <SelectTrigger className="w-32">
+                    <SelectTrigger className="w-full sm:w-32">
                       <SelectValue placeholder="Status" />
                     </SelectTrigger>
                     <SelectContent>
@@ -732,10 +734,11 @@ export function UserManagement() {
                   </Select>
                   <Button
                     onClick={() => setIsCreateUserDialogOpen(true)}
-                    className="bg-gradient-to-r from-primary to-secondary hover:from-primary/90 hover:to-secondary/90"
+                    className="bg-gradient-to-r from-primary to-secondary hover:from-primary/90 hover:to-secondary/90 w-full sm:w-auto whitespace-nowrap"
                   >
                     <UserPlus className="h-4 w-4 mr-2" />
-                    Create User
+                    <span className="hidden sm:inline">Create User</span>
+                    <span className="sm:hidden">Create</span>
                   </Button>
                 </div>
               </div>
