@@ -227,7 +227,7 @@ export default function StaffNewBookingPage() {
     fetchUsers()
   }, [])
 
-  // Fetch bookings for conflict checking
+  // Fetch bookings for conflict checking (exclude cancelled and deleted bookings)
   useEffect(() => {
     const fetchBookings = async () => {
       try {
@@ -240,7 +240,13 @@ export default function StaffNewBookingPage() {
         
         const bookingsData: any[] = Array.isArray(bookingsResponse) ? bookingsResponse : []
         
-        const transformedBookings: Booking[] = bookingsData.map((booking: any) => {
+        // Filter out cancelled bookings - they don't block time slots
+        const activeBookings = bookingsData.filter((booking: any) => {
+          const status = booking.status?.toLowerCase()
+          return status !== 'cancelled'
+        })
+        
+        const transformedBookings: Booking[] = activeBookings.map((booking: any) => {
           // Normalize date
           let normalizedDate = booking.booking_date
           if (normalizedDate && typeof normalizedDate === 'string' && normalizedDate.includes('T')) {
@@ -260,6 +266,7 @@ export default function StaffNewBookingPage() {
           }
         })
         
+        console.log(`📋 Loaded ${transformedBookings.length} active bookings (excluded ${bookingsData.length - activeBookings.length} cancelled bookings)`)
         setExistingBookings(transformedBookings)
       } catch (error) {
         console.error('Failed to fetch bookings:', error)
@@ -405,6 +412,8 @@ export default function StaffNewBookingPage() {
       const closeMinutes = timeToMinutes(closeTime)
 
       // Get existing bookings for this date and place
+      // Filter bookings: same date, same place, and exclude cancelled bookings
+      // Note: cancelled bookings are already filtered out when fetching, but double-check here
       const relevantBookings = existingBookings.filter(booking => {
         const placeMatches = booking.placeId ? booking.placeId === formData.place : booking.place === selectedPlace.name
         return booking.date === formData.date && placeMatches && booking.startTime && booking.endTime
@@ -413,6 +422,8 @@ export default function StaffNewBookingPage() {
         end: timeToMinutes(booking.endTime),
         title: booking.title
       })).sort((a, b) => a.start - b.start)
+      
+      console.log(`📋 Found ${relevantBookings.length} active bookings for ${formData.date} at ${selectedPlace.name} (cancelled bookings excluded)`)
 
       console.log('📋 Relevant bookings for gap calculation:', relevantBookings)
 

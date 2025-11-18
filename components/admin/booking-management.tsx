@@ -3966,15 +3966,15 @@ export function BookingManagement() {
                             const hasReason = reason && String(reason).trim().length > 0
                             
                             return (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleShowCancellationReason(booking)}
-                                className="text-blue-600 hover:text-blue-700 hover:border-blue-600"
-                                title={hasReason ? `View cancellation reason: ${String(reason).substring(0, 50)}...` : "View cancellation details"}
-                              >
-                                <Info className="h-4 w-4" />
-                              </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleShowCancellationReason(booking)}
+                                  className="text-blue-600 hover:text-blue-700 hover:border-blue-600"
+                                  title={hasReason ? `View cancellation reason: ${String(reason).substring(0, 50)}...` : "View cancellation details"}
+                                >
+                                  <Info className="h-4 w-4" />
+                                </Button>
                             )
                           })()}
                         </div>

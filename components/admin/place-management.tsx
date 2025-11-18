@@ -401,14 +401,14 @@ export function PlaceManagement() {
       try {
         // Method 1: Query with filters
         configResponse = await placeManagementAPI.getTableData('place_configuration', {
-          filters: [{
-            column: 'place_id',
-            operator: 'equals',
-            value: place.id
-          }],
-          limit: 1
-        })
-        
+        filters: [{
+          column: 'place_id',
+          operator: 'equals',
+          value: place.id
+        }],
+        limit: 1
+      })
+      
         console.log('📦 Configuration response (filtered):', configResponse)
         
         // Handle different response formats
@@ -538,17 +538,17 @@ export function PlaceManagement() {
           // Configuration exists - UPDATE it using config ID
           console.log('🔄 Updating existing configuration with ID:', existingConfigId)
           try {
-            await placeManagementAPI.updateRecord('place_configuration', 
+        await placeManagementAPI.updateRecord('place_configuration', 
               { id: existingConfigId }, 
               configData
-            )
+        )
             console.log('✅ Configuration updated successfully')
             toast.success(`Configuration for "${selectedPlaceForConfig.name}" updated successfully!`, {
-              position: 'top-center',
-              duration: 3000,
+          position: 'top-center',
+          duration: 3000,
               icon: '✅'
-            })
-            setIsConfigDialogOpen(false)
+        })
+        setIsConfigDialogOpen(false)
           } catch (updateError: any) {
             console.error('❌ Update failed, error:', updateError)
             // If update fails with "No records found", try insert instead
@@ -567,12 +567,12 @@ export function PlaceManagement() {
               console.log('✅ Configuration created successfully with ID:', configId)
               setConfigExists(true)
               setExistingConfigId(configId)
-              toast.success(`Configuration for "${selectedPlaceForConfig.name}" created successfully!`, {
-                position: 'top-center',
-                duration: 3000,
+            toast.success(`Configuration for "${selectedPlaceForConfig.name}" created successfully!`, {
+              position: 'top-center',
+              duration: 3000,
                 icon: '✅'
-              })
-              setIsConfigDialogOpen(false)
+            })
+            setIsConfigDialogOpen(false)
             } else {
               throw updateError // Re-throw if it's a different error
             }
@@ -595,7 +595,7 @@ export function PlaceManagement() {
           setConfigExists(true) // Mark as existing for next time
           setExistingConfigId(configId) // Store the new config ID
           toast.success(`Configuration for "${selectedPlaceForConfig.name}" created successfully!`, {
-            position: 'top-center',
+              position: 'top-center',
             duration: 3000,
             icon: '✅'
           })
@@ -608,13 +608,13 @@ export function PlaceManagement() {
           stack: error instanceof Error ? error.stack : undefined,
           error: error
         })
-        const errorMessage = error instanceof Error ? error.message : "Failed to save configuration"
-        setError(errorMessage)
-        toast.error(errorMessage, {
-          position: 'top-center',
-          duration: 4000,
-          icon: '❌'
-        })
+          const errorMessage = error instanceof Error ? error.message : "Failed to save configuration"
+          setError(errorMessage)
+          toast.error(errorMessage, {
+            position: 'top-center',
+            duration: 4000,
+            icon: '❌'
+          })
       }
     })
     setIsConfirmDialogOpen(true)
@@ -821,14 +821,14 @@ export function PlaceManagement() {
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="address">Address *</Label>
-                <Input
-                  id="address"
-                  value={formData.address}
-                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                  required
-                />
+                <div className="space-y-2">
+                  <Label htmlFor="address">Address *</Label>
+                  <Input
+                    id="address"
+                    value={formData.address}
+                    onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                    required
+                  />
               </div>
 
               <div className="grid grid-cols-2 gap-4">

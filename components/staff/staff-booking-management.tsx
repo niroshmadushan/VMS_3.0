@@ -2912,42 +2912,42 @@ export function StaffBookingManagement() {
 
         {/* Filters and Button Container */}
         <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
-          {/* Status Filter */}
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
+        {/* Status Filter */}
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-full sm:w-[150px]">
-              <SelectValue placeholder="All Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="upcoming">Upcoming</SelectItem>
-              <SelectItem value="ongoing">Ongoing</SelectItem>
-              <SelectItem value="completed">Completed</SelectItem>
-              <SelectItem value="cancelled">Cancelled</SelectItem>
-            </SelectContent>
-          </Select>
+            <SelectValue placeholder="All Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Status</SelectItem>
+            <SelectItem value="upcoming">Upcoming</SelectItem>
+            <SelectItem value="ongoing">Ongoing</SelectItem>
+            <SelectItem value="completed">Completed</SelectItem>
+            <SelectItem value="cancelled">Cancelled</SelectItem>
+          </SelectContent>
+        </Select>
 
-          {/* Place Filter */}
-          <Select value={placeFilter} onValueChange={setPlaceFilter}>
+        {/* Place Filter */}
+        <Select value={placeFilter} onValueChange={setPlaceFilter}>
             <SelectTrigger className="w-full sm:w-[180px]">
-              <SelectValue placeholder="All Places" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Places</SelectItem>
-              {Array.from(new Set(bookings.map(b => b.place))).map(place => (
-                <SelectItem key={place} value={place}>{place}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            <SelectValue placeholder="All Places" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Places</SelectItem>
+            {Array.from(new Set(bookings.map(b => b.place))).map(place => (
+              <SelectItem key={place} value={place}>{place}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
-          {/* New Booking Button */}
-          <Button 
+        {/* New Booking Button */}
+        <Button 
             onClick={() => window.location.href = '/staff/bookings/new'}
             className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-lg w-full sm:w-auto whitespace-nowrap"
-          >
-            <Plus className="h-4 w-4" />
+        >
+          <Plus className="h-4 w-4" />
             <span className="hidden sm:inline">New Booking</span>
             <span className="sm:hidden">New</span>
-          </Button>
+        </Button>
         </div>
       </div>
 
@@ -3750,15 +3750,15 @@ export function StaffBookingManagement() {
                             const hasReason = reason && String(reason).trim().length > 0
                             
                             return (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleShowCancellationReason(booking)}
-                                className="text-blue-600 hover:text-blue-700 hover:border-blue-600"
-                                title={hasReason ? `View cancellation reason: ${String(reason).substring(0, 50)}...` : "View cancellation details"}
-                              >
-                                <Info className="h-4 w-4" />
-                              </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleShowCancellationReason(booking)}
+                                  className="text-blue-600 hover:text-blue-700 hover:border-blue-600"
+                                  title={hasReason ? `View cancellation reason: ${String(reason).substring(0, 50)}...` : "View cancellation details"}
+                                >
+                                  <Info className="h-4 w-4" />
+                                </Button>
                             )
                           })()}
                         </div>

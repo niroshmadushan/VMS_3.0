@@ -218,7 +218,7 @@ export default function NewBookingPage() {
     fetchUsers()
   }, [])
 
-  // Fetch bookings for conflict checking
+  // Fetch bookings for conflict checking (exclude cancelled and deleted bookings)
   useEffect(() => {
     const fetchBookings = async () => {
       try {
@@ -231,7 +231,13 @@ export default function NewBookingPage() {
         
         const bookingsData: any[] = Array.isArray(bookingsResponse) ? bookingsResponse : []
         
-        const transformedBookings: Booking[] = bookingsData.map((booking: any) => {
+        // Filter out cancelled bookings - they don't block time slots
+        const activeBookings = bookingsData.filter((booking: any) => {
+          const status = booking.status?.toLowerCase()
+          return status !== 'cancelled'
+        })
+        
+        const transformedBookings: Booking[] = activeBookings.map((booking: any) => {
           // Normalize date
           let normalizedDate = booking.booking_date
           if (normalizedDate && typeof normalizedDate === 'string' && normalizedDate.includes('T')) {
@@ -251,6 +257,7 @@ export default function NewBookingPage() {
           }
         })
         
+        console.log(`📋 Loaded ${transformedBookings.length} active bookings (excluded ${bookingsData.length - activeBookings.length} cancelled bookings)`)
         setExistingBookings(transformedBookings)
       } catch (error) {
         console.error('Failed to fetch bookings:', error)
@@ -396,6 +403,8 @@ export default function NewBookingPage() {
       const closeMinutes = timeToMinutes(closeTime)
 
       // Get existing bookings for this date and place
+      // Filter bookings: same date, same place, and exclude cancelled bookings
+      // Note: cancelled bookings are already filtered out when fetching, but double-check here
       const relevantBookings = existingBookings.filter(booking => {
         const placeMatches = booking.placeId ? booking.placeId === formData.place : booking.place === selectedPlace.name
         return booking.date === formData.date && placeMatches && booking.startTime && booking.endTime
@@ -404,6 +413,8 @@ export default function NewBookingPage() {
         end: timeToMinutes(booking.endTime),
         title: booking.title
       })).sort((a, b) => a.start - b.start)
+      
+      console.log(`📋 Found ${relevantBookings.length} active bookings for ${formData.date} at ${selectedPlace.name} (cancelled bookings excluded)`)
 
       console.log('📋 Relevant bookings for gap calculation:', relevantBookings)
 
@@ -650,55 +661,80 @@ export default function NewBookingPage() {
     try {
       console.log('📧 Sending email notifications to:', selectedEmailParticipants)
       
-      // Prepare email data
-      const emailData = {
-        booking: {
-          title: bookingData.title,
-          description: bookingData.description,
-          date: bookingData.booking_date,
-          startTime: bookingData.start_time,
-          endTime: bookingData.end_time,
-          place: bookingData.place_name,
-          refId: bookingRefId,
-          responsiblePerson: bookingData.responsible_person_name
-        },
-        recipients: selectedEmailParticipants
+      // Get authentication token
+      const token = localStorage.getItem('authToken') || localStorage.getItem('jwt_token') || localStorage.getItem('token')
+      
+      if (!token) {
+        console.error('❌ No authentication token found')
+        toast.error('Authentication required. Please log in again.', {
+          position: 'top-center',
+          duration: 4000,
+          icon: '❌'
+        })
+        return
       }
 
-      // Call the email API endpoint
-      const response = await fetch('/api/admin/send-meeting-invitations', {
+      // Format time for email (remove seconds if present)
+      const formatTime = (time: string) => {
+        return time.substring(0, 5) // Remove seconds if present
+      }
+
+      // Prepare email data for the new simplified API
+      const emailData = {
+        meetingName: bookingData.title,
+        date: bookingData.booking_date,
+        startTime: formatTime(bookingData.start_time),
+        endTime: formatTime(bookingData.end_time),
+        place: bookingData.place_name || '',
+        description: bookingData.description || '',
+        participantEmails: selectedEmailParticipants,
+        emailType: 'booking_details' as const
+      }
+
+      console.log('📧 Email data prepared:', emailData)
+
+      // Call the simplified email API endpoint
+      const response = await fetch('/api/booking-email/send-from-frontend', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify(emailData)
       })
 
       const result = await response.json()
 
+      console.log('📧 Email API response status:', response.status)
+      console.log('📧 Email API response:', result)
+
       if (!response.ok) {
-        throw new Error(result.error || 'Failed to send emails')
+        throw new Error(result.message || result.error || 'Failed to send emails')
       }
 
-      console.log('📧 Email API response:', result)
-      
-      // Show success message with details
-      if (result.data.failed > 0) {
-        toast.success(`Emails sent to ${result.data.successful} participants (${result.data.failed} failed)`, {
-          position: 'top-center',
-          duration: 4000,
-          icon: '📧'
-        })
+      if (result.success) {
+        const successful = result.data?.successful || result.data?.emailsSent || selectedEmailParticipants.length
+        const failed = result.data?.failed || 0
+        
+        if (failed > 0) {
+          toast.success(`Emails sent to ${successful} participants (${failed} failed)`, {
+            position: 'top-center',
+            duration: 4000,
+            icon: '📧'
+          })
+        } else {
+          toast.success(`Email notifications sent to ${successful} participants`, {
+            position: 'top-center',
+            duration: 3000,
+            icon: '📧'
+          })
+        }
       } else {
-        toast.success(`Email notifications sent to ${result.data.successful} participants`, {
-          position: 'top-center',
-          duration: 3000,
-          icon: '📧'
-        })
+        throw new Error(result.message || 'Failed to send emails')
       }
       
     } catch (error: any) {
-      console.error('Failed to send email notifications:', error)
+      console.error('❌ Failed to send email notifications:', error)
       toast.error(`Failed to send email notifications: ${error.message}`, {
         position: 'top-center',
         duration: 4000,

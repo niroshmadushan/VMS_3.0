@@ -358,15 +358,15 @@ const sendBookingDetailsEmail = async (req, res) => {
                         // Lookup by email
                         console.log('📧 Looking up internal participant by email:', identifier);
                         query = `
-                            SELECT 
-                                bp.id,
+                        SELECT 
+                            bp.id,
                                 bp.employee_id,
-                                bp.employee_name as full_name,
-                                bp.employee_email as email,
-                                bp.employee_phone as phone,
-                                '' as company_name,
-                                'employee' as member_type
-                            FROM booking_participants bp
+                            bp.employee_name as full_name,
+                            bp.employee_email as email,
+                            bp.employee_phone as phone,
+                            '' as company_name,
+                            'employee' as member_type
+                        FROM booking_participants bp
                             WHERE bp.employee_email = ? AND bp.booking_id = ? AND bp.is_deleted = 0 AND bp.employee_email IS NOT NULL
                         `;
                         queryParams = [identifier, bookingId];
