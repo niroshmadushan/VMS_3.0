@@ -64,7 +64,7 @@ export async function manageUser(formData: FormDataType): Promise<{ success: boo
         console.error('Password is not a string:', password)
         return { success: false, error: 'Invalid password format' }
       }
-      console.log('Creating user with payload:', { email, password, email_confirm: true, user_metadata: { full_name: fullName, phone, role, is_active: status } }) // Debug
+      console.log('Creating user with payload:', { email, password, email_confirm: true, user_metadata: { full_name: fullName, phone, role, is_active: status, original_email: email } }) // Debug
 
       const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
         email,
@@ -75,6 +75,7 @@ export async function manageUser(formData: FormDataType): Promise<{ success: boo
           phone,
           role,
           is_active: status,
+          original_email: email, // Store original email to preserve format (e.g., dots in Gmail)
         },
       })
 

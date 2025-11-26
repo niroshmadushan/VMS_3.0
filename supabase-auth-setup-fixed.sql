@@ -70,10 +70,13 @@ CREATE POLICY "Admins can update all profiles" ON public.profiles
 -- =====================================================
 
 -- Function to handle new user signup
+-- FIXED: Uses original_email from user_metadata to preserve email format (e.g., dots in Gmail)
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
     -- Insert new profile record
+    -- Use original_email from user_metadata if available, otherwise use NEW.email
+    -- This preserves the original email format even if Supabase Auth normalizes it
     INSERT INTO public.profiles (
         id,
         email,
@@ -85,8 +88,8 @@ BEGIN
     )
     VALUES (
         NEW.id,
-        NEW.email,
-        COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.email),
+        COALESCE(NEW.raw_user_meta_data->>'original_email', NEW.email),
+        COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.raw_user_meta_data->>'original_email', NEW.email),
         COALESCE(NEW.raw_user_meta_data->>'first_name', ''),
         COALESCE(NEW.raw_user_meta_data->>'last_name', ''),
         NOW(),

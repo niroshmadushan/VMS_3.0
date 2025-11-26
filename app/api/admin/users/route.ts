@@ -75,7 +75,12 @@ export async function POST(req: Request) {
       phone,
       password: tempPassword,
       options: {
-        data: { full_name: fullName, role, is_active },
+        data: { 
+          full_name: fullName, 
+          role, 
+          is_active,
+          original_email: email, // Store original email to preserve format (e.g., dots in Gmail)
+        },
         emailRedirectTo: process.env.NEXT_PUBLIC_SITE_URL + '/login',
       },
     })
