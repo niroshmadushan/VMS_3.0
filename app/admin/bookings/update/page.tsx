@@ -650,16 +650,21 @@ export default function UpdateBookingPage() {
       const closeMinutes = timeToMinutes(closeTime)
 
       // Get existing bookings for this date and place
+      // IMPORTANT: Exclude the current booking being edited so it doesn't block its own time slot
       const relevantBookings = existingBookings.filter(booking => {
         const placeMatches = booking.placeId ? booking.placeId === formData.place : booking.place === selectedPlace.name
-        return booking.date === formData.date && placeMatches && booking.startTime && booking.endTime
+        const isCurrentBooking = bookingId && booking.id === bookingId
+        return booking.date === formData.date && placeMatches && booking.startTime && booking.endTime && !isCurrentBooking
       }).map(booking => ({
         start: timeToMinutes(booking.startTime),
         end: timeToMinutes(booking.endTime),
         title: booking.title
       })).sort((a, b) => a.start - b.start)
 
-      console.log('📋 Relevant bookings for gap calculation:', relevantBookings)
+      console.log('📋 Relevant bookings for gap calculation (excluding current booking):', relevantBookings)
+      if (bookingId) {
+        console.log('✅ Excluded current booking ID:', bookingId, 'from time slot calculation')
+      }
 
       // Find gaps
       const gaps: {start: string, end: string, duration: string}[] = []

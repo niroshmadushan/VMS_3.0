@@ -94,11 +94,7 @@ export function PlaceManagement() {
   const [formData, setFormData] = useState({
     name: "",
     description: "",
-    address: "",
     city: "",
-    state: "",
-    country: "",
-    place_type: "",
     capacity: 0,
     area_sqft: 0,
     phone: "",
@@ -194,8 +190,7 @@ export function PlaceManagement() {
     if (searchTerm) {
       filtered = filtered.filter(place =>
         place.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        place.city.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        place.address.toLowerCase().includes(searchTerm.toLowerCase())
+        place.city.toLowerCase().includes(searchTerm.toLowerCase())
       )
     }
 
@@ -225,11 +220,7 @@ export function PlaceManagement() {
     setFormData({
       name: "",
       description: "",
-      address: "",
       city: "",
-      state: "",
-      country: "",
-      place_type: "",
       capacity: 0,
       area_sqft: 0,
       phone: "",
@@ -246,7 +237,12 @@ export function PlaceManagement() {
       try {
         // Clean the form data - remove undefined values and convert empty strings to null
         // Also set email, phone, and city to null for new places (these fields are not in the form)
+        // Exclude address, state, country, and place_type fields
         const cleanData = Object.entries(formData).reduce((acc, [key, value]) => {
+          // Skip address, state, country, and place_type fields
+          if (key === 'address' || key === 'state' || key === 'country' || key === 'place_type') {
+            return acc
+          }
           // For new places, set email, phone, and city to null (not shown in form)
           if (!editingPlace && (key === 'email' || key === 'phone' || key === 'city')) {
             acc[key] = null
@@ -303,11 +299,7 @@ export function PlaceManagement() {
     setFormData({
       name: place.name,
       description: place.description,
-      address: place.address,
       city: place.city,
-      state: place.state,
-      country: place.country,
-      place_type: place.place_type,
       capacity: place.capacity,
       area_sqft: place.area_sqft,
       phone: place.phone,
@@ -784,31 +776,14 @@ export function PlaceManagement() {
               <DialogTitle>{editingPlace ? "Edit Place" : "Add New Place"}</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Place Name *</Label>
-                  <Input
-                    id="name"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="place_type">Place Type *</Label>
-                  <Select value={formData.place_type} onValueChange={(value) => setFormData({ ...formData, place_type: value })}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select place type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {placeTypes.map((type) => (
-                        <SelectItem key={type.value} value={type.value}>
-                          {type.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="name">Place Name *</Label>
+                <Input
+                  id="name"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  required
+                />
               </div>
 
               <div className="space-y-2">
@@ -819,37 +794,6 @@ export function PlaceManagement() {
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   rows={3}
                 />
-              </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="address">Address *</Label>
-                  <Input
-                    id="address"
-                    value={formData.address}
-                    onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                    required
-                  />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="state">State *</Label>
-                  <Input
-                    id="state"
-                    value={formData.state}
-                    onChange={(e) => setFormData({ ...formData, state: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="country">Country *</Label>
-                  <Input
-                    id="country"
-                    value={formData.country}
-                    onChange={(e) => setFormData({ ...formData, country: e.target.value })}
-                    required
-                  />
-                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -941,7 +885,7 @@ export function PlaceManagement() {
                         <TableCell className="min-w-[150px]">
                           <div className="flex items-center gap-1 text-sm">
                             <MapPin className="h-3 w-3" />
-                            {place.city}, {place.state}
+                            {place.city}
                           </div>
                         </TableCell>
                         <TableCell className="min-w-[100px]">
@@ -1041,7 +985,7 @@ export function PlaceManagement() {
             <div className="space-y-4">
               <div className="bg-muted p-3 rounded-lg">
                 <h3 className="font-semibold">{selectedPlaceForConfig.name}</h3>
-                <p className="text-sm text-muted-foreground">{selectedPlaceForConfig.city}, {selectedPlaceForConfig.state}</p>
+                <p className="text-sm text-muted-foreground">{selectedPlaceForConfig.city}</p>
               </div>
 
               <div className="space-y-4">

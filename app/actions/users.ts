@@ -53,7 +53,7 @@ export async function manageUser(formData: FormDataType): Promise<{ success: boo
     if (!fullName || !email || !phone || !role) {
       return { success: false, error: 'Missing required fields' }
     }
-    if (!['admin', 'reception', 'employee'].includes(role)) {
+    if (!['admin', 'staff', 'assistant'].includes(role)) {
       return { success: false, error: 'Invalid role' }
     }
 

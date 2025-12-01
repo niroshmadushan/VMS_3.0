@@ -185,7 +185,7 @@ export function UserManagement() {
   // Form data
   const [userFormData, setUserFormData] = useState({
     email: '',
-    role: 'employee'
+    role: 'staff'
   })
 
   const [profileFormData, setProfileFormData] = useState({
@@ -594,9 +594,27 @@ export function UserManagement() {
   const getRoleBadgeVariant = (role: string) => {
     switch (role) {
       case 'admin': return 'default'
-      case 'reception': return 'secondary'
-      case 'employee': return 'outline'
+      case 'staff': return 'secondary'
+      case 'assistant': return 'outline'
       default: return 'outline'
+    }
+  }
+
+  const getRoleDisplayName = (role: string) => {
+    switch (role) {
+      case 'admin': return 'Administrator'
+      case 'staff': return 'Staff'
+      case 'assistant': return 'Smart Assistant'
+      default: return role.charAt(0).toUpperCase() + role.slice(1)
+    }
+  }
+
+  const getRoleShortName = (role: string) => {
+    switch (role) {
+      case 'admin': return 'Admin'
+      case 'staff': return 'Staff'
+      case 'assistant': return 'Assistant'
+      default: return role.charAt(0).toUpperCase() + role.slice(1)
     }
   }
 
@@ -620,6 +638,23 @@ export function UserManagement() {
   }
 
   return (
+    <>
+      <style dangerouslySetInnerHTML={{__html: `
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: transparent;
+          border-radius: 3px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: #cbd5e1;
+          border-radius: 3px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: #94a3b8;
+        }
+      `}} />
     <div className="space-y-6">
       {/* Statistics Cards */}
       {statistics && (
@@ -717,9 +752,9 @@ export function UserManagement() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Roles</SelectItem>
-                      <SelectItem value="admin">Admin</SelectItem>
-                      <SelectItem value="reception">Reception</SelectItem>
-                      <SelectItem value="employee">Employee</SelectItem>
+                      <SelectItem value="admin">Administrator</SelectItem>
+                      <SelectItem value="staff">Staff</SelectItem>
+                      <SelectItem value="assistant">Smart Assistant</SelectItem>
                     </SelectContent>
                   </Select>
                   <Select value={statusFilter || "all"} onValueChange={(value) => setStatusFilter(value === "all" ? "" : value)}>
@@ -957,18 +992,18 @@ export function UserManagement() {
             <>
               {/* Role Distribution */}
               <Card className="border-2">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Shield className="h-5 w-5" />
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <Shield className="h-4 w-4" />
                     Role Distribution
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <CardContent className="pt-0">
+                  <div className="grid grid-cols-3 gap-3">
                     {statistics.roleDistribution.map((role) => (
-                      <div key={role.role} className="text-center p-4 border-2 rounded-lg">
-                        <p className="text-2xl font-bold">{role.count}</p>
-                        <p className="text-sm text-muted-foreground capitalize">{role.role}s</p>
+                      <div key={role.role} className="text-center p-3 border rounded-lg bg-muted/30">
+                        <p className="text-xl font-bold">{role.count}</p>
+                        <p className="text-xs text-muted-foreground mt-1">{getRoleDisplayName(role.role)}</p>
                       </div>
                     ))}
                   </div>
@@ -977,28 +1012,28 @@ export function UserManagement() {
 
               {/* Recent Users */}
               <Card className="border-2">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Calendar className="h-5 w-5" />
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <Calendar className="h-4 w-4" />
                     Recent Registrations
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {statistics.recentUsers.map((user) => (
-                      <div key={user.id} className="flex items-center justify-between p-3 border rounded-lg">
-                        <div>
-                          <p className="font-medium">
+                <CardContent className="pt-0">
+                  <div className="max-h-[300px] overflow-y-auto pr-2 space-y-2 custom-scrollbar">
+                    {statistics.recentUsers.slice(0, 5).map((user) => (
+                      <div key={user.id} className="flex items-center justify-between p-2 border rounded-lg hover:bg-muted/50 transition-colors">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm truncate">
                             {user.first_name && user.last_name 
                               ? `${user.first_name} ${user.last_name}`
                               : 'No Name Set'
                             }
                           </p>
-                          <p className="text-sm text-muted-foreground">{user.email}</p>
+                          <p className="text-xs text-muted-foreground truncate">{user.email}</p>
                         </div>
-                        <div className="text-right">
-                          <Badge variant={getRoleBadgeVariant(user.role)}>
-                            {user.role}
+                        <div className="text-right ml-2 flex-shrink-0">
+                          <Badge variant={getRoleBadgeVariant(user.role)} className="text-xs">
+                            {getRoleShortName(user.role)}
                           </Badge>
                           <p className="text-xs text-muted-foreground mt-1">
                             {formatDate(user.created_at)}
@@ -1006,34 +1041,37 @@ export function UserManagement() {
                         </div>
                       </div>
                     ))}
+                    {statistics.recentUsers.length === 0 && (
+                      <p className="text-sm text-muted-foreground text-center py-4">No recent registrations</p>
+                    )}
                   </div>
                 </CardContent>
               </Card>
 
               {/* Most Active Users */}
               <Card className="border-2">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Activity className="h-5 w-5" />
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <Activity className="h-4 w-4" />
                     Most Active Users
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {statistics.mostActiveUsers.map((user) => (
-                      <div key={user.id} className="flex items-center justify-between p-3 border rounded-lg">
-                        <div>
-                          <p className="font-medium">
+                <CardContent className="pt-0">
+                  <div className="max-h-[300px] overflow-y-auto pr-2 space-y-2 custom-scrollbar">
+                    {statistics.mostActiveUsers.slice(0, 5).map((user) => (
+                      <div key={user.id} className="flex items-center justify-between p-2 border rounded-lg hover:bg-muted/50 transition-colors">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm truncate">
                             {user.first_name && user.last_name 
                               ? `${user.first_name} ${user.last_name}`
                               : 'No Name Set'
                             }
                           </p>
-                          <p className="text-sm text-muted-foreground">{user.email}</p>
+                          <p className="text-xs text-muted-foreground truncate">{user.email}</p>
                         </div>
-                        <div className="text-right">
-                          <Badge variant={getRoleBadgeVariant(user.role)}>
-                            {user.role}
+                        <div className="text-right ml-2 flex-shrink-0">
+                          <Badge variant={getRoleBadgeVariant(user.role)} className="text-xs">
+                            {getRoleShortName(user.role)}
                           </Badge>
                           <p className="text-xs text-muted-foreground mt-1">
                             {formatDateTime(user.last_login)}
@@ -1041,6 +1079,9 @@ export function UserManagement() {
                         </div>
                       </div>
                     ))}
+                    {statistics.mostActiveUsers.length === 0 && (
+                      <p className="text-sm text-muted-foreground text-center py-4">No active users</p>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -1077,9 +1118,9 @@ export function UserManagement() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="admin">Admin</SelectItem>
-                  <SelectItem value="reception">Reception</SelectItem>
-                  <SelectItem value="employee">Employee</SelectItem>
+                  <SelectItem value="admin">Administrator</SelectItem>
+                  <SelectItem value="staff">Staff</SelectItem>
+                  <SelectItem value="assistant">Smart Assistant</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -1464,7 +1505,7 @@ export function UserManagement() {
                     password: '',
                     firstName: '',
                     lastName: '',
-                    role: 'employee'
+                    role: 'staff'
                   })
                 }}
                 disabled={isCreatingUser}
@@ -1493,5 +1534,6 @@ export function UserManagement() {
         </DialogContent>
       </Dialog>
     </div>
+    </>
   )
 }

@@ -192,6 +192,62 @@ export default function NewBookingPage() {
   
   // Refreshment serving time options
   const [servingTimeOptions, setServingTimeOptions] = useState<string[]>([])
+  
+  // Refreshment types and items from database
+  const [refreshmentTypes, setRefreshmentTypes] = useState<Array<{id: string, name: string, code: string}>>([])
+  const [refreshmentItems, setRefreshmentItems] = useState<Array<{id: string, name: string, type_id: string}>>([])
+  const [availableItemsForType, setAvailableItemsForType] = useState<Array<{id: string, name: string}>>([])
+
+  // Load refreshment types and items
+  useEffect(() => {
+    const loadRefreshments = async () => {
+      try {
+        // Load types
+        const typesResponse = await placeManagementAPI.getTableData('refreshment_types', {
+          is_deleted: 'false',
+          is_active: 'true'
+        })
+        const typesData = Array.isArray(typesResponse) ? typesResponse : typesResponse?.data || []
+        setRefreshmentTypes(typesData)
+        
+        // Load items
+        const itemsResponse = await placeManagementAPI.getTableData('refreshment_items', {
+          is_deleted: 'false',
+          is_active: 'true'
+        })
+        const itemsData = Array.isArray(itemsResponse) ? itemsResponse : itemsResponse?.data || []
+        setRefreshmentItems(itemsData)
+      } catch (error) {
+        console.error('Error loading refreshments:', error)
+        // Fallback to default types if table doesn't exist
+        setRefreshmentTypes([
+          { id: '1', name: 'Beverages', code: 'beverages' },
+          { id: '2', name: 'Light Snacks', code: 'light_snacks' },
+          { id: '3', name: 'Full Meal', code: 'full_meal' },
+          { id: '4', name: 'Custom', code: 'custom' },
+        ])
+      }
+    }
+    loadRefreshments()
+  }, [])
+
+  // Filter items based on selected type
+  useEffect(() => {
+    if (formData.refreshments.type && refreshmentItems.length > 0) {
+      // Find type by code
+      const selectedType = refreshmentTypes.find(t => t.code === formData.refreshments.type)
+      if (selectedType) {
+        const filtered = refreshmentItems
+          .filter(item => item.type_id === selectedType.id)
+          .map(item => ({ id: item.id, name: item.name }))
+        setAvailableItemsForType(filtered)
+      } else {
+        setAvailableItemsForType([])
+      }
+    } else {
+      setAvailableItemsForType([])
+    }
+  }, [formData.refreshments.type, refreshmentTypes, refreshmentItems])
 
   // Fetch users on mount
   useEffect(() => {
@@ -2038,10 +2094,20 @@ export default function NewBookingPage() {
                       <SelectValue placeholder="Select type" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="beverages">Beverages</SelectItem>
-                      <SelectItem value="light_snacks">Light Snacks</SelectItem>
-                      <SelectItem value="full_meal">Full Meal</SelectItem>
-                      <SelectItem value="custom">Custom</SelectItem>
+                      {refreshmentTypes.length > 0 ? (
+                        refreshmentTypes.map((type) => (
+                          <SelectItem key={type.id} value={type.code}>
+                            {type.name}
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <>
+                          <SelectItem value="beverages">Beverages</SelectItem>
+                          <SelectItem value="light_snacks">Light Snacks</SelectItem>
+                          <SelectItem value="full_meal">Full Meal</SelectItem>
+                          <SelectItem value="custom">Custom</SelectItem>
+                        </>
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
@@ -2111,20 +2177,44 @@ export default function NewBookingPage() {
                       </Badge>
                     ))}
                   </div>
-                  <Select onValueChange={(value) => addRefreshmentItem(value)}>
+                  <Select 
+                    onValueChange={(value) => addRefreshmentItem(value)}
+                    disabled={!formData.refreshments.type || availableItemsForType.length === 0}
+                  >
                     <SelectTrigger>
-                      <SelectValue placeholder="Add item" />
+                      <SelectValue placeholder={
+                        !formData.refreshments.type 
+                          ? "Select type first" 
+                          : availableItemsForType.length === 0
+                          ? "No items available"
+                          : "Add item"
+                      } />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Coffee">Coffee</SelectItem>
-                      <SelectItem value="Tea">Tea</SelectItem>
-                      <SelectItem value="Water">Water</SelectItem>
-                      <SelectItem value="Juice">Juice</SelectItem>
-                      <SelectItem value="Cookies">Cookies</SelectItem>
-                      <SelectItem value="Sandwiches">Sandwiches</SelectItem>
-                      <SelectItem value="Lunch">Lunch</SelectItem>
+                      {availableItemsForType.length > 0 ? (
+                        availableItemsForType.map((item) => (
+                          <SelectItem key={item.id} value={item.name}>
+                            {item.name}
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <>
+                          <SelectItem value="Coffee">Coffee</SelectItem>
+                          <SelectItem value="Tea">Tea</SelectItem>
+                          <SelectItem value="Water">Water</SelectItem>
+                          <SelectItem value="Juice">Juice</SelectItem>
+                          <SelectItem value="Cookies">Cookies</SelectItem>
+                          <SelectItem value="Sandwiches">Sandwiches</SelectItem>
+                          <SelectItem value="Lunch">Lunch</SelectItem>
+                        </>
+                      )}
                     </SelectContent>
                   </Select>
+                  {formData.refreshments.type && availableItemsForType.length === 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      No items available for this type. <a href="/admin/refreshments" className="text-blue-600 hover:underline">Manage items</a>
+                    </p>
+                  )}
                 </div>
 
                 <div className="col-span-3 space-y-2">

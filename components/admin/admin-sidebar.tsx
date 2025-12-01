@@ -21,6 +21,7 @@ import {
   Sun,
   Moon,
   User,
+  Utensils,
 } from "lucide-react"
 
 const navigation = [
@@ -63,6 +64,11 @@ const navigation = [
     name: "External Members",
     href: "/admin/external-members",
     icon: UserCheck,
+  },
+  {
+    name: "Refreshments",
+    href: "/admin/refreshments",
+    icon: Utensils,
   },
   // {
   //   name: "Feedback",

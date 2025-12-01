@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
     last_name TEXT,
     avatar_url TEXT,
     phone TEXT,
-    role TEXT DEFAULT 'user' CHECK (role IN ('admin', 'employee', 'reception', 'user')),
+    role TEXT DEFAULT 'user' CHECK (role IN ('admin', 'staff', 'assistant', 'user')),
     department TEXT,
     job_position TEXT,
     employee_id TEXT UNIQUE,

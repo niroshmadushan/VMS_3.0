@@ -182,18 +182,43 @@ export function VisitorPassManagement() {
         const bookingParticipants = participants.filter((p: any) => 
           p.booking_id === booking.id && 
           (p.is_deleted === false || p.is_deleted === 0) && 
-          p.member_id &&
-          p.participation_status === 'confirmed' // Only show visitors who have confirmed attendance
+          // Show visitors with any active participation status (confirmed, checked_in, attended, invited)
+          ['confirmed', 'checked_in', 'attended', 'invited'].includes(p.participation_status)
         )
         
         bookingParticipants.forEach((participant: any) => {
-          const member = members.find((m: any) => 
-            m.id === participant.member_id && 
-            (m.is_deleted === false || m.is_deleted === 0) && 
-            (m.is_active === true || m.is_active === 1)
-          )
+          // Try to find linked member, but also allow participants without member_id
+          let member = null
+          if (participant.member_id) {
+            member = members.find((m: any) => 
+              m.id === participant.member_id && 
+              (m.is_deleted === false || m.is_deleted === 0) && 
+              (m.is_active === true || m.is_active === 1)
+            )
+          }
           
-          if (!member) return
+          // If no member found but participant has data, use participant data directly
+          // This handles cases where participants exist but aren't linked to external_members
+          if (!member && participant.full_name) {
+            // Use participant's own data as fallback
+            member = {
+              id: participant.member_id || participant.id, // Use participant id as fallback
+              full_name: participant.full_name,
+              email: participant.email,
+              phone: participant.phone,
+              company_name: participant.company_name,
+              designation: participant.company_position,
+              reference_type: participant.reference_type,
+              reference_value: participant.reference_value,
+              is_blacklisted: false,
+              visit_count: 0,
+              is_deleted: false,
+              is_active: true
+            }
+          }
+          
+          // Skip if we still don't have member data
+          if (!member || !member.full_name) return
           
           // Calculate current status
           const now = new Date()
@@ -978,36 +1003,33 @@ export function VisitorPassManagement() {
               <p className="text-sm text-muted-foreground mt-1">Try adjusting your search or filters</p>
             </div>
           ) : (
-            <div className="border rounded-lg overflow-hidden">
-              <div className="relative overflow-x-auto">
-                <table className="w-full min-w-[1200px]">
-                  <thead className="bg-gradient-to-r from-blue-100 to-purple-100">
-                    <tr>
-                      <th className="text-left p-3 font-semibold text-sm min-w-[120px]">Date</th>
-                      <th className="text-left p-3 font-semibold text-sm min-w-[120px]">Time</th>
-                      <th className="text-left p-3 font-semibold text-sm min-w-[200px]">Visitor</th>
-                      <th className="text-left p-3 font-semibold text-sm min-w-[150px]">Reference</th>
-                      <th className="text-left p-3 font-semibold text-sm min-w-[180px]">Booking</th>
-                      <th className="text-left p-3 font-semibold text-sm min-w-[150px]">Place</th>
-                      <th className="text-center p-3 font-semibold text-sm min-w-[120px]">Pass</th>
-                      <th className="text-center p-3 font-semibold text-sm min-w-[120px]">History</th>
-                      <th className="text-center p-3 font-semibold text-sm min-w-[100px]">Status</th>
-                      <th className="text-center p-3 font-semibold text-sm min-w-[120px]">Actions</th>
-                    </tr>
-                  </thead>
-                </table>
-              </div>
-              <div className="max-h-[450px] overflow-y-auto overflow-x-auto">
-                <table className="w-full min-w-[1200px]">
-                  <tbody>
-                    {filteredVisitors.map((visitor, idx) => (
-                      <tr 
-                        key={`${visitor.booking_id}-${visitor.member_id}-${idx}`}
-                        className={`border-t hover:bg-blue-50 transition-colors ${
-                          idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'
-                        } ${visitor.is_blacklisted ? 'bg-red-50 border-l-4 border-l-red-500' : ''}`}
-                      >
-                        <td className="p-3 min-w-[120px]">
+            <div className="border rounded-lg overflow-hidden w-full">
+              <div className="max-h-[450px] overflow-y-auto overflow-x-auto w-full">
+                <div className="inline-block min-w-full align-middle">
+                  <table className="w-full" style={{ minWidth: '1400px' }}>
+                    <thead className="bg-gradient-to-r from-blue-100 to-purple-100 sticky top-0 z-10">
+                      <tr>
+                        <th className="text-left p-3 font-semibold text-sm whitespace-nowrap">Date</th>
+                        <th className="text-left p-3 font-semibold text-sm whitespace-nowrap">Time</th>
+                        <th className="text-left p-3 font-semibold text-sm whitespace-nowrap">Visitor</th>
+                        <th className="text-left p-3 font-semibold text-sm whitespace-nowrap">Reference</th>
+                        <th className="text-left p-3 font-semibold text-sm whitespace-nowrap">Booking</th>
+                        <th className="text-left p-3 font-semibold text-sm whitespace-nowrap">Place</th>
+                        <th className="text-center p-3 font-semibold text-sm whitespace-nowrap">Pass</th>
+                        <th className="text-center p-3 font-semibold text-sm whitespace-nowrap">History</th>
+                        <th className="text-center p-3 font-semibold text-sm whitespace-nowrap sticky right-[120px] bg-gradient-to-r from-blue-100 to-purple-100 z-10">Status</th>
+                        <th className="text-center p-3 font-semibold text-sm whitespace-nowrap sticky right-0 bg-gradient-to-r from-blue-100 to-purple-100 z-10">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredVisitors.map((visitor, idx) => (
+                        <tr 
+                          key={`${visitor.booking_id}-${visitor.member_id}-${idx}`}
+                          className={`border-t hover:bg-blue-50 transition-colors ${
+                            idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'
+                          } ${visitor.is_blacklisted ? 'bg-red-50 border-l-4 border-l-red-500' : ''}`}
+                        >
+                          <td className="p-3 whitespace-nowrap">
                           <div className="space-y-1">
                             <p className="font-bold">
                               {new Date(visitor.booking_date).toLocaleDateString('en-US', { 
@@ -1022,14 +1044,14 @@ export function VisitorPassManagement() {
                           </div>
                         </td>
                         
-                        <td className="p-3 min-w-[120px]">
-                          <div className="flex items-center gap-2">
-                            <Clock className="h-4 w-4 text-blue-600" />
-                            <p className="font-mono font-bold text-sm">{visitor.time_slot}</p>
-                          </div>
-                        </td>
-                        
-                        <td className="p-3 min-w-[200px]">
+                          <td className="p-3 whitespace-nowrap">
+                            <div className="flex items-center gap-2">
+                              <Clock className="h-4 w-4 text-blue-600" />
+                              <p className="font-mono font-bold text-sm">{visitor.time_slot}</p>
+                            </div>
+                          </td>
+                          
+                          <td className="p-3">
                           <div className="space-y-1">
                             <p className="font-bold text-sm">{visitor.visitor_name}</p>
                             <p className="text-xs flex items-center gap-1">
@@ -1049,32 +1071,32 @@ export function VisitorPassManagement() {
                           </div>
                         </td>
                         
-                        <td className="p-3 min-w-[150px]">
-                          <Badge variant="outline" className="font-mono font-bold text-xs">
-                            {visitor.reference_type}
-                          </Badge>
-                          <p className="font-mono text-xs font-bold mt-1">
-                            {visitor.reference_value}
-                          </p>
-                        </td>
-                        
-                        <td className="p-3 min-w-[180px]">
-                          <p className="font-bold text-sm">{visitor.booking_title}</p>
-                          {visitor.booking_ref_id && (
-                            <Badge variant="outline" className="text-xs mt-1">
-                              {visitor.booking_ref_id}
+                          <td className="p-3 whitespace-nowrap">
+                            <Badge variant="outline" className="font-mono font-bold text-xs">
+                              {visitor.reference_type}
                             </Badge>
-                          )}
-                        </td>
-                        
-                        <td className="p-3 min-w-[150px]">
-                          <div className="flex items-center gap-2">
-                            <MapPin className="h-4 w-4 text-green-600" />
-                            <p className="font-medium text-sm">{visitor.place_name}</p>
-                          </div>
-                        </td>
-                        
-                        <td className="p-3 text-center min-w-[120px]">
+                            <p className="font-mono text-xs font-bold mt-1">
+                              {visitor.reference_value}
+                            </p>
+                          </td>
+                          
+                          <td className="p-3">
+                            <p className="font-bold text-sm">{visitor.booking_title}</p>
+                            {visitor.booking_ref_id && (
+                              <Badge variant="outline" className="text-xs mt-1">
+                                {visitor.booking_ref_id}
+                              </Badge>
+                            )}
+                          </td>
+                          
+                          <td className="p-3 whitespace-nowrap">
+                            <div className="flex items-center gap-2">
+                              <MapPin className="h-4 w-4 text-green-600" />
+                              <p className="font-medium text-sm">{visitor.place_name}</p>
+                            </div>
+                          </td>
+                          
+                          <td className="p-3 text-center whitespace-nowrap">
                           <div className="space-y-1">
                             {visitor.assigned_pass_number ? (
                               <Badge className="bg-green-500 text-white px-3 py-1 font-bold">
@@ -1104,78 +1126,79 @@ export function VisitorPassManagement() {
                           </div>
                         </td>
                         
-                        <td className="p-3 text-center min-w-[120px]">
-                          <div className="space-y-1">
-                            {visitor.historical_assignments && visitor.historical_assignments.length > 0 && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => openHistoryDialog(visitor)}
-                                className="text-blue-600 hover:bg-blue-50 text-xs h-7"
-                              >
-                                <Eye className="h-3 w-3 mr-1" />
-                                View ({visitor.historical_assignments.length})
-                              </Button>
-                            )}
-                            {(() => {
-                              const todayAssignments = visitor.historical_assignments?.filter((assignment: any) => {
-                                const today = new Date().toISOString().split('T')[0]
-                                const assignmentDate = assignment.assigned_date ? assignment.assigned_date.split('T')[0] : null
-                                return assignmentDate === today
-                              }) || []
-                              
-                              return todayAssignments.length > 1 && (
+                          <td className="p-3 text-center whitespace-nowrap">
+                            <div className="space-y-1">
+                              {visitor.historical_assignments && visitor.historical_assignments.length > 0 && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => openHistoryDialog(visitor)}
+                                  className="text-blue-600 hover:bg-blue-50 text-xs h-7"
+                                >
+                                  <Eye className="h-3 w-3 mr-1" />
+                                  View ({visitor.historical_assignments.length})
+                                </Button>
+                              )}
+                              {(() => {
+                                const todayAssignments = visitor.historical_assignments?.filter((assignment: any) => {
+                                  const today = new Date().toISOString().split('T')[0]
+                                  const assignmentDate = assignment.assigned_date ? assignment.assigned_date.split('T')[0] : null
+                                  return assignmentDate === today
+                                }) || []
+                                
+                                return todayAssignments.length > 1 && (
+                                  <div className="mt-1">
+                                    <Badge className="bg-blue-100 text-blue-800 text-xs">
+                                      {todayAssignments.length} Today
+                                    </Badge>
+                                  </div>
+                                )
+                              })()}
+                              {visitor.needs_manual_return && (
                                 <div className="mt-1">
-                                  <Badge className="bg-blue-100 text-blue-800 text-xs">
-                                    {todayAssignments.length} Today
+                                  <Badge className="bg-orange-100 text-orange-800 text-xs">
+                                    Manual Return
                                   </Badge>
                                 </div>
-                              )
-                            })()}
-                            {visitor.needs_manual_return && (
-                              <div className="mt-1">
-                                <Badge className="bg-orange-100 text-orange-800 text-xs">
-                                  Manual Return
-                                </Badge>
-                              </div>
-                            )}
-                          </div>
-                        </td>
-                        
-                        <td className="p-3 text-center min-w-[100px]">
-                          <Badge className={`px-3 py-1 font-bold text-xs ${getStatusColor(visitor.current_status)}`}>
-                            {visitor.current_status.toUpperCase()}
-                          </Badge>
-                        </td>
-                        
-                        <td className="p-3 text-center min-w-[120px]">
-                          <div className="flex gap-1 justify-center">
-                            {visitor.assigned_pass_id ? (
-                              <Button 
-                                size="sm"
-                                variant="outline"
-                                onClick={() => openReturnDialog(visitor)}
-                                className="border-green-500 text-green-700 hover:bg-green-50 text-xs h-7"
-                              >
-                                <CheckCircle className="h-3 w-3 mr-1" />
-                                Return
-                              </Button>
-                            ) : visitor.current_status !== 'cancelled' && (
-                              <Button 
-                                size="sm"
-                                onClick={() => openAssignDialog(visitor)}
-                                className="text-xs h-7"
-                              >
-                                <CreditCard className="h-3 w-3 mr-1" />
-                                Assign
-                              </Button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                              )}
+                            </div>
+                          </td>
+                          
+                          <td className="p-3 text-center whitespace-nowrap sticky right-[120px] bg-white z-10 shadow-[2px_0_5px_rgba(0,0,0,0.1)]">
+                            <Badge className={`px-3 py-1 font-bold text-xs ${getStatusColor(visitor.current_status)}`}>
+                              {visitor.current_status.toUpperCase()}
+                            </Badge>
+                          </td>
+                          
+                          <td className="p-3 text-center whitespace-nowrap sticky right-0 bg-white z-10 shadow-[2px_0_5px_rgba(0,0,0,0.1)]">
+                            <div className="flex gap-1 justify-center">
+                              {visitor.assigned_pass_id ? (
+                                <Button 
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => openReturnDialog(visitor)}
+                                  className="border-green-500 text-green-700 hover:bg-green-50 text-xs h-7"
+                                >
+                                  <CheckCircle className="h-3 w-3 mr-1" />
+                                  Return
+                                </Button>
+                              ) : visitor.current_status !== 'cancelled' && (
+                                <Button 
+                                  size="sm"
+                                  onClick={() => openAssignDialog(visitor)}
+                                  className="text-xs h-7"
+                                >
+                                  <CreditCard className="h-3 w-3 mr-1" />
+                                  Assign
+                                </Button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           )}

@@ -42,9 +42,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Invalid email format' }, { status: 400 })
     }
 
-    if (!['admin', 'reception', 'employee'].includes(role)) {
+    if (!['admin', 'staff', 'assistant'].includes(role)) {
       console.error('Invalid role:', role)
-      return NextResponse.json({ error: 'Invalid role: must be admin, reception, or employee' }, { status: 400 })
+      return NextResponse.json({ error: 'Invalid role: must be admin, staff, or assistant' }, { status: 400 })
     }
 
     const phoneRegex = /^\+\d{10,15}$/

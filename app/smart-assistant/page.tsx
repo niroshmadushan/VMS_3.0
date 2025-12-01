@@ -10,8 +10,11 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Checkbox } from "@/components/ui/checkbox"
 import { 
   QrCode, Hash, Search, Calendar, MapPin, Users, Clock, 
-  UserCheck, CheckCircle, Building2, Phone, Mail, ArrowRight, ArrowLeft, AlertCircle, User
+  UserCheck, CheckCircle, Building2, Phone, Mail, ArrowRight, ArrowLeft, AlertCircle, User, Plus, X
 } from "lucide-react"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Textarea } from "@/components/ui/textarea"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { placeManagementAPI } from "@/lib/place-management-api"
 import { API_BASE_URL } from '@/lib/api-config'
 import toast from "react-hot-toast"
@@ -60,6 +63,23 @@ export default function SmartAssistantPage() {
   const [externalVisitors, setExternalVisitors] = useState<ExternalVisitor[]>([])
   const [selectedVisitor, setSelectedVisitor] = useState<ExternalVisitor | null>(null)
   const [isTodayBooking, setIsTodayBooking] = useState(false)
+  
+  // Add member state
+  const [showAddMemberDialog, setShowAddMemberDialog] = useState(false)
+  const [memberSearchTerm, setMemberSearchTerm] = useState("")
+  const [searchedMembers, setSearchedMembers] = useState<any[]>([])
+  const [showMemberDropdown, setShowMemberDropdown] = useState(false)
+  const [showCreateMemberDialog, setShowCreateMemberDialog] = useState(false)
+  const [newMemberForm, setNewMemberForm] = useState({
+    full_name: "",
+    email: "",
+    phone: "",
+    company_name: "",
+    designation: "",
+    reference_type: "NIC" as "NIC" | "Passport" | "Employee ID",
+    reference_value: "",
+  })
+  const [isAddingMember, setIsAddingMember] = useState(false)
   
   const handleLogout = async () => {
     await signOut()
@@ -162,14 +182,23 @@ export default function SmartAssistantPage() {
         const isToday = normalizedDate === today
         setIsTodayBooking(isToday)
 
+        // Get all external participants and filter by booking_id client-side
+        // This ensures we only show participants for THIS specific booking
         const participantsResponse = await placeManagementAPI.getTableData('external_participants', {
-          filters: [
-            { column: 'booking_id', operator: 'equals', value: foundBooking.id }
-          ],
-          limit: 100
+          limit: 500
         })
 
-        const participants = Array.isArray(participantsResponse) ? participantsResponse : []
+        const allParticipants = Array.isArray(participantsResponse) ? participantsResponse : participantsResponse?.data || []
+        
+        // IMPORTANT: Filter to only show participants for THIS booking
+        const participants = allParticipants.filter((p: any) => 
+          p.booking_id === foundBooking.id
+        )
+        
+        console.log('📋 All participants fetched:', allParticipants.length)
+        console.log('📋 Participants for booking', foundBooking.id, ':', participants.length)
+        console.log('📋 Filtered participants:', participants)
+        
         setExternalVisitors(participants)
 
         setCurrentView('details')
@@ -270,15 +299,22 @@ export default function SmartAssistantPage() {
         // If multiple bookings, show the first one (or we could show a list)
         const foundBooking = todayMatchingBookings[0]
         
-        // Get participants for this specific booking
+        // Get all external participants and filter by booking_id client-side
+        // This ensures we only show participants for THIS specific booking
         const bookingParticipantsResponse = await placeManagementAPI.getTableData('external_participants', {
-          filters: [
-            { column: 'booking_id', operator: 'equals', value: foundBooking.id }
-          ],
-          limit: 100
+          limit: 500
         })
         
-        const bookingParticipants = Array.isArray(bookingParticipantsResponse) ? bookingParticipantsResponse : []
+        const allParticipants = Array.isArray(bookingParticipantsResponse) ? bookingParticipantsResponse : bookingParticipantsResponse?.data || []
+        
+        // IMPORTANT: Filter to only show participants for THIS booking
+        const bookingParticipants = allParticipants.filter((p: any) => 
+          p.booking_id === foundBooking.id
+        )
+        
+        console.log('📋 All participants fetched:', allParticipants.length)
+        console.log('📋 Participants for booking', foundBooking.id, ':', bookingParticipants.length)
+        console.log('📋 Filtered participants:', bookingParticipants)
         
         let normalizedDate = foundBooking.booking_date
         if (normalizedDate && typeof normalizedDate === 'string' && normalizedDate.includes('T')) {
@@ -347,6 +383,217 @@ export default function SmartAssistantPage() {
     setIsTodayBooking(false)
     setSearchType('meetingId')
     setCurrentView('search')
+    setShowAddMemberDialog(false)
+    setMemberSearchTerm("")
+    setSearchedMembers([])
+    setShowMemberDropdown(false)
+    setShowCreateMemberDialog(false)
+  }
+
+  // Search external members by reference
+  const searchExternalMembers = async (searchTerm: string) => {
+    if (!searchTerm || searchTerm.length < 2) {
+      setSearchedMembers([])
+      return
+    }
+
+    try {
+      const response = await placeManagementAPI.getTableData('external_members', {
+        limit: 500
+      })
+      
+      const data = Array.isArray(response) ? response : response?.data || []
+      
+      // Filter out deleted and blacklisted members
+      const activeMembers = data.filter((m: any) => !m.is_deleted && !m.is_blacklisted && m.is_active)
+      
+      // Search by reference value, name, email, phone, or company
+      const filtered = activeMembers.filter((member: any) =>
+        member.reference_value?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        member.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        member.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        member.phone?.includes(searchTerm) ||
+        member.company_name?.toLowerCase().includes(searchTerm.toLowerCase())
+      ).slice(0, 10)
+      
+      setSearchedMembers(filtered)
+    } catch (error) {
+      console.error('Failed to search members:', error)
+      setSearchedMembers([])
+    }
+  }
+
+  // Select existing member and add to meeting
+  const selectExistingMember = async (member: any) => {
+    if (!meeting) return
+
+    // Check if member is already in the meeting
+    if (externalVisitors.some(v => v.email === member.email)) {
+      toast.error('This member is already added to the meeting')
+      return
+    }
+
+    try {
+      setIsAddingMember(true)
+      
+      // Create external participant record
+      const participantId = `participant_${Date.now()}`
+      await placeManagementAPI.insertRecord('external_participants', {
+        id: participantId,
+        booking_id: meeting.id,
+        full_name: member.full_name,
+        email: member.email,
+        phone: member.phone,
+        company_name: member.company_name || null,
+        designation: member.designation || null,
+        reference_type: member.reference_type,
+        reference_value: member.reference_value,
+        participation_status: 'invited',
+        created_at: new Date().toISOString()
+      })
+
+      // Add to local state
+      const newVisitor: ExternalVisitor = {
+        id: participantId,
+        full_name: member.full_name,
+        email: member.email,
+        phone: member.phone,
+        reference_type: member.reference_type,
+        reference_value: member.reference_value,
+        company_name: member.company_name,
+        designation: member.designation,
+      }
+
+      setExternalVisitors([...externalVisitors, newVisitor])
+      setMemberSearchTerm("")
+      setSearchedMembers([])
+      setShowMemberDropdown(false)
+      setShowAddMemberDialog(false)
+      toast.success(`Added ${member.full_name} to the meeting`)
+    } catch (error: any) {
+      console.error('Failed to add member:', error)
+      toast.error(error?.message || 'Failed to add member to meeting')
+    } finally {
+      setIsAddingMember(false)
+    }
+  }
+
+  // Create new member and add to meeting
+  const createAndAddMember = async () => {
+    if (!meeting) return
+
+    // Validate required fields
+    if (!newMemberForm.full_name || !newMemberForm.email || !newMemberForm.phone || !newMemberForm.reference_value) {
+      toast.error('Please fill in all required fields')
+      return
+    }
+
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(newMemberForm.email.trim())) {
+      toast.error('Please enter a valid email address')
+      return
+    }
+
+    try {
+      setIsAddingMember(true)
+
+      // Check for duplicate email or phone
+      const existingResponse = await placeManagementAPI.getTableData('external_members', {
+        limit: 500
+      })
+      const existingMembers = Array.isArray(existingResponse) ? existingResponse : existingResponse?.data || []
+      
+      // Filter out deleted members
+      const activeMembers = existingMembers.filter((m: any) => !m.is_deleted)
+      
+      const duplicate = activeMembers.find((m: any) => 
+        m.email?.toLowerCase().trim() === newMemberForm.email.toLowerCase().trim() ||
+        m.phone?.trim() === newMemberForm.phone.trim()
+      )
+
+      let memberId: string
+      if (duplicate) {
+        // Use existing member
+        memberId = duplicate.id
+        toast.success('Using existing member record')
+      } else {
+        // Create new member
+        memberId = `member_${Date.now()}`
+        await placeManagementAPI.insertRecord('external_members', {
+          id: memberId,
+          full_name: newMemberForm.full_name.trim(),
+          email: newMemberForm.email.trim(),
+          phone: newMemberForm.phone.trim(),
+          company_name: newMemberForm.company_name?.trim() || null,
+          designation: newMemberForm.designation?.trim() || null,
+          reference_type: newMemberForm.reference_type,
+          reference_value: newMemberForm.reference_value.trim(),
+          is_active: true,
+          is_deleted: false,
+          is_blacklisted: false,
+          visit_count: 1,
+          last_visit_date: new Date().toISOString(),
+          created_at: new Date().toISOString()
+        })
+        toast.success('New member created')
+      }
+
+      // Check if member is already in the meeting
+      if (externalVisitors.some(v => v.email === newMemberForm.email.trim())) {
+        toast.error('This member is already added to the meeting')
+        return
+      }
+
+      // Create external participant record
+      const participantId = `participant_${Date.now()}`
+      await placeManagementAPI.insertRecord('external_participants', {
+        id: participantId,
+        booking_id: meeting.id,
+        full_name: newMemberForm.full_name.trim(),
+        email: newMemberForm.email.trim(),
+        phone: newMemberForm.phone.trim(),
+        company_name: newMemberForm.company_name?.trim() || null,
+        designation: newMemberForm.designation?.trim() || null,
+        reference_type: newMemberForm.reference_type,
+        reference_value: newMemberForm.reference_value.trim(),
+        participation_status: 'invited',
+        created_at: new Date().toISOString()
+      })
+
+      // Add to local state
+      const newVisitor: ExternalVisitor = {
+        id: participantId,
+        full_name: newMemberForm.full_name.trim(),
+        email: newMemberForm.email.trim(),
+        phone: newMemberForm.phone.trim(),
+        reference_type: newMemberForm.reference_type,
+        reference_value: newMemberForm.reference_value.trim(),
+        company_name: newMemberForm.company_name?.trim(),
+        designation: newMemberForm.designation?.trim(),
+      }
+
+      setExternalVisitors([...externalVisitors, newVisitor])
+      
+      // Reset form
+      setNewMemberForm({
+        full_name: "",
+        email: "",
+        phone: "",
+        company_name: "",
+        designation: "",
+        reference_type: "NIC",
+        reference_value: "",
+      })
+      setShowCreateMemberDialog(false)
+      setShowAddMemberDialog(false)
+      toast.success(`Added ${newMemberForm.full_name.trim()} to the meeting`)
+    } catch (error: any) {
+      console.error('Failed to create and add member:', error)
+      toast.error(error?.message || 'Failed to create and add member')
+    } finally {
+      setIsAddingMember(false)
+    }
   }
 
   const formatDate = (dateString: string) => {
@@ -606,13 +853,23 @@ export default function SmartAssistantPage() {
                    {/* External Visitors List */}
                    <Card className="border-2 shadow-lg">
                      <CardHeader className={`bg-gradient-to-r ${isTodayBooking ? 'from-indigo-50 to-sky-50' : 'from-gray-50 to-slate-50'} pb-3`}>
-                       <CardTitle className="text-lg flex items-center gap-2">
-                         <Users className="h-5 w-5 text-indigo-600" />
-                         {isTodayBooking ? 'Select Your Name to Mark Attendance' : 'External Visitors (View Only)'}
-                         <Badge className={`ml-auto ${isTodayBooking ? 'bg-indigo-600 text-white' : 'bg-gray-500 text-white'} text-xs`}>
-                           {externalVisitors.length} Visitors
-                         </Badge>
-                       </CardTitle>
+                       <div className="flex items-center justify-between">
+                         <CardTitle className="text-lg flex items-center gap-2">
+                           <Users className="h-5 w-5 text-indigo-600" />
+                           {isTodayBooking ? 'Select Your Name to Mark Attendance' : 'External Visitors (View Only)'}
+                           <Badge className={`ml-2 ${isTodayBooking ? 'bg-indigo-600 text-white' : 'bg-gray-500 text-white'} text-xs`}>
+                             {externalVisitors.length} Visitors
+                           </Badge>
+                         </CardTitle>
+                         <Button
+                           onClick={() => setShowAddMemberDialog(true)}
+                           size="sm"
+                           className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
+                         >
+                           <Plus className="h-4 w-4 mr-2" />
+                           Add Member
+                         </Button>
+                       </div>
                        {!isTodayBooking && (
                          <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded-lg">
                            <p className="text-amber-800 text-sm">
@@ -646,48 +903,57 @@ export default function SmartAssistantPage() {
                     {externalVisitors.map((visitor) => (
                       <Card
                         key={visitor.id}
-                        className={`border-2 transition-all ${
+                        className={`border-2 transition-all duration-200 ${
                           isTodayBooking 
-                            ? 'cursor-pointer hover:shadow-lg hover:border-indigo-500' 
-                            : 'cursor-default opacity-75'
+                            ? 'cursor-pointer hover:shadow-xl hover:border-indigo-500 hover:scale-[1.02] bg-gradient-to-r from-white to-indigo-50/30' 
+                            : 'cursor-default opacity-75 bg-gray-50'
                         }`}
                         onClick={isTodayBooking ? () => handleSelectVisitor(visitor) : undefined}
                       >
                         <CardContent className="p-4">
                           <div className="flex items-center justify-between">
                             <div className="flex-1">
-                              <h3 className="text-lg font-bold mb-2">{visitor.full_name}</h3>
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-1 text-xs text-muted-foreground">
+                              <div className="flex items-center gap-2 mb-2">
+                                <div className="h-10 w-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm">
+                                  {visitor.full_name.charAt(0).toUpperCase()}
+                                </div>
+                                <h3 className="text-lg font-bold">{visitor.full_name}</h3>
+                              </div>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
                                 {visitor.email && (
-                                  <div className="flex items-center gap-1">
-                                    <Mail className="h-3 w-3" />
-                                    <span className="truncate">{visitor.email}</span>
+                                  <div className="flex items-center gap-2 p-2 bg-blue-50 rounded-md">
+                                    <Mail className="h-3 w-3 text-blue-600" />
+                                    <span className="truncate text-blue-900">{visitor.email}</span>
                                   </div>
                                 )}
                                 {visitor.phone && (
-                                  <div className="flex items-center gap-1">
-                                    <Phone className="h-3 w-3" />
-                                    <span>{visitor.phone}</span>
+                                  <div className="flex items-center gap-2 p-2 bg-green-50 rounded-md">
+                                    <Phone className="h-3 w-3 text-green-600" />
+                                    <span className="text-green-900">{visitor.phone}</span>
                                   </div>
                                 )}
                                 {visitor.company_name && (
-                                  <div className="flex items-center gap-1">
-                                    <Building2 className="h-3 w-3" />
-                                    <span className="truncate">{visitor.company_name}</span>
+                                  <div className="flex items-center gap-2 p-2 bg-purple-50 rounded-md">
+                                    <Building2 className="h-3 w-3 text-purple-600" />
+                                    <span className="truncate text-purple-900">{visitor.company_name}</span>
                                   </div>
                                 )}
                                 {visitor.reference_type && (
-                                  <div className="flex items-center gap-1">
-                                    <Hash className="h-3 w-3" />
-                                    <span className="truncate">{visitor.reference_type}: {visitor.reference_value}</span>
+                                  <div className="flex items-center gap-2 p-2 bg-orange-50 rounded-md">
+                                    <Hash className="h-3 w-3 text-orange-600" />
+                                    <span className="truncate text-orange-900">
+                                      <span className="font-medium">{visitor.reference_type}:</span> {visitor.reference_value}
+                                    </span>
                                   </div>
                                 )}
                               </div>
                             </div>
                             {isTodayBooking ? (
-                              <ArrowRight className="h-6 w-6 text-indigo-600" />
+                              <div className="ml-4 p-2 bg-indigo-100 rounded-full">
+                                <ArrowRight className="h-5 w-5 text-indigo-600" />
+                              </div>
                             ) : (
-                              <div className="text-gray-400 text-xs font-medium">
+                              <div className="ml-4 text-gray-400 text-xs font-medium bg-gray-100 px-3 py-2 rounded-full">
                                 View Only
                               </div>
                             )}
@@ -701,6 +967,225 @@ export default function SmartAssistantPage() {
             </Card>
           </div>
         </div>
+
+        {/* Add Member Dialog */}
+        <Dialog open={showAddMemberDialog} onOpenChange={setShowAddMemberDialog}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Plus className="h-5 w-5 text-blue-600" />
+                Add External Member to Meeting
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              {/* Search Existing Members */}
+              <div className="space-y-3 p-5 bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 border-2 border-blue-300 rounded-xl shadow-sm">
+                <Label className="text-blue-900 font-semibold flex items-center gap-2 text-base">
+                  <div className="p-2 bg-blue-600 rounded-lg">
+                    <Search className="h-4 w-4 text-white" />
+                  </div>
+                  Search Existing Members by Reference
+                </Label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search by reference value, name, email, phone, or company..."
+                    value={memberSearchTerm}
+                    onChange={(e) => {
+                      setMemberSearchTerm(e.target.value)
+                      searchExternalMembers(e.target.value)
+                      setShowMemberDropdown(true)
+                    }}
+                    onFocus={() => memberSearchTerm.length >= 2 && setShowMemberDropdown(true)}
+                    className="pl-10 border-2 focus:border-blue-500"
+                  />
+                </div>
+                {showMemberDropdown && searchedMembers.length > 0 && (
+                  <div className="mt-2 border-2 border-blue-200 rounded-lg bg-white shadow-xl max-h-60 overflow-y-auto custom-scrollbar">
+                    {searchedMembers.map((member) => (
+                      <div
+                        key={member.id}
+                        onClick={() => selectExistingMember(member)}
+                        className="p-4 hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 cursor-pointer border-b last:border-b-0 transition-all duration-200 hover:shadow-md"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="h-10 w-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+                            {member.full_name?.charAt(0).toUpperCase() || '?'}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="font-semibold text-base">{member.full_name}</div>
+                            <div className="text-sm text-muted-foreground mt-1">
+                              <span className="flex items-center gap-1">
+                                <Mail className="h-3 w-3" />
+                                {member.email}
+                              </span>
+                              <span className="flex items-center gap-1 mt-1">
+                                <Phone className="h-3 w-3" />
+                                {member.phone}
+                              </span>
+                            </div>
+                            {member.reference_value && (
+                              <div className="text-xs text-blue-700 mt-2 font-medium bg-blue-100 px-2 py-1 rounded inline-block">
+                                <Hash className="h-3 w-3 inline mr-1" />
+                                {member.reference_type}: {member.reference_value}
+                              </div>
+                            )}
+                          </div>
+                          <Plus className="h-5 w-5 text-blue-600 flex-shrink-0" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {memberSearchTerm.length >= 2 && searchedMembers.length === 0 && (
+                  <div className="mt-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                    <p className="text-sm text-amber-800">No members found. Create a new member below.</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <div className="flex-1 border-t"></div>
+                <span className="text-sm text-muted-foreground">OR</span>
+                <div className="flex-1 border-t"></div>
+              </div>
+
+              {/* Create New Member */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-base font-semibold">Create New Member</Label>
+                  <Button
+                    onClick={() => setShowCreateMemberDialog(true)}
+                    size="sm"
+                    variant="outline"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create New
+                  </Button>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setShowAddMemberDialog(false)}>
+                  Close
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Create New Member Dialog */}
+        <Dialog open={showCreateMemberDialog} onOpenChange={setShowCreateMemberDialog}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <User className="h-5 w-5 text-green-600" />
+                Create New Member & Add to Meeting
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Full Name *</Label>
+                  <Input
+                    value={newMemberForm.full_name}
+                    onChange={(e) => setNewMemberForm({ ...newMemberForm, full_name: e.target.value })}
+                    placeholder="Enter full name"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Email *</Label>
+                  <Input
+                    type="email"
+                    value={newMemberForm.email}
+                    onChange={(e) => setNewMemberForm({ ...newMemberForm, email: e.target.value })}
+                    placeholder="email@example.com"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Phone *</Label>
+                  <Input
+                    value={newMemberForm.phone}
+                    onChange={(e) => setNewMemberForm({ ...newMemberForm, phone: e.target.value })}
+                    placeholder="+94XXXXXXXXX"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Company Name</Label>
+                  <Input
+                    value={newMemberForm.company_name}
+                    onChange={(e) => setNewMemberForm({ ...newMemberForm, company_name: e.target.value })}
+                    placeholder="Company name (optional)"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Designation</Label>
+                  <Input
+                    value={newMemberForm.designation}
+                    onChange={(e) => setNewMemberForm({ ...newMemberForm, designation: e.target.value })}
+                    placeholder="Job title (optional)"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Reference Type *</Label>
+                  <Select
+                    value={newMemberForm.reference_type}
+                    onValueChange={(value: "NIC" | "Passport" | "Employee ID") => 
+                      setNewMemberForm({ ...newMemberForm, reference_type: value })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="NIC">NIC</SelectItem>
+                      <SelectItem value="Passport">Passport</SelectItem>
+                      <SelectItem value="Employee ID">Employee ID</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Reference Value *</Label>
+                <Input
+                  value={newMemberForm.reference_value}
+                  onChange={(e) => setNewMemberForm({ ...newMemberForm, reference_value: e.target.value })}
+                  placeholder="Enter reference number"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-4">
+                <Button variant="outline" onClick={() => setShowCreateMemberDialog(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={createAndAddMember}
+                  disabled={isAddingMember}
+                  className="bg-gradient-to-r from-green-600 to-emerald-600"
+                >
+                  {isAddingMember ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Adding...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                      Create & Add to Meeting
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     )
   }
