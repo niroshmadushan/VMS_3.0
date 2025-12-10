@@ -17,6 +17,7 @@ import {
   Coffee,
   BarChart3,
   FileText,
+  Utensils,
 } from "lucide-react"
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar"
 
@@ -26,6 +27,7 @@ const navigationConfig = {
     { name: "Bookings", href: "/admin/bookings", icon: Calendar },
     { name: "User Management", href: "/admin/users", icon: Users },
     { name: "Place Management", href: "/admin/places", icon: MapPin },
+    { name: "Refreshments", href: "/admin/refreshments", icon: Utensils },
     { name: "Visitor Passes", href: "/admin/passes", icon: CreditCard },
     { name: "External Members", href: "/admin/external-members", icon: UserCheck },
     // { name: "Feedback", href: "/admin/feedback", icon: MessageSquare }, // Temporarily hidden - will be developed in a few days

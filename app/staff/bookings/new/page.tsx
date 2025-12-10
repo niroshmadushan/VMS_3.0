@@ -177,6 +177,70 @@ export default function StaffNewBookingPage() {
   
   // Refreshment serving time options
   const [servingTimeOptions, setServingTimeOptions] = useState<string[]>([])
+  
+  // Refreshment types and items from database
+  const [refreshmentTypes, setRefreshmentTypes] = useState<Array<{id: string, name: string, code: string}>>([])
+  const [refreshmentItems, setRefreshmentItems] = useState<Array<{id: string, name: string, type_id: string}>>([])
+  const [availableItemsForType, setAvailableItemsForType] = useState<Array<{id: string, name: string}>>([])
+
+  // Load refreshment types and items
+  useEffect(() => {
+    const loadRefreshments = async () => {
+      try {
+        // Load types
+        const typesResponse = await placeManagementAPI.getTableData('refreshment_types', {
+          limit: 100
+        })
+        const typesData = Array.isArray(typesResponse) ? typesResponse : typesResponse?.data || []
+        // Filter client-side for active and non-deleted
+        const activeTypes = typesData.filter((t: any) => 
+          (t.is_deleted === false || t.is_deleted === 0 || t.is_deleted === 'false') &&
+          (t.is_active === true || t.is_active === 1 || t.is_active === 'true')
+        )
+        setRefreshmentTypes(activeTypes)
+        
+        // Load items
+        const itemsResponse = await placeManagementAPI.getTableData('refreshment_items', {
+          limit: 500
+        })
+        const itemsData = Array.isArray(itemsResponse) ? itemsResponse : itemsResponse?.data || []
+        // Filter client-side for active and non-deleted
+        const activeItems = itemsData.filter((i: any) => 
+          (i.is_deleted === false || i.is_deleted === 0 || i.is_deleted === 'false') &&
+          (i.is_active === true || i.is_active === 1 || i.is_active === 'true')
+        )
+        setRefreshmentItems(activeItems)
+      } catch (error) {
+        console.error('Error loading refreshments:', error)
+        // Fallback to default types if table doesn't exist
+        setRefreshmentTypes([
+          { id: '1', name: 'Beverages', code: 'beverages' },
+          { id: '2', name: 'Light Snacks', code: 'light_snacks' },
+          { id: '3', name: 'Full Meal', code: 'full_meal' },
+          { id: '4', name: 'Custom', code: 'custom' },
+        ])
+      }
+    }
+    loadRefreshments()
+  }, [])
+
+  // Filter items based on selected type
+  useEffect(() => {
+    if (formData.refreshments.type && refreshmentItems.length > 0) {
+      // Find type by code
+      const selectedType = refreshmentTypes.find(t => t.code === formData.refreshments.type)
+      if (selectedType) {
+        const filtered = refreshmentItems
+          .filter(item => item.type_id === selectedType.id)
+          .map(item => ({ id: item.id, name: item.name }))
+        setAvailableItemsForType(filtered)
+      } else {
+        setAvailableItemsForType([])
+      }
+    } else {
+      setAvailableItemsForType([])
+    }
+  }, [formData.refreshments.type, refreshmentTypes, refreshmentItems])
 
   // Auto-set current user as responsible person
   useEffect(() => {
@@ -670,51 +734,76 @@ export default function StaffNewBookingPage() {
     try {
       console.log('📧 Sending email notifications to:', selectedEmailParticipants)
       
-      // Prepare email data
-      const emailData = {
-        booking: {
-          title: bookingData.title,
-          description: bookingData.description,
-          date: bookingData.booking_date,
-          startTime: bookingData.start_time,
-          endTime: bookingData.end_time,
-          place: bookingData.place_name,
-          refId: bookingRefId,
-          responsiblePerson: bookingData.responsible_person_name
-        },
-        recipients: selectedEmailParticipants
+      // Get authentication token
+      const token = localStorage.getItem('authToken') || localStorage.getItem('jwt_token') || localStorage.getItem('token')
+      
+      if (!token) {
+        console.error('❌ No authentication token found')
+        toast.error('Authentication required. Please log in again.', {
+          position: 'top-center',
+          duration: 4000,
+          icon: '❌'
+        })
+        return
       }
 
-      // Call the email API endpoint
-      const response = await fetch('/api/admin/send-meeting-invitations', {
+      // Format time for email (remove seconds if present)
+      const formatTime = (time: string) => {
+        if (!time) return ''
+        return time.substring(0, 5) // Remove seconds if present
+      }
+
+      // Prepare email data for the new simplified API
+      const emailData = {
+        meetingName: bookingData.title,
+        date: bookingData.booking_date,
+        startTime: formatTime(bookingData.start_time),
+        endTime: formatTime(bookingData.end_time),
+        place: bookingData.place_name || '',
+        description: bookingData.description || '',
+        participantEmails: selectedEmailParticipants,
+        emailType: 'booking_details' as const,
+        bookingRefId: bookingRefId // Include booking reference ID
+      }
+
+      console.log('📧 Email data prepared:', emailData)
+
+      // Call the simplified email API endpoint
+      const response = await fetch('/api/booking-email/send-from-frontend', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify(emailData)
       })
 
       const result = await response.json()
 
+      console.log('📧 Email API response status:', response.status)
+      console.log('📧 Email API response:', result)
+
       if (!response.ok) {
-        throw new Error(result.error || 'Failed to send emails')
+        throw new Error(result.message || result.error || 'Failed to send emails')
       }
 
-      console.log('📧 Email API response:', result)
-      
-      // Show success message with details
-      if (result.data.failed > 0) {
-        toast.success(`Emails sent to ${result.data.successful} participants (${result.data.failed} failed)`, {
-          position: 'top-center',
-          duration: 4000,
-          icon: '📧'
-        })
+      if (result.success) {
+        // Show success message with details
+        if (result.data?.emailsFailed && result.data.emailsFailed > 0) {
+          toast.success(`Emails sent to ${result.data.emailsSent} participants (${result.data.emailsFailed} failed)`, {
+            position: 'top-center',
+            duration: 4000,
+            icon: '📧'
+          })
+        } else {
+          toast.success(`Email notifications sent to ${result.data?.emailsSent || selectedEmailParticipants.length} participants`, {
+            position: 'top-center',
+            duration: 3000,
+            icon: '📧'
+          })
+        }
       } else {
-        toast.success(`Email notifications sent to ${result.data.successful} participants`, {
-          position: 'top-center',
-          duration: 3000,
-          icon: '📧'
-        })
+        throw new Error(result.message || 'Failed to send emails')
       }
       
     } catch (error: any) {
@@ -1810,10 +1899,20 @@ export default function StaffNewBookingPage() {
                       <SelectValue placeholder="Select type" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="beverages">Beverages</SelectItem>
-                      <SelectItem value="light_snacks">Light Snacks</SelectItem>
-                      <SelectItem value="full_meal">Full Meal</SelectItem>
-                      <SelectItem value="custom">Custom</SelectItem>
+                      {refreshmentTypes.length > 0 ? (
+                        refreshmentTypes.map((type) => (
+                          <SelectItem key={type.id} value={type.code}>
+                            {type.name}
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <>
+                          <SelectItem value="beverages">Beverages</SelectItem>
+                          <SelectItem value="light_snacks">Light Snacks</SelectItem>
+                          <SelectItem value="full_meal">Full Meal</SelectItem>
+                          <SelectItem value="custom">Custom</SelectItem>
+                        </>
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
@@ -1883,20 +1982,40 @@ export default function StaffNewBookingPage() {
                       </Badge>
                     ))}
                   </div>
-                  <Select onValueChange={(value) => addRefreshmentItem(value)}>
+                  <Select 
+                    onValueChange={(value) => addRefreshmentItem(value)}
+                    disabled={!formData.refreshments.type || availableItemsForType.length === 0}
+                  >
                     <SelectTrigger>
-                      <SelectValue placeholder="Add item" />
+                      <SelectValue placeholder={
+                        !formData.refreshments.type 
+                          ? "Select type first" 
+                          : availableItemsForType.length === 0
+                          ? "No items available"
+                          : "Add item"
+                      } />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Coffee">Coffee</SelectItem>
-                      <SelectItem value="Tea">Tea</SelectItem>
-                      <SelectItem value="Water">Water</SelectItem>
-                      <SelectItem value="Juice">Juice</SelectItem>
-                      <SelectItem value="Cookies">Cookies</SelectItem>
-                      <SelectItem value="Sandwiches">Sandwiches</SelectItem>
-                      <SelectItem value="Lunch">Lunch</SelectItem>
+                      {availableItemsForType.length > 0 ? (
+                        availableItemsForType.map((item) => (
+                          <SelectItem key={item.id} value={item.name}>
+                            {item.name}
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <div className="p-4 text-center text-sm text-muted-foreground">
+                          {!formData.refreshments.type 
+                            ? "Please select a refreshment type first" 
+                            : "No items available for this type"}
+                        </div>
+                      )}
                     </SelectContent>
                   </Select>
+                  {formData.refreshments.type && availableItemsForType.length === 0 && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      No items available for this type. <a href="/admin/refreshments" className="text-blue-600 hover:underline">Manage items</a>
+                    </p>
+                  )}
                 </div>
 
                 <div className="col-span-3 space-y-2">

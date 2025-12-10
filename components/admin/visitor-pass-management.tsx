@@ -191,10 +191,10 @@ export function VisitorPassManagement() {
           let member = null
           if (participant.member_id) {
             member = members.find((m: any) => 
-              m.id === participant.member_id && 
-              (m.is_deleted === false || m.is_deleted === 0) && 
-              (m.is_active === true || m.is_active === 1)
-            )
+            m.id === participant.member_id && 
+            (m.is_deleted === false || m.is_deleted === 0) && 
+            (m.is_active === true || m.is_active === 1)
+          )
           }
           
           // If no member found but participant has data, use participant data directly
@@ -836,96 +836,42 @@ export function VisitorPassManagement() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Statistics Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
-        <Card className="border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-blue-100">
-          <CardContent className="pt-4 pb-4">
-            <div className="flex items-center justify-between">
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-blue-700 truncate">All Visitors</p>
-                <p className="text-2xl font-bold text-blue-900 mt-1">{totalVisitors}</p>
+    <div className="space-y-6 max-w-[98%] mx-auto">
+      {/* Statistics & Available Passes - Single Line */}
+      <Card className="border-2 mb-4">
+        <CardContent className="p-2">
+          <div className="flex items-center justify-between gap-4 text-xs flex-wrap">
+            {/* Statistics */}
+            <div className="flex items-center gap-2">
+              <span className="text-muted-foreground font-medium">All Visitors:</span>
+              <span className="font-bold text-blue-700">{totalVisitors}</span>
               </div>
-              <div className="p-3 bg-blue-500 rounded-lg flex-shrink-0">
-                <Users className="h-6 w-6 text-white" />
+            <div className="flex items-center gap-2">
+              <span className="text-muted-foreground font-medium">Ongoing:</span>
+              <span className="font-bold text-green-700">{ongoingCount}</span>
               </div>
+            <div className="flex items-center gap-2">
+              <span className="text-muted-foreground font-medium">Upcoming:</span>
+              <span className="font-bold text-orange-700">{upcomingCount}</span>
             </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-2 border-green-200 bg-gradient-to-br from-green-50 to-green-100">
-          <CardContent className="pt-4 pb-4">
-            <div className="flex items-center justify-between">
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-green-700 truncate">Ongoing</p>
-                <p className="text-2xl font-bold text-green-900 mt-1">{ongoingCount}</p>
+            <div className="flex items-center gap-2">
+              <span className="text-muted-foreground font-medium">With Pass:</span>
+              <span className="font-bold text-purple-700">{withPassCount}</span>
               </div>
-              <div className="p-3 bg-green-500 rounded-lg flex-shrink-0">
-                <Activity className="h-6 w-6 text-white" />
+            <div className="flex items-center gap-2">
+              <span className="text-muted-foreground font-medium">Need Pass:</span>
+              <span className="font-bold text-red-700">{withoutPassCount}</span>
               </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-2 border-orange-200 bg-gradient-to-br from-orange-50 to-orange-100">
-          <CardContent className="pt-4 pb-4">
-            <div className="flex items-center justify-between">
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-orange-700 truncate">Upcoming</p>
-                <p className="text-2xl font-bold text-orange-900 mt-1">{upcomingCount}</p>
-              </div>
-              <div className="p-3 bg-orange-500 rounded-lg flex-shrink-0">
-                <Clock className="h-6 w-6 text-white" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-2 border-purple-200 bg-gradient-to-br from-purple-50 to-purple-100">
-          <CardContent className="pt-4 pb-4">
-            <div className="flex items-center justify-between">
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-purple-700 truncate">With Pass</p>
-                <p className="text-2xl font-bold text-purple-900 mt-1">{withPassCount}</p>
-              </div>
-              <div className="p-3 bg-purple-500 rounded-lg flex-shrink-0">
-                <CheckCircle className="h-6 w-6 text-white" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-2 border-red-200 bg-gradient-to-br from-red-50 to-red-100">
-          <CardContent className="pt-4 pb-4">
-            <div className="flex items-center justify-between">
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-red-700 truncate">Need Pass</p>
-                <p className="text-2xl font-bold text-red-900 mt-1">{withoutPassCount}</p>
-              </div>
-              <div className="p-3 bg-red-500 rounded-lg flex-shrink-0">
-                <XCircle className="h-6 w-6 text-white" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Available Passes by Type */}
-      <Card className="border-2">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg">Available Passes</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-            {passTypes.map(type => (
-              <div 
-                key={type.id}
-                className="p-3 border-2 rounded-lg text-center min-h-[80px] flex flex-col justify-center"
-                style={{ borderColor: type.color + '40', backgroundColor: type.color + '10' }}
-              >
-                <p className="text-xs font-medium text-muted-foreground truncate">{type.name}</p>
-                <p className="text-2xl font-bold mt-1" style={{ color: type.color }}>{type.available_count}</p>
-                <p className="text-xs text-muted-foreground">available</p>
+            
+            {/* Separator */}
+            <span className="text-muted-foreground">|</span>
+            
+            {/* Available Passes */}
+            {passTypes.map((type, index) => (
+              <div key={type.id} className="flex items-center gap-2">
+                <span className="text-muted-foreground font-medium">{type.name}:</span>
+                <span className="font-bold" style={{ color: type.color }}>{type.available_count}</span>
+                {index < passTypes.length - 1 && <span className="text-muted-foreground">|</span>}
               </div>
             ))}
           </div>
@@ -933,9 +879,9 @@ export function VisitorPassManagement() {
       </Card>
 
       {/* Filters and Search */}
-      <Card className="border-2">
-        <CardContent className="pt-4 pb-4">
-          <div className="flex flex-col lg:flex-row gap-4">
+      <Card className="border-2 mb-4">
+        <CardContent className="pt-3 pb-3 px-3">
+          <div className="flex flex-col lg:flex-row gap-3">
             <div className="flex-1 min-w-0">
               <div className="relative">
                 <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
@@ -976,26 +922,26 @@ export function VisitorPassManagement() {
 
       {/* Visitors Table */}
       <Card className="border-2 shadow-lg">
-        <CardHeader className="bg-gradient-to-r from-blue-50 to-purple-50 border-b-2 pb-4">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+        <CardHeader className="bg-gradient-to-r from-blue-50 to-purple-50 border-b-2 pb-2 pt-3 px-3">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
             <div className="flex items-center gap-2">
-              <Calendar className="h-5 w-5 text-blue-600" />
-              <CardTitle className="text-lg">Active & Upcoming Visitors</CardTitle>
+              <Calendar className="h-4 w-4 text-blue-600" />
+              <CardTitle className="text-sm font-semibold">Active & Upcoming Visitors</CardTitle>
             </div>
-            <Badge className="bg-blue-600 text-white text-sm px-3 py-1 self-start sm:self-center">
+            <Badge className="bg-blue-600 text-white text-xs px-2 py-0.5 self-start sm:self-center">
               {filteredVisitors.length} Visitor{filteredVisitors.length !== 1 ? 's' : ''}
             </Badge>
           </div>
-          <p className="text-sm text-muted-foreground mt-2">
+          <p className="text-xs text-muted-foreground mt-1">
             Showing today, upcoming bookings, and past bookings with unreturned passes
           </p>
-          <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-            <p className="text-sm text-amber-800">
-              <strong>Note:</strong> Only visitors who have confirmed their attendance (participation_status = 'confirmed') are eligible for pass assignment.
+          <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded text-xs">
+            <p className="text-amber-800">
+              <strong>Note:</strong> Only visitors who have confirmed their attendance are eligible for pass assignment.
             </p>
           </div>
         </CardHeader>
-        <CardContent className="pt-4">
+        <CardContent className="pt-2 px-3 pb-3">
           {filteredVisitors.length === 0 ? (
             <div className="text-center py-12 border-2 border-dashed rounded-lg">
               <Users className="h-16 w-16 mx-auto text-muted-foreground mb-3" />
@@ -1004,121 +950,121 @@ export function VisitorPassManagement() {
             </div>
           ) : (
             <div className="border rounded-lg overflow-hidden w-full">
-              <div className="max-h-[450px] overflow-y-auto overflow-x-auto w-full">
+              <div className="max-h-[500px] overflow-y-auto overflow-x-auto w-full">
                 <div className="inline-block min-w-full align-middle">
-                  <table className="w-full" style={{ minWidth: '1400px' }}>
+                  <table className="w-full text-sm" style={{ minWidth: '1100px' }}>
                     <thead className="bg-gradient-to-r from-blue-100 to-purple-100 sticky top-0 z-10">
                       <tr>
-                        <th className="text-left p-3 font-semibold text-sm whitespace-nowrap">Date</th>
-                        <th className="text-left p-3 font-semibold text-sm whitespace-nowrap">Time</th>
-                        <th className="text-left p-3 font-semibold text-sm whitespace-nowrap">Visitor</th>
-                        <th className="text-left p-3 font-semibold text-sm whitespace-nowrap">Reference</th>
-                        <th className="text-left p-3 font-semibold text-sm whitespace-nowrap">Booking</th>
-                        <th className="text-left p-3 font-semibold text-sm whitespace-nowrap">Place</th>
-                        <th className="text-center p-3 font-semibold text-sm whitespace-nowrap">Pass</th>
-                        <th className="text-center p-3 font-semibold text-sm whitespace-nowrap">History</th>
-                        <th className="text-center p-3 font-semibold text-sm whitespace-nowrap sticky right-[120px] bg-gradient-to-r from-blue-100 to-purple-100 z-10">Status</th>
-                        <th className="text-center p-3 font-semibold text-sm whitespace-nowrap sticky right-0 bg-gradient-to-r from-blue-100 to-purple-100 z-10">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredVisitors.map((visitor, idx) => (
-                        <tr 
-                          key={`${visitor.booking_id}-${visitor.member_id}-${idx}`}
-                          className={`border-t hover:bg-blue-50 transition-colors ${
-                            idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'
-                          } ${visitor.is_blacklisted ? 'bg-red-50 border-l-4 border-l-red-500' : ''}`}
-                        >
-                          <td className="p-3 whitespace-nowrap">
-                          <div className="space-y-1">
-                            <p className="font-bold">
+                        <th className="text-left p-2 font-semibold text-xs whitespace-nowrap">Date</th>
+                        <th className="text-left p-2 font-semibold text-xs whitespace-nowrap">Time</th>
+                        <th className="text-left p-2 font-semibold text-xs whitespace-nowrap">Visitor</th>
+                        <th className="text-left p-2 font-semibold text-xs whitespace-nowrap">Reference</th>
+                        <th className="text-left p-2 font-semibold text-xs whitespace-nowrap">Booking</th>
+                        <th className="text-left p-2 font-semibold text-xs whitespace-nowrap">Place</th>
+                        <th className="text-center p-2 font-semibold text-xs whitespace-nowrap">Pass</th>
+                        <th className="text-center p-2 font-semibold text-xs whitespace-nowrap">History</th>
+                        <th className="text-center p-2 font-semibold text-xs whitespace-nowrap sticky right-[100px] bg-gradient-to-r from-blue-100 to-purple-100 z-10">Status</th>
+                        <th className="text-center p-2 font-semibold text-xs whitespace-nowrap sticky right-0 bg-gradient-to-r from-blue-100 to-purple-100 z-10">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredVisitors.map((visitor, idx) => (
+                      <tr 
+                        key={`${visitor.booking_id}-${visitor.member_id}-${idx}`}
+                        className={`border-t hover:bg-blue-50 transition-colors ${
+                          idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'
+                        } ${visitor.is_blacklisted ? 'bg-red-50 border-l-4 border-l-red-500' : ''}`}
+                      >
+                          <td className="p-2 whitespace-nowrap">
+                            <div className="space-y-0.5">
+                              <p className="font-bold text-xs">
                               {new Date(visitor.booking_date).toLocaleDateString('en-US', { 
                                 month: 'short', 
                                 day: 'numeric',
                                 year: 'numeric'
                               })}
                             </p>
-                            <p className="text-xs text-muted-foreground">
+                              <p className="text-[10px] text-muted-foreground">
                               {new Date(visitor.booking_date).toLocaleDateString('en-US', { weekday: 'short' })}
                             </p>
                           </div>
                         </td>
                         
-                          <td className="p-3 whitespace-nowrap">
-                            <div className="flex items-center gap-2">
-                              <Clock className="h-4 w-4 text-blue-600" />
-                              <p className="font-mono font-bold text-sm">{visitor.time_slot}</p>
-                            </div>
-                          </td>
-                          
-                          <td className="p-3">
-                          <div className="space-y-1">
-                            <p className="font-bold text-sm">{visitor.visitor_name}</p>
-                            <p className="text-xs flex items-center gap-1">
-                              <Mail className="h-3 w-3" />
+                          <td className="p-2 whitespace-nowrap">
+                            <div className="flex items-center gap-1">
+                              <Clock className="h-3 w-3 text-blue-600" />
+                              <p className="font-mono font-bold text-xs">{visitor.time_slot}</p>
+                          </div>
+                        </td>
+                        
+                          <td className="p-2">
+                            <div className="space-y-0.5">
+                              <p className="font-bold text-xs">{visitor.visitor_name}</p>
+                              <p className="text-[10px] flex items-center gap-1 truncate max-w-[150px]">
+                                <Mail className="h-2.5 w-2.5" />
                               {visitor.visitor_email}
                             </p>
-                            <p className="text-xs flex items-center gap-1">
-                              <Phone className="h-3 w-3" />
+                              <p className="text-[10px] flex items-center gap-1">
+                                <Phone className="h-2.5 w-2.5" />
                               {visitor.visitor_phone}
                             </p>
                             {visitor.visitor_company && (
-                              <p className="text-xs flex items-center gap-1">
-                                <Building2 className="h-3 w-3" />
+                                <p className="text-[10px] flex items-center gap-1 truncate max-w-[150px]">
+                                  <Building2 className="h-2.5 w-2.5" />
                                 {visitor.visitor_company}
                               </p>
                             )}
                           </div>
                         </td>
                         
-                          <td className="p-3 whitespace-nowrap">
-                            <Badge variant="outline" className="font-mono font-bold text-xs">
-                              {visitor.reference_type}
+                          <td className="p-2 whitespace-nowrap">
+                            <Badge variant="outline" className="font-mono font-bold text-[10px] px-1 py-0">
+                            {visitor.reference_type}
+                          </Badge>
+                            <p className="font-mono text-[10px] font-bold mt-0.5">
+                            {visitor.reference_value}
+                          </p>
+                        </td>
+                        
+                          <td className="p-2">
+                            <p className="font-bold text-xs">{visitor.booking_title}</p>
+                          {visitor.booking_ref_id && (
+                              <Badge variant="outline" className="text-[10px] mt-0.5 px-1 py-0">
+                              {visitor.booking_ref_id}
                             </Badge>
-                            <p className="font-mono text-xs font-bold mt-1">
-                              {visitor.reference_value}
-                            </p>
-                          </td>
-                          
-                          <td className="p-3">
-                            <p className="font-bold text-sm">{visitor.booking_title}</p>
-                            {visitor.booking_ref_id && (
-                              <Badge variant="outline" className="text-xs mt-1">
-                                {visitor.booking_ref_id}
-                              </Badge>
-                            )}
-                          </td>
-                          
-                          <td className="p-3 whitespace-nowrap">
-                            <div className="flex items-center gap-2">
-                              <MapPin className="h-4 w-4 text-green-600" />
-                              <p className="font-medium text-sm">{visitor.place_name}</p>
-                            </div>
-                          </td>
-                          
-                          <td className="p-3 text-center whitespace-nowrap">
-                          <div className="space-y-1">
+                          )}
+                        </td>
+                        
+                          <td className="p-2 whitespace-nowrap">
+                            <div className="flex items-center gap-1">
+                              <MapPin className="h-3 w-3 text-green-600" />
+                              <p className="font-medium text-xs">{visitor.place_name}</p>
+                          </div>
+                        </td>
+                        
+                          <td className="p-2 text-center whitespace-nowrap">
+                          <div className="space-y-0.5">
                             {visitor.assigned_pass_number ? (
-                              <Badge className="bg-green-500 text-white px-3 py-1 font-bold">
+                              <Badge className="bg-green-500 text-white px-2 py-0.5 font-bold text-[10px]">
                                 {visitor.assigned_pass_number}
                               </Badge>
                             ) : visitor.returned_pass_number ? (
                               <>
-                                <Badge className="bg-gray-500 text-white px-3 py-1 font-bold line-through">
+                                <Badge className="bg-gray-500 text-white px-2 py-0.5 font-bold text-[10px] line-through">
                                   {visitor.returned_pass_number}
                                 </Badge>
-                                <p className="text-xs text-green-600 font-medium">
+                                <p className="text-[10px] text-green-600 font-medium">
                                   ✓ Returned
                                 </p>
                               </>
                             ) : (
-                              <Badge variant="outline" className="text-red-600">
+                              <Badge variant="outline" className="text-red-600 text-[10px] px-2 py-0.5">
                                 No Pass
                               </Badge>
                             )}
                             {visitor.needs_manual_return && (
-                              <div className="mt-1">
-                                <Badge className="bg-red-100 text-red-800 text-xs">
+                              <div className="mt-0.5">
+                                <Badge className="bg-red-100 text-red-800 text-[10px] px-1 py-0">
                                   ⚠ Needs Return
                                 </Badge>
                               </div>
@@ -1126,78 +1072,78 @@ export function VisitorPassManagement() {
                           </div>
                         </td>
                         
-                          <td className="p-3 text-center whitespace-nowrap">
-                            <div className="space-y-1">
-                              {visitor.historical_assignments && visitor.historical_assignments.length > 0 && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => openHistoryDialog(visitor)}
-                                  className="text-blue-600 hover:bg-blue-50 text-xs h-7"
-                                >
-                                  <Eye className="h-3 w-3 mr-1" />
-                                  View ({visitor.historical_assignments.length})
-                                </Button>
-                              )}
-                              {(() => {
-                                const todayAssignments = visitor.historical_assignments?.filter((assignment: any) => {
-                                  const today = new Date().toISOString().split('T')[0]
-                                  const assignmentDate = assignment.assigned_date ? assignment.assigned_date.split('T')[0] : null
-                                  return assignmentDate === today
-                                }) || []
-                                
-                                return todayAssignments.length > 1 && (
-                                  <div className="mt-1">
-                                    <Badge className="bg-blue-100 text-blue-800 text-xs">
-                                      {todayAssignments.length} Today
-                                    </Badge>
-                                  </div>
-                                )
-                              })()}
-                              {visitor.needs_manual_return && (
-                                <div className="mt-1">
-                                  <Badge className="bg-orange-100 text-orange-800 text-xs">
-                                    Manual Return
+                          <td className="p-2 text-center whitespace-nowrap">
+                            <div className="space-y-0.5">
+                            {visitor.historical_assignments && visitor.historical_assignments.length > 0 && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => openHistoryDialog(visitor)}
+                                  className="text-blue-600 hover:bg-blue-50 text-[10px] h-6 px-2"
+                              >
+                                  <Eye className="h-2.5 w-2.5 mr-0.5" />
+                                View ({visitor.historical_assignments.length})
+                              </Button>
+                            )}
+                            {(() => {
+                              const todayAssignments = visitor.historical_assignments?.filter((assignment: any) => {
+                                const today = new Date().toISOString().split('T')[0]
+                                const assignmentDate = assignment.assigned_date ? assignment.assigned_date.split('T')[0] : null
+                                return assignmentDate === today
+                              }) || []
+                              
+                              return todayAssignments.length > 1 && (
+                                  <div className="mt-0.5">
+                                    <Badge className="bg-blue-100 text-blue-800 text-[10px] px-1 py-0">
+                                    {todayAssignments.length} Today
                                   </Badge>
                                 </div>
-                              )}
-                            </div>
-                          </td>
-                          
-                          <td className="p-3 text-center whitespace-nowrap sticky right-[120px] bg-white z-10 shadow-[2px_0_5px_rgba(0,0,0,0.1)]">
-                            <Badge className={`px-3 py-1 font-bold text-xs ${getStatusColor(visitor.current_status)}`}>
-                              {visitor.current_status.toUpperCase()}
-                            </Badge>
-                          </td>
-                          
-                          <td className="p-3 text-center whitespace-nowrap sticky right-0 bg-white z-10 shadow-[2px_0_5px_rgba(0,0,0,0.1)]">
-                            <div className="flex gap-1 justify-center">
-                              {visitor.assigned_pass_id ? (
-                                <Button 
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => openReturnDialog(visitor)}
-                                  className="border-green-500 text-green-700 hover:bg-green-50 text-xs h-7"
-                                >
-                                  <CheckCircle className="h-3 w-3 mr-1" />
-                                  Return
-                                </Button>
-                              ) : visitor.current_status !== 'cancelled' && (
-                                <Button 
-                                  size="sm"
-                                  onClick={() => openAssignDialog(visitor)}
-                                  className="text-xs h-7"
-                                >
-                                  <CreditCard className="h-3 w-3 mr-1" />
-                                  Assign
-                                </Button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                              )
+                            })()}
+                            {visitor.needs_manual_return && (
+                                <div className="mt-0.5">
+                                  <Badge className="bg-orange-100 text-orange-800 text-[10px] px-1 py-0">
+                                  Manual Return
+                                </Badge>
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                        
+                          <td className="p-2 text-center whitespace-nowrap sticky right-[100px] bg-white z-10 shadow-[2px_0_5px_rgba(0,0,0,0.1)]">
+                            <Badge className={`px-2 py-0.5 font-bold text-[10px] ${getStatusColor(visitor.current_status)}`}>
+                            {visitor.current_status.toUpperCase()}
+                          </Badge>
+                        </td>
+                        
+                          <td className="p-2 text-center whitespace-nowrap sticky right-0 bg-white z-10 shadow-[2px_0_5px_rgba(0,0,0,0.1)]">
+                            <div className="flex gap-0.5 justify-center">
+                            {visitor.assigned_pass_id ? (
+                              <Button 
+                                size="sm"
+                                variant="outline"
+                                onClick={() => openReturnDialog(visitor)}
+                                  className="border-green-500 text-green-700 hover:bg-green-50 text-[10px] h-6 px-2"
+                              >
+                                  <CheckCircle className="h-2.5 w-2.5 mr-0.5" />
+                                Return
+                              </Button>
+                            ) : visitor.current_status !== 'cancelled' && (
+                              <Button 
+                                size="sm"
+                                onClick={() => openAssignDialog(visitor)}
+                                  className="text-[10px] h-6 px-2"
+                              >
+                                  <CreditCard className="h-2.5 w-2.5 mr-0.5" />
+                                Assign
+                              </Button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
                 </div>
               </div>
             </div>

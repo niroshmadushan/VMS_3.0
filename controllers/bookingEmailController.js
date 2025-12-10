@@ -247,6 +247,7 @@ const sendBookingDetailsEmail = async (req, res) => {
         const bookingQuery = `
             SELECT 
                 b.*, 
+                b.booking_ref_id,
                 p.name as place_name, 
                 p.address, 
                 p.phone as place_phone,
@@ -280,6 +281,7 @@ const sendBookingDetailsEmail = async (req, res) => {
         console.log('📧 ==========================================');
         console.log('📧 Booking ID:', booking.id);
         console.log('📧 Booking Title:', booking.title);
+        console.log('📧 Booking Reference ID:', booking.booking_ref_id || '(not set)');
         console.log('📧 Booking Date (booking_date):', booking.booking_date);
         console.log('📧 Booking Date (date):', booking.date);
         console.log('📧 Start Time:', booking.start_time);
@@ -741,7 +743,7 @@ const sendBookingReminderEmail = async (req, res) => {
         
         // Get booking details - fix collation issue in JOIN
         const bookingQuery = `
-            SELECT b.*, p.name as place_name, p.address, p.phone as place_phone
+            SELECT b.*, b.booking_ref_id, p.name as place_name, p.address, p.phone as place_phone
             FROM bookings b
             LEFT JOIN places p ON b.place_id COLLATE utf8mb4_unicode_ci = p.id COLLATE utf8mb4_unicode_ci
             WHERE b.id = ? AND b.is_deleted = 0
@@ -986,6 +988,13 @@ const generateBookingEmail = (booking, participant, emailType, customMessage) =>
             
             <div style="background-color: #ffffff; border: 1px solid #dee2e6; padding: 20px; border-radius: 8px; margin: 20px 0;">
                 <h3 style="color: #495057; margin-top: 0;">${booking.title}</h3>
+                ${booking.booking_ref_id ? `
+                <div style="background-color: #e3f2fd; padding: 12px; border-radius: 5px; text-align: center; margin: 15px 0;">
+                    <p style="margin: 0; color: #1976d2; font-family: monospace; font-size: 18px; font-weight: bold;">
+                        Booking Reference: ${booking.booking_ref_id}
+                    </p>
+                </div>
+                ` : ''}
                 <p><strong>📅 Date:</strong> ${formattedDate}</p>
                 <p><strong>🕐 Time:</strong> ${formattedStartTime} - ${formattedEndTime}</p>
                 <p><strong>📍 Location:</strong> ${booking.place_name || 'Not specified'}</p>
@@ -1021,6 +1030,7 @@ const generateBookingEmail = (booking, participant, emailType, customMessage) =>
         Here are the details for your upcoming booking:
         
         ${booking.title}
+        ${booking.booking_ref_id ? `Booking Reference: ${booking.booking_ref_id}` : ''}
         Date: ${formattedDate}
         Time: ${formattedStartTime} - ${formattedEndTime}
         Location: ${booking.place_name || 'Not specified'}
@@ -1147,7 +1157,8 @@ const sendBookingEmailFromFrontend = async (req, res) => {
             description,
             participantEmails,
             emailType = 'booking_details',
-            customMessage = ''
+            customMessage = '',
+            bookingRefId = ''
         } = req.body;
 
         // Get request details
@@ -1238,6 +1249,11 @@ const sendBookingEmailFromFrontend = async (req, res) => {
         console.log('📧   Value:', customMessage || '(not provided)');
         console.log('📧   Type:', typeof customMessage);
         console.log('📧   Length:', customMessage ? customMessage.length : 0);
+        console.log('');
+        console.log('📧 Booking Reference ID:');
+        console.log('📧   Value:', bookingRefId || '(not provided)');
+        console.log('📧   Type:', typeof bookingRefId);
+        console.log('📧   Length:', bookingRefId ? bookingRefId.length : 0);
         console.log('');
         console.log('📧 ==========================================');
         console.log('📧 VALIDATING REQUEST DATA...');
@@ -1350,6 +1366,13 @@ const sendBookingEmailFromFrontend = async (req, res) => {
                 
                 <div style="background-color: #ffffff; border: 1px solid #dee2e6; padding: 20px; border-radius: 8px; margin: 20px 0;">
                     <h3 style="color: #495057; margin-top: 0;">${meetingName}</h3>
+                    ${bookingRefId ? `
+                    <div style="background-color: #e3f2fd; padding: 12px; border-radius: 5px; text-align: center; margin: 15px 0;">
+                        <p style="margin: 0; color: #1976d2; font-family: monospace; font-size: 18px; font-weight: bold;">
+                            Booking Reference: ${bookingRefId}
+                        </p>
+                    </div>
+                    ` : ''}
                     <p><strong>📅 Date:</strong> ${formattedDate}</p>
                     <p><strong>🕐 Time:</strong> ${formattedStartTime} - ${formattedEndTime}</p>
                     ${place ? `<p><strong>📍 Location:</strong> ${place}</p>` : ''}
@@ -1392,6 +1415,7 @@ const sendBookingEmailFromFrontend = async (req, res) => {
             Here are the details for your upcoming booking:
             
             ${meetingName}
+            ${bookingRefId ? `Booking Reference: ${bookingRefId}` : ''}
             Date: ${formattedDate}
             Time: ${formattedStartTime} - ${formattedEndTime}
             ${place ? `Location: ${place}` : ''}

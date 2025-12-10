@@ -744,7 +744,8 @@ export default function NewBookingPage() {
         place: bookingData.place_name || '',
         description: bookingData.description || '',
         participantEmails: selectedEmailParticipants,
-        emailType: 'booking_details' as const
+        emailType: 'booking_details' as const,
+        bookingRefId: bookingRefId // Include booking reference ID
       }
 
       console.log('📧 Email data prepared:', emailData)

@@ -9,8 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Utensils, Plus, Edit, Trash2, X } from 'lucide-react'
+import { Utensils, Plus, Edit, Trash2, Search, X, Package, Coffee } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { RouteProtection } from '@/components/auth/route-protection'
 import { placeManagementAPI } from '@/lib/place-management-api'
@@ -37,7 +36,9 @@ export default function RefreshmentManagementPage() {
   const [types, setTypes] = useState<RefreshmentType[]>([])
   const [items, setItems] = useState<RefreshmentItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [selectedType, setSelectedType] = useState<string>('')
+  const [selectedType, setSelectedType] = useState<string | null>(null)
+  const [typeSearchTerm, setTypeSearchTerm] = useState('')
+  const [itemSearchTerm, setItemSearchTerm] = useState('')
   
   // Type management
   const [isTypeDialogOpen, setIsTypeDialogOpen] = useState(false)
@@ -54,12 +55,8 @@ export default function RefreshmentManagementPage() {
   }, [])
 
   useEffect(() => {
-    if (selectedType) {
-      loadItems(selectedType)
-    } else {
-      loadItems()
-    }
-  }, [selectedType])
+    loadItems()
+  }, [])
 
   const loadData = async () => {
     try {
@@ -82,7 +79,6 @@ export default function RefreshmentManagementPage() {
       setTypes(data)
     } catch (error) {
       console.error('Error loading types:', error)
-      // If table doesn't exist, initialize with default types
       if (types.length === 0) {
         setTypes([
           { id: '1', name: 'Beverages', code: 'beverages', is_active: true },
@@ -94,12 +90,9 @@ export default function RefreshmentManagementPage() {
     }
   }
 
-  const loadItems = async (typeId?: string) => {
+  const loadItems = async () => {
     try {
       const filters: any = { is_deleted: 'false' }
-      if (typeId) {
-        filters.type_id = typeId
-      }
       const response = await placeManagementAPI.getTableData('refreshment_items', filters)
       const data = Array.isArray(response) ? response : response?.data || []
       setItems(data)
@@ -129,7 +122,6 @@ export default function RefreshmentManagementPage() {
 
     try {
       if (editingType) {
-        // Update existing type
         await placeManagementAPI.updateRecord('refreshment_types', { id: editingType.id }, {
           name: typeFormData.name,
           code: typeFormData.code,
@@ -137,7 +129,6 @@ export default function RefreshmentManagementPage() {
         })
         toast.success('Refreshment type updated successfully')
       } else {
-        // Create new type
         const newType = {
           id: `type_${Date.now()}`,
           name: typeFormData.name,
@@ -167,20 +158,24 @@ export default function RefreshmentManagementPage() {
         updated_at: new Date().toISOString()
       })
       toast.success('Refreshment type deleted successfully')
+      if (selectedType === type.id) {
+        setSelectedType(null)
+      }
       loadTypes()
+      loadItems()
     } catch (error: any) {
       console.error('Error deleting type:', error)
       toast.error(error?.message || 'Failed to delete refreshment type')
     }
   }
 
-  const handleCreateItem = () => {
-    if (!selectedType && types.length > 0) {
-      toast.error('Please select a refreshment type first')
+  const handleCreateItem = (typeId?: string) => {
+    if (types.length === 0) {
+      toast.error('Please create a refreshment type first')
       return
     }
     setEditingItem(null)
-    setItemFormData({ name: '', type_id: selectedType || types[0]?.id || '' })
+    setItemFormData({ name: '', type_id: typeId || selectedType || types[0]?.id || '' })
     setIsItemDialogOpen(true)
   }
 
@@ -198,7 +193,6 @@ export default function RefreshmentManagementPage() {
 
     try {
       if (editingItem) {
-        // Update existing item
         await placeManagementAPI.updateRecord('refreshment_items', { id: editingItem.id }, {
           name: itemFormData.name,
           type_id: itemFormData.type_id,
@@ -206,7 +200,6 @@ export default function RefreshmentManagementPage() {
         })
         toast.success('Refreshment item updated successfully')
       } else {
-        // Create new item
         const newItem = {
           id: `item_${Date.now()}`,
           name: itemFormData.name,
@@ -220,7 +213,7 @@ export default function RefreshmentManagementPage() {
         toast.success('Refreshment item created successfully')
       }
       setIsItemDialogOpen(false)
-      loadItems(selectedType || undefined)
+      loadItems()
     } catch (error: any) {
       console.error('Error saving item:', error)
       toast.error(error?.message || 'Failed to save refreshment item')
@@ -236,20 +229,38 @@ export default function RefreshmentManagementPage() {
         updated_at: new Date().toISOString()
       })
       toast.success('Refreshment item deleted successfully')
-      loadItems(selectedType || undefined)
+      loadItems()
     } catch (error: any) {
       console.error('Error deleting item:', error)
       toast.error(error?.message || 'Failed to delete refreshment item')
     }
   }
 
-  const filteredItems = selectedType 
-    ? items.filter(item => item.type_id === selectedType)
-    : items
+  // Filter types by search term
+  const filteredTypes = types.filter(type => 
+    type.name.toLowerCase().includes(typeSearchTerm.toLowerCase()) ||
+    type.code.toLowerCase().includes(typeSearchTerm.toLowerCase())
+  )
+
+  // Filter items by selected type and search term
+  const filteredItems = items.filter(item => {
+    const matchesType = !selectedType || item.type_id === selectedType
+    const matchesSearch = item.name.toLowerCase().includes(itemSearchTerm.toLowerCase())
+    return matchesType && matchesSearch
+  })
 
   const getTypeName = (typeId: string) => {
     return types.find(t => t.id === typeId)?.name || 'Unknown'
   }
+
+  const getTypeItemCount = (typeId: string) => {
+    return items.filter(item => item.type_id === typeId && !item.is_active === false).length
+  }
+
+  const totalTypes = types.length
+  const totalItems = items.length
+  const activeTypes = types.filter(t => t.is_active).length
+  const activeItems = items.filter(i => i.is_active).length
 
   return (
     <RouteProtection requiredRole="admin">
@@ -258,162 +269,362 @@ export default function RefreshmentManagementPage() {
         subtitle="Manage refreshment types and items for bookings"
       >
         <div className="space-y-6">
-          {/* Refreshment Types Section */}
+          {/* Statistics Card */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Total Types</p>
+                    <p className="text-2xl font-bold">{totalTypes}</p>
+                    <p className="text-xs text-muted-foreground mt-1">{activeTypes} active</p>
+                  </div>
+                  <div className="h-12 w-12 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
+                    <Package className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Total Items</p>
+                    <p className="text-2xl font-bold">{totalItems}</p>
+                    <p className="text-xs text-muted-foreground mt-1">{activeItems} active</p>
+                  </div>
+                  <div className="h-12 w-12 rounded-full bg-green-100 dark:bg-green-900 flex items-center justify-center">
+                    <Coffee className="h-6 w-6 text-green-600 dark:text-green-400" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Selected Type</p>
+                    <p className="text-2xl font-bold">
+                      {selectedType ? getTypeName(selectedType) : 'None'}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {selectedType ? `${filteredItems.length} items` : 'Click a type card'}
+                    </p>
+                  </div>
+                  <div className="h-12 w-12 rounded-full bg-purple-100 dark:bg-purple-900 flex items-center justify-center">
+                    <Utensils className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Filtered Items</p>
+                    <p className="text-2xl font-bold">{filteredItems.length}</p>
+                    <p className="text-xs text-muted-foreground mt-1">Currently showing</p>
+                  </div>
+                  <div className="h-12 w-12 rounded-full bg-orange-100 dark:bg-orange-900 flex items-center justify-center">
+                    <Search className="h-6 w-6 text-orange-600 dark:text-orange-400" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Types Section */}
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="flex items-center gap-2">
-                <Utensils className="h-5 w-5" />
+                <Package className="h-5 w-5" />
                 Refreshment Types
               </CardTitle>
-              <Button onClick={handleCreateType} size="sm">
-                <Plus className="h-4 w-4 mr-2" />
-                Add Type
-              </Button>
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <p className="text-center text-muted-foreground py-4">Loading...</p>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Code</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {types.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={4} className="text-center text-muted-foreground">
-                          No refreshment types found
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      types.map((type) => (
-                        <TableRow key={type.id}>
-                          <TableCell className="font-medium">{type.name}</TableCell>
-                          <TableCell>
-                            <Badge variant="outline">{type.code}</Badge>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant={type.is_active ? 'default' : 'secondary'}>
-                              {type.is_active ? 'Active' : 'Inactive'}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex justify-end gap-2">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleEditType(type)}
-                              >
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleDeleteType(type)}
-                              >
-                                <Trash2 className="h-4 w-4 text-destructive" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Refreshment Items Section */}
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="flex items-center gap-2">
-                <Utensils className="h-5 w-5" />
-                Refreshment Items
-              </CardTitle>
               <div className="flex items-center gap-2">
-                <Select value={selectedType} onValueChange={setSelectedType}>
-                  <SelectTrigger className="w-[200px]">
-                    <SelectValue placeholder="Filter by type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">All Types</SelectItem>
-                    {types.map((type) => (
-                      <SelectItem key={type.id} value={type.id}>
-                        {type.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Button onClick={handleCreateItem} size="sm">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search types..."
+                    value={typeSearchTerm}
+                    onChange={(e) => setTypeSearchTerm(e.target.value)}
+                    className="pl-9 w-[250px]"
+                  />
+                </div>
+                <Button onClick={handleCreateType} size="sm">
                   <Plus className="h-4 w-4 mr-2" />
-                  Add Item
+                  Add Type
                 </Button>
               </div>
             </CardHeader>
             <CardContent>
               {isLoading ? (
-                <p className="text-center text-muted-foreground py-4">Loading...</p>
+                <p className="text-center text-muted-foreground py-8">Loading...</p>
+              ) : filteredTypes.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground mb-4">
+                    {typeSearchTerm ? 'No types found matching your search' : 'No refreshment types found'}
+                  </p>
+                  <Button onClick={handleCreateType} variant="outline">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create First Type
+                  </Button>
+                </div>
               ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredItems.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={4} className="text-center text-muted-foreground">
-                          {selectedType ? 'No items found for selected type' : 'No refreshment items found'}
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      filteredItems.map((item) => (
-                        <TableRow key={item.id}>
-                          <TableCell className="font-medium">{item.name}</TableCell>
-                          <TableCell>
-                            <Badge variant="outline">{getTypeName(item.type_id)}</Badge>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant={item.is_active ? 'default' : 'secondary'}>
-                              {item.is_active ? 'Active' : 'Inactive'}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex justify-end gap-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  {filteredTypes.map((type) => {
+                    const itemCount = getTypeItemCount(type.id)
+                    const isSelected = selectedType === type.id
+                    return (
+                      <Card
+                        key={type.id}
+                        className={`cursor-pointer transition-all hover:shadow-lg ${
+                          isSelected 
+                            ? 'ring-2 ring-primary border-primary' 
+                            : 'hover:border-primary/50'
+                        }`}
+                        onClick={() => setSelectedType(isSelected ? null : type.id)}
+                      >
+                        <CardContent className="p-6">
+                          <div className="flex items-start justify-between mb-4">
+                            <div className="flex-1">
+                              <h3 className="font-semibold text-lg mb-1">{type.name}</h3>
+                              <Badge variant="outline" className="text-xs">{type.code}</Badge>
+                            </div>
+                            <div className="flex gap-1">
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => handleEditItem(item)}
+                                className="h-8 w-8 p-0"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleEditType(type)
+                                }}
                               >
                                 <Edit className="h-4 w-4" />
                               </Button>
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => handleDeleteItem(item)}
+                                className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleDeleteType(type)
+                                }}
                               >
-                                <Trash2 className="h-4 w-4 text-destructive" />
+                                <Trash2 className="h-4 w-4" />
                               </Button>
                             </div>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <Badge variant={type.is_active ? 'default' : 'secondary'}>
+                                {type.is_active ? 'Active' : 'Inactive'}
+                              </Badge>
+                              <span className="text-sm text-muted-foreground">
+                                {itemCount} {itemCount === 1 ? 'item' : 'items'}
+                              </span>
+                            </div>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-8 w-8 p-0"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleCreateItem(type.id)
+                              }}
+                              title="Add item to this type"
+                            >
+                              <Plus className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )
+                  })}
+                </div>
               )}
             </CardContent>
           </Card>
+
+          {/* Items Section - Only show when a type is selected */}
+          {selectedType && (
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <CardTitle className="flex items-center gap-2">
+                    <Coffee className="h-5 w-5" />
+                    Items - {getTypeName(selectedType)}
+                  </CardTitle>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setSelectedType(null)}
+                  >
+                    <X className="h-4 w-4 mr-2" />
+                    Clear Selection
+                  </Button>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search items..."
+                      value={itemSearchTerm}
+                      onChange={(e) => setItemSearchTerm(e.target.value)}
+                      className="pl-9 w-[250px]"
+                    />
+                  </div>
+                  <Button onClick={() => handleCreateItem(selectedType)} size="sm">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Item
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {filteredItems.length === 0 ? (
+                  <div className="text-center py-8">
+                    <p className="text-muted-foreground mb-4">
+                      {itemSearchTerm 
+                        ? 'No items found matching your search' 
+                        : 'No items found for this type'}
+                    </p>
+                    <Button onClick={() => handleCreateItem(selectedType)} variant="outline">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add First Item
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                    {filteredItems.map((item) => (
+                      <div
+                        key={item.id}
+                        className="flex items-center justify-between p-4 border rounded-lg hover:bg-accent/50 transition-colors"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                            <Utensils className="h-5 w-5 text-primary" />
+                          </div>
+                          <div>
+                            <p className="font-medium">{item.name}</p>
+                            <Badge variant={item.is_active ? 'default' : 'secondary'} className="text-xs">
+                              {item.is_active ? 'Active' : 'Inactive'}
+                            </Badge>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEditItem(item)}
+                          >
+                            <Edit className="h-4 w-4 mr-2" />
+                            Edit
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteItem(item)}
+                            className="text-destructive hover:text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Show all items if no type selected */}
+          {!selectedType && (
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <Coffee className="h-5 w-5" />
+                  All Items
+                </CardTitle>
+                <div className="flex items-center gap-2">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search items..."
+                      value={itemSearchTerm}
+                      onChange={(e) => setItemSearchTerm(e.target.value)}
+                      className="pl-9 w-[250px]"
+                    />
+                  </div>
+                  <Button onClick={() => handleCreateItem()} size="sm">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Item
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {filteredItems.length === 0 ? (
+                  <div className="text-center py-8">
+                    <p className="text-muted-foreground mb-4">
+                      {itemSearchTerm ? 'No items found matching your search' : 'No refreshment items found'}
+                    </p>
+                    <Button onClick={() => handleCreateItem()} variant="outline">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Create First Item
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                    {filteredItems.map((item) => (
+                      <div
+                        key={item.id}
+                        className="flex items-center justify-between p-4 border rounded-lg hover:bg-accent/50 transition-colors"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                            <Utensils className="h-5 w-5 text-primary" />
+                          </div>
+                          <div>
+                            <p className="font-medium">{item.name}</p>
+                            <div className="flex items-center gap-2 mt-1">
+                              <Badge variant="outline" className="text-xs">
+                                {getTypeName(item.type_id)}
+                              </Badge>
+                              <Badge variant={item.is_active ? 'default' : 'secondary'} className="text-xs">
+                                {item.is_active ? 'Active' : 'Inactive'}
+                              </Badge>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedType(item.type_id)
+                              handleEditItem(item)
+                            }}
+                          >
+                            <Edit className="h-4 w-4 mr-2" />
+                            Edit
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteItem(item)}
+                            className="text-destructive hover:text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {/* Type Dialog */}
@@ -499,4 +710,3 @@ export default function RefreshmentManagementPage() {
     </RouteProtection>
   )
 }
-

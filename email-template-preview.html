@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Booking Email Template Preview</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .template-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .template-title {
+            color: #2c3e50;
+            border-bottom: 2px solid #2c3e50;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+        .preview-box {
+            border: 2px dashed #ccc;
+            padding: 20px;
+            margin: 20px 0;
+            background-color: #fafafa;
+        }
+        .code-block {
+            background: #2d2d2d;
+            color: #f8f8f2;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            margin: 10px 0;
+        }
+        h1 {
+            color: #2c3e50;
+        }
+        h2 {
+            color: #495057;
+        }
+    </style>
+</head>
+<body>
+    <h1>📧 Booking Email Templates Preview</h1>
+    <p>This file shows the email templates sent when:</p>
+    <ul>
+        <li>✅ A booking is created (after creation)</li>
+        <li>✅ "Send Mail" button is clicked</li>
+        <li>✅ Sent to: Responsible Person, Internal Members, External Members</li>
+    </ul>
+
+    <!-- Template 1: From Database (generateBookingEmail) -->
+    <div class="template-section">
+        <h2 class="template-title">Template 1: Booking Details Email (from Database)</h2>
+        <p><strong>Used when:</strong> Sending emails from existing booking data in database</p>
+        <p><strong>Subject:</strong> <code>Booking Details - {booking.title}</code></p>
+        
+        <h3>HTML Email Preview:</h3>
+        <div class="preview-box">
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+                <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                    <h2 style="color: #2c3e50; margin-top: 0;">📅 Booking Details</h2>
+                </div>
+                
+                <p>Dear <strong>John Doe</strong>,</p>
+                <p>Here are the details for your upcoming booking:</p>
+                
+                <div style="background-color: #ffffff; border: 1px solid #dee2e6; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                    <h3 style="color: #495057; margin-top: 0;">Meeting with Client</h3>
+                    <div style="background-color: #e3f2fd; padding: 12px; border-radius: 5px; text-align: center; margin: 15px 0;">
+                        <p style="margin: 0; color: #1976d2; font-family: monospace; font-size: 18px; font-weight: bold;">
+                            Booking Reference: BK-2024-001234
+                        </p>
+                    </div>
+                    <p><strong>📅 Date:</strong> Monday, January 15, 2024</p>
+                    <p><strong>🕐 Time:</strong> 10:00 - 12:00</p>
+                    <p><strong>📍 Location:</strong> Conference Room A</p>
+                    <p><strong>🏢 Address:</strong> 123 Main Street, City</p>
+                    <p><strong>📞 Phone:</strong> +1 234-567-8900</p>
+                    <p><strong>📝 Description:</strong> Quarterly business review meeting</p>
+                </div>
+                
+                <div style="background-color: #e3f2fd; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                    <p><strong>💬 Additional Message:</strong></p>
+                    <p>Please bring your laptop and presentation materials.</p>
+                </div>
+                
+                <div style="background-color: #fff3cd; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                    <p><strong>⚠️ Important:</strong> Please arrive 10 minutes early for check-in.</p>
+                </div>
+                
+                <hr style="border: none; border-top: 1px solid #dee2e6; margin: 30px 0;">
+                <p style="color: #6c757d; font-size: 12px; text-align: center;">
+                    This is an automated message from the booking system.<br>
+                    If you have any questions, please contact the organizer.
+                </p>
+            </div>
+        </div>
+
+        <h3>Template Code (HTML):</h3>
+        <div class="code-block">
+&lt;div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;"&gt;
+    &lt;div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;"&gt;
+        &lt;h2 style="color: #2c3e50; margin-top: 0;"&gt;📅 Booking Details&lt;/h2&gt;
+    &lt;/div&gt;
+    
+    &lt;p&gt;Dear ${participant.full_name},&lt;/p&gt;
+    &lt;p&gt;Here are the details for your upcoming booking:&lt;/p&gt;
+    
+    &lt;div style="background-color: #ffffff; border: 1px solid #dee2e6; padding: 20px; border-radius: 8px; margin: 20px 0;"&gt;
+        &lt;h3 style="color: #495057; margin-top: 0;"&gt;${booking.title}&lt;/h3&gt;
+        ${booking.booking_ref_id ? `
+        &lt;div style="background-color: #e3f2fd; padding: 12px; border-radius: 5px; text-align: center; margin: 15px 0;"&gt;
+            &lt;p style="margin: 0; color: #1976d2; font-family: monospace; font-size: 18px; font-weight: bold;"&gt;
+                Booking Reference: ${booking.booking_ref_id}
+            &lt;/p&gt;
+        &lt;/div&gt;
+        ` : ''}
+        &lt;p&gt;&lt;strong&gt;📅 Date:&lt;/strong&gt; ${formattedDate}&lt;/p&gt;
+        &lt;p&gt;&lt;strong&gt;🕐 Time:&lt;/strong&gt; ${formattedStartTime} - ${formattedEndTime}&lt;/p&gt;
+        &lt;p&gt;&lt;strong&gt;📍 Location:&lt;/strong&gt; ${booking.place_name || 'Not specified'}&lt;/p&gt;
+        ${booking.address ? `&lt;p&gt;&lt;strong&gt;🏢 Address:&lt;/strong&gt; ${booking.address}&lt;/p&gt;` : ''}
+        ${booking.place_phone ? `&lt;p&gt;&lt;strong&gt;📞 Phone:&lt;/strong&gt; ${booking.place_phone}&lt;/p&gt;` : ''}
+        ${booking.description ? `&lt;p&gt;&lt;strong&gt;📝 Description:&lt;/strong&gt; ${booking.description}&lt;/p&gt;` : ''}
+    &lt;/div&gt;
+    
+    ${customMessage ? `
+        &lt;div style="background-color: #e3f2fd; padding: 15px; border-radius: 8px; margin: 20px 0;"&gt;
+            &lt;p&gt;&lt;strong&gt;💬 Additional Message:&lt;/strong&gt;&lt;/p&gt;
+            &lt;p&gt;${customMessage}&lt;/p&gt;
+        &lt;/div&gt;
+    ` : ''}
+    
+    &lt;div style="background-color: #fff3cd; padding: 15px; border-radius: 8px; margin: 20px 0;"&gt;
+        &lt;p&gt;&lt;strong&gt;⚠️ Important:&lt;/strong&gt; Please arrive 10 minutes early for check-in.&lt;/p&gt;
+    &lt;/div&gt;
+    
+    &lt;hr style="border: none; border-top: 1px solid #dee2e6; margin: 30px 0;"&gt;
+    &lt;p style="color: #6c757d; font-size: 12px; text-align: center;"&gt;
+        This is an automated message from the booking system.&lt;br&gt;
+        If you have any questions, please contact the organizer.
+    &lt;/p&gt;
+&lt;/div&gt;
+        </div>
+    </div>
+
+    <!-- Template 2: From Frontend (sendBookingEmailFromFrontend) -->
+    <div class="template-section">
+        <h2 class="template-title">Template 2: Booking Details Email (from Frontend)</h2>
+        <p><strong>Used when:</strong> Sending emails directly from frontend (Send Mail button)</p>
+        <p><strong>Subject:</strong> <code>Booking Details - {meetingName}</code></p>
+        
+        <h3>HTML Email Preview:</h3>
+        <div class="preview-box">
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+                <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                    <h2 style="color: #2c3e50; margin-top: 0;">📅 Booking Details</h2>
+                </div>
+                
+                <p>Dear <strong>Participant</strong>,</p>
+                <p>Here are the details for your upcoming booking:</p>
+                
+                <div style="background-color: #ffffff; border: 1px solid #dee2e6; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                    <h3 style="color: #495057; margin-top: 0;">Meeting with Client</h3>
+                    <div style="background-color: #e3f2fd; padding: 12px; border-radius: 5px; text-align: center; margin: 15px 0;">
+                        <p style="margin: 0; color: #1976d2; font-family: monospace; font-size: 18px; font-weight: bold;">
+                            Booking Reference: BK-2024-001234
+                        </p>
+                    </div>
+                    <p><strong>📅 Date:</strong> Monday, January 15, 2024</p>
+                    <p><strong>🕐 Time:</strong> 10:00 - 12:00</p>
+                    <p><strong>📍 Location:</strong> Conference Room A</p>
+                    <p><strong>📝 Description:</strong> Quarterly business review meeting</p>
+                </div>
+                
+                <div style="background-color: #e3f2fd; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                    <p><strong>💬 Additional Message:</strong></p>
+                    <p>Please bring your laptop and presentation materials.</p>
+                </div>
+                
+                <div style="background-color: #fff3cd; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                    <p><strong>⚠️ Important:</strong> Please arrive 10 minutes early for check-in.</p>
+                </div>
+                
+                <hr style="border: none; border-top: 1px solid #dee2e6; margin: 30px 0;">
+                <div style="background-color: #e8f5e9; padding: 15px; border-radius: 8px; margin: 20px 0; text-align: center;">
+                    <p style="margin: 0; color: #2e7d32; font-weight: bold;">📅 Calendar Invitation Attached</p>
+                    <p style="margin: 10px 0 0 0; color: #388e3c; font-size: 14px;">
+                        A calendar file (meeting.ics) is attached to this email.<br>
+                        Click on it to automatically add this meeting to your calendar (Google Calendar, Outlook, Apple Calendar, etc.)
+                    </p>
+                </div>
+                
+                <hr style="border: none; border-top: 1px solid #dee2e6; margin: 30px 0;">
+                <p style="color: #6c757d; font-size: 12px; text-align: center;">
+                    This is an automated message from the booking system.<br>
+                    If you have any questions, please contact the organizer.
+                </p>
+            </div>
+        </div>
+
+        <h3>Template Code (HTML):</h3>
+        <div class="code-block">
+&lt;div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;"&gt;
+    &lt;div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;"&gt;
+        &lt;h2 style="color: #2c3e50; margin-top: 0;"&gt;📅 Booking Details&lt;/h2&gt;
+    &lt;/div&gt;
+    
+    &lt;p&gt;Dear Participant,&lt;/p&gt;
+    &lt;p&gt;Here are the details for your upcoming booking:&lt;/p&gt;
+    
+    &lt;div style="background-color: #ffffff; border: 1px solid #dee2e6; padding: 20px; border-radius: 8px; margin: 20px 0;"&gt;
+        &lt;h3 style="color: #495057; margin-top: 0;"&gt;${meetingName}&lt;/h3&gt;
+        ${bookingRefId ? `
+        &lt;div style="background-color: #e3f2fd; padding: 12px; border-radius: 5px; text-align: center; margin: 15px 0;"&gt;
+            &lt;p style="margin: 0; color: #1976d2; font-family: monospace; font-size: 18px; font-weight: bold;"&gt;
+                Booking Reference: ${bookingRefId}
+            &lt;/p&gt;
+        &lt;/div&gt;
+        ` : ''}
+        &lt;p&gt;&lt;strong&gt;📅 Date:&lt;/strong&gt; ${formattedDate}&lt;/p&gt;
+        &lt;p&gt;&lt;strong&gt;🕐 Time:&lt;/strong&gt; ${formattedStartTime} - ${formattedEndTime}&lt;/p&gt;
+        ${place ? `&lt;p&gt;&lt;strong&gt;📍 Location:&lt;/strong&gt; ${place}&lt;/p&gt;` : ''}
+        ${description ? `&lt;p&gt;&lt;strong&gt;📝 Description:&lt;/strong&gt; ${description}&lt;/p&gt;` : ''}
+    &lt;/div&gt;
+    
+    ${customMessage ? `
+        &lt;div style="background-color: #e3f2fd; padding: 15px; border-radius: 8px; margin: 20px 0;"&gt;
+            &lt;p&gt;&lt;strong&gt;💬 Additional Message:&lt;/strong&gt;&lt;/p&gt;
+            &lt;p&gt;${customMessage}&lt;/p&gt;
+        &lt;/div&gt;
+    ` : ''}
+    
+    &lt;div style="background-color: #fff3cd; padding: 15px; border-radius: 8px; margin: 20px 0;"&gt;
+        &lt;p&gt;&lt;strong&gt;⚠️ Important:&lt;/strong&gt; Please arrive 10 minutes early for check-in.&lt;/p&gt;
+    &lt;/div&gt;
+    
+    &lt;hr style="border: none; border-top: 1px solid #dee2e6; margin: 30px 0;"&gt;
+    &lt;div style="background-color: #e8f5e9; padding: 15px; border-radius: 8px; margin: 20px 0; text-align: center;"&gt;
+        &lt;p style="margin: 0; color: #2e7d32; font-weight: bold;"&gt;📅 Calendar Invitation Attached&lt;/p&gt;
+        &lt;p style="margin: 10px 0 0 0; color: #388e3c; font-size: 14px;"&gt;
+            A calendar file (meeting.ics) is attached to this email.&lt;br&gt;
+            Click on it to automatically add this meeting to your calendar (Google Calendar, Outlook, Apple Calendar, etc.)
+        &lt;/p&gt;
+    &lt;/div&gt;
+    
+    &lt;hr style="border: none; border-top: 1px solid #dee2e6; margin: 30px 0;"&gt;
+    &lt;p style="color: #6c757d; font-size: 12px; text-align: center;"&gt;
+        This is an automated message from the booking system.&lt;br&gt;
+        If you have any questions, please contact the organizer.
+    &lt;/p&gt;
+&lt;/div&gt;
+        </div>
+    </div>
+
+    <!-- Email Recipients -->
+    <div class="template-section">
+        <h2 class="template-title">📬 Email Recipients</h2>
+        <p>The email is sent to the following participants:</p>
+        <ul>
+            <li><strong>✅ Responsible Person</strong> - The person who created/manages the booking</li>
+            <li><strong>✅ Internal Members</strong> - Staff/employees added as participants</li>
+            <li><strong>✅ External Members</strong> - External visitors/guests added as participants</li>
+        </ul>
+        <p><strong>Note:</strong> Only participants with valid email addresses receive the email.</p>
+    </div>
+
+    <!-- Email Content Fields -->
+    <div class="template-section">
+        <h2 class="template-title">📋 Email Content Fields</h2>
+        <p>The email includes the following information:</p>
+        <ul>
+            <li><strong>📅 Booking Title/Meeting Name</strong></li>
+            <li><strong>🔖 Booking Reference ID</strong> (if available)</li>
+            <li><strong>📅 Date</strong> (formatted as: "Monday, January 15, 2024")</li>
+            <li><strong>🕐 Time</strong> (formatted as: "10:00 - 12:00")</li>
+            <li><strong>📍 Location/Place</strong></li>
+            <li><strong>🏢 Address</strong> (if available)</li>
+            <li><strong>📞 Phone</strong> (if available)</li>
+            <li><strong>📝 Description</strong> (if available)</li>
+            <li><strong>💬 Additional Message</strong> (if custom message is provided)</li>
+            <li><strong>📅 Calendar Invitation</strong> (ICS file attachment - only in frontend template)</li>
+        </ul>
+    </div>
+
+    <div style="margin-top: 40px; padding: 20px; background-color: #e3f2fd; border-radius: 8px;">
+        <p><strong>📝 Note:</strong> This is a preview file. The actual email templates are located in:</p>
+        <code>controllers/bookingEmailController.js</code>
+        <p style="margin-top: 10px;">Functions: <code>generateBookingEmail()</code> and <code>sendBookingEmailFromFrontend()</code></p>
+    </div>
+</body>
+</html>
+

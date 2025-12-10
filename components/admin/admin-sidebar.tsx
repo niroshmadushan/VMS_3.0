@@ -36,6 +36,11 @@ const navigation = [
     icon: MapPin,
   },
   {
+    name: "Refreshments",
+    href: "/admin/refreshments",
+    icon: Utensils,
+  },
+  {
     name: "Users",
     href: "/admin/users",
     icon: Users,
@@ -64,11 +69,6 @@ const navigation = [
     name: "External Members",
     href: "/admin/external-members",
     icon: UserCheck,
-  },
-  {
-    name: "Refreshments",
-    href: "/admin/refreshments",
-    icon: Utensils,
   },
   // {
   //   name: "Feedback",

@@ -2553,6 +2553,7 @@ export function StaffBookingManagement() {
     description?: string
     participantEmails: string[]
     emailType?: string
+    bookingRefId?: string
   }) => {
     try {
       console.log('📧 ==========================================')
@@ -2804,7 +2805,8 @@ export function StaffBookingManagement() {
         description: selectedBookingForEmail.description || '',
         participantEmails: participantEmails,
         emailType: emailType || 'booking_details',
-        customMessage: ''
+        customMessage: '',
+        bookingRefId: selectedBookingForEmail.bookingRefId || '' // Include booking reference ID
       }
       
       console.log('📧 ==========================================')
@@ -2819,6 +2821,7 @@ export function StaffBookingManagement() {
       console.log('📧 participantEmails:', participantEmails)
       console.log('📧 participantEmails count:', participantEmails.length)
       console.log('📧 emailType:', bookingData.emailType)
+      console.log('📧 bookingRefId:', bookingData.bookingRefId || '(not provided)')
       console.log('📧 ==========================================')
       console.log('📧 USING NEW SIMPLIFIED API - NO BOOKING ID NEEDED!')
       console.log('📧 ==========================================')
