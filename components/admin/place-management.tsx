@@ -656,119 +656,18 @@ export function PlaceManagement() {
   }
 
   return (
-    <div className="space-y-6 px-2 sm:px-4">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+    <div className="w-full max-w-[1920px] mx-auto space-y-4 px-4 py-4">
+      {/* Header Section */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Place Management</h1>
-          <p className="text-sm sm:text-base text-muted-foreground">Manage places and their status</p>
+          <h1 className="text-3xl font-bold text-foreground">Place Management</h1>
+          <p className="text-sm text-muted-foreground mt-1">Manage places and their status</p>
         </div>
-      </div>
-
-      {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Places</CardTitle>
-            <Building2 className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{places.length}</div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Places</CardTitle>
-            <CheckCircle className="h-4 w-4 text-green-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">{activePlacesCount}</div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Inactive Places</CardTitle>
-            <AlertTriangle className="h-4 w-4 text-red-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-600">{inactivePlacesCount}</div>
-          </CardContent>
-            </Card>
-        
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Capacity</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalCapacity}</div>
-          </CardContent>
-            </Card>
-      </div>
-
-      {/* Filters */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Filters</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1 min-w-0">
-              <div className="relative">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search places..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 w-full"
-                />
-          </div>
-        </div>
-
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full md:w-48">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="inactive">Inactive</SelectItem>
-              </SelectContent>
-            </Select>
-            
-            <Select value={typeFilter} onValueChange={setTypeFilter}>
-              <SelectTrigger className="w-full md:w-48">
-                <SelectValue placeholder="Type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Types</SelectItem>
-                {placeTypes.map((type) => (
-                  <SelectItem key={type.value} value={type.value}>
-                    {type.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Error Alert */}
-      {error && (
-        <Alert variant="destructive">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
-
-      <div className="flex items-center justify-end">
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button onClick={resetForm} className="flex items-center gap-2 w-full sm:w-auto">
+            <Button onClick={resetForm} className="flex items-center gap-2">
               <Plus className="h-4 w-4" />
-              <span className="hidden sm:inline">Add Place</span>
-              <span className="sm:hidden">Add</span>
+              Add Place
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -843,100 +742,215 @@ export function PlaceManagement() {
         </Dialog>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+      {/* Search Bar - Top of Page */}
+      <div className="flex flex-col lg:flex-row gap-3 items-start lg:items-center">
+        <div className="flex-1 w-full">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+            <Input
+              placeholder="Search places by name or location..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10 h-11 text-base"
+            />
+          </div>
+        </div>
+        <div className="flex gap-2 w-full lg:w-auto">
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-full lg:w-[140px] h-11">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Status</SelectItem>
+              <SelectItem value="active">Active</SelectItem>
+              <SelectItem value="inactive">Inactive</SelectItem>
+            </SelectContent>
+          </Select>
+          
+          <Select value={typeFilter} onValueChange={setTypeFilter}>
+            <SelectTrigger className="w-full lg:w-[140px] h-11">
+              <SelectValue placeholder="Type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Types</SelectItem>
+              {placeTypes.map((type) => (
+                <SelectItem key={type.value} value={type.value}>
+                  {type.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      {/* Compact Statistics Table */}
+      <Card className="border shadow-sm">
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableBody>
+                <TableRow className="hover:bg-transparent border-b">
+                  <TableCell className="py-3 px-6 font-medium">
+                    <div className="flex items-center gap-2">
+                      <Building2 className="h-4 w-4 text-muted-foreground" />
+                      Total Places
+                    </div>
+                  </TableCell>
+                  <TableCell className="py-3 px-6 text-right">
+                    <span className="text-2xl font-bold">{places.length}</span>
+                  </TableCell>
+                  <TableCell className="py-3 px-6 font-medium">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-green-600" />
+                      Active Places
+                    </div>
+                  </TableCell>
+                  <TableCell className="py-3 px-6 text-right">
+                    <span className="text-2xl font-bold text-green-600">{activePlacesCount}</span>
+                  </TableCell>
+                  <TableCell className="py-3 px-6 font-medium">
+                    <div className="flex items-center gap-2">
+                      <AlertTriangle className="h-4 w-4 text-red-600" />
+                      Inactive Places
+                    </div>
+                  </TableCell>
+                  <TableCell className="py-3 px-6 text-right">
+                    <span className="text-2xl font-bold text-red-600">{inactivePlacesCount}</span>
+                  </TableCell>
+                  <TableCell className="py-3 px-6 font-medium">
+                    <div className="flex items-center gap-2">
+                      <Users className="h-4 w-4 text-muted-foreground" />
+                      Total Capacity
+                    </div>
+                  </TableCell>
+                  <TableCell className="py-3 px-6 text-right">
+                    <span className="text-2xl font-bold">{totalCapacity}</span>
+                  </TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Error Alert */}
+      {error && (
+        <Alert variant="destructive" className="mb-4">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      {/* Places Table */}
+      <Card className="border shadow-sm">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-lg">
             <MapPin className="h-5 w-5" />
             Places ({filteredPlaces.length})
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           {filteredPlaces.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              No places found matching your criteria.
+            <div className="text-center py-12 text-muted-foreground">
+              <Building2 className="h-12 w-12 mx-auto mb-3 opacity-50" />
+              <p className="text-base">No places found matching your criteria.</p>
             </div>
           ) : (
-            <div className="relative overflow-x-auto">
-              <Table className="w-full">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="min-w-[200px]">Name</TableHead>
-                    <TableHead className="min-w-[100px]">Type</TableHead>
-                    <TableHead className="min-w-[150px]">Location</TableHead>
-                    <TableHead className="min-w-[100px]">Capacity</TableHead>
-                    <TableHead className="min-w-[120px]">Status</TableHead>
-                    <TableHead className="min-w-[120px]">Created</TableHead>
-                    <TableHead className="min-w-[150px]">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-              </Table>
-              <div className="max-h-[450px] overflow-y-auto">
-                <Table className="w-full">
-                  <TableBody>
-                    {filteredPlaces.map((place) => (
-                      <TableRow key={place.id}>
-                        <TableCell className="min-w-[200px]">
-                          <div>
-                            <div className="font-medium">{place.name}</div>
-                            <div className="text-sm text-muted-foreground">{place.description}</div>
-                          </div>
-                        </TableCell>
-                        <TableCell className="min-w-[100px]">{getTypeBadge(place.place_type)}</TableCell>
-                        <TableCell className="min-w-[150px]">
-                          <div className="flex items-center gap-1 text-sm">
-                            <MapPin className="h-3 w-3" />
-                            {place.city}
-                          </div>
-                        </TableCell>
-                        <TableCell className="min-w-[100px]">
-                          <div className="flex items-center gap-1">
-                            <Users className="h-3 w-3" />
-                            {place.capacity}
-                          </div>
-                        </TableCell>
-                        <TableCell className="min-w-[120px]">
-                          <div className="flex items-center gap-2">
-                            {getStatusBadge(place)}
-                            <Switch
-                              checked={place.is_active}
-                              onCheckedChange={() => toggleStatus(place.id)}
-                            />
-                          </div>
-                        </TableCell>
-                        <TableCell className="min-w-[120px]">
-                          <div className="flex items-center gap-1 text-sm">
-                            <Calendar className="h-3 w-3" />
-                            {format(new Date(place.created_at), 'MMM dd, yyyy')}
-                          </div>
-                        </TableCell>
-                        <TableCell className="min-w-[150px]">
-                          <div className="flex items-center gap-2">
-                            <Button 
-                              variant="ghost" 
-                              size="sm"
-                              onClick={() => handleOpenConfig(place)}
-                              title="Configure availability & hours"
-                            >
-                              <Clock className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="sm" onClick={() => handleEdit(place)} title="Edit place">
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="text-red-600 hover:text-red-700"
-                              onClick={() => handleDeletePlace(place.id)}
-                              title="Delete place (soft delete)"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
+            <div className="table-scroll-container">
+              <div className="relative">
+                <div className="overflow-x-auto">
+                  <Table className="w-full">
+                    <TableHeader>
+                      <TableRow className="bg-muted/50">
+                        <TableHead className="font-semibold min-w-[250px] whitespace-nowrap">Name & Description</TableHead>
+                        <TableHead className="font-semibold min-w-[180px] whitespace-nowrap">Location</TableHead>
+                        <TableHead className="font-semibold min-w-[120px] text-center whitespace-nowrap">Capacity</TableHead>
+                        <TableHead className="font-semibold min-w-[140px] whitespace-nowrap">Status</TableHead>
+                        <TableHead className="font-semibold min-w-[130px] whitespace-nowrap">Created</TableHead>
+                        <TableHead className="font-semibold min-w-[160px] text-right whitespace-nowrap">Actions</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                  </Table>
+                </div>
+                <div className="max-h-[560px] overflow-y-auto table-scroll-container-vertical overflow-x-auto">
+                  <Table className="w-full">
+                    <TableBody>
+                      {filteredPlaces.map((place) => (
+                        <TableRow key={place.id} className="hover:bg-muted/30 transition-colors">
+                          <TableCell className="min-w-[250px]">
+                            <div>
+                              <div className="font-semibold text-base">{place.name}</div>
+                              {place.description && (
+                                <div className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                                  {place.description}
+                                </div>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell className="min-w-[180px]">
+                            <div className="flex items-center gap-2 text-sm">
+                              <MapPin className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                              <span className="truncate">{place.city}{place.state ? `, ${place.state}` : ''}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="min-w-[120px] text-center">
+                            <div className="flex items-center justify-center gap-2">
+                              <Users className="h-4 w-4 text-muted-foreground" />
+                              <span className="font-medium">{place.capacity}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="min-w-[140px]">
+                            <div className="flex items-center gap-3">
+                              {getStatusBadge(place)}
+                              <Switch
+                                checked={place.is_active}
+                                onCheckedChange={() => toggleStatus(place.id)}
+                                className="scale-90"
+                              />
+                            </div>
+                          </TableCell>
+                          <TableCell className="min-w-[130px]">
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <Calendar className="h-4 w-4" />
+                              {format(new Date(place.created_at), 'MMM dd, yyyy')}
+                            </div>
+                          </TableCell>
+                          <TableCell className="min-w-[160px]">
+                            <div className="flex items-center justify-end gap-1">
+                              <Button 
+                                variant="ghost" 
+                                size="sm"
+                                onClick={() => handleOpenConfig(place)}
+                                title="Configure availability & hours"
+                                className="h-8 w-8 p-0"
+                              >
+                                <Clock className="h-4 w-4" />
+                              </Button>
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                onClick={() => handleEdit(place)} 
+                                title="Edit place"
+                                className="h-8 w-8 p-0"
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-red-600 hover:text-red-700 hover:bg-red-50 h-8 w-8 p-0"
+                                onClick={() => handleDeletePlace(place.id)}
+                                title="Delete place (soft delete)"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
               </div>
             </div>
           )}

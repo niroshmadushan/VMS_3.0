@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
+import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table"
 import { 
   Calendar, 
   Clock, 
@@ -15,7 +16,6 @@ import {
   XCircle, 
   AlertTriangle, 
   Loader2, 
-  ArrowRight,
   MapPin,
   Users,
   TrendingUp,
@@ -398,260 +398,200 @@ export function AvailabilityChecker() {
   }
 
   return (
-    <div className="space-y-4">
-      {/* Premium Header */}
-      <div className="relative overflow-hidden bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600 rounded-lg p-5 shadow-xl">
-        <div className="absolute inset-0 bg-black/20"></div>
-        <div className="relative z-10">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-white/20 backdrop-blur-sm rounded-lg">
-              <Sparkles className="h-6 w-6 text-white" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-white">
-                Availability Intelligence
-              </h1>
-              <p className="text-white/90 text-xs">
-                Advanced place availability analysis with real-time insights
-              </p>
-            </div>
-          </div>
+    <div className="space-y-3 px-2 sm:px-4 max-w-[98vw] mx-auto dark:bg-background">
+      {/* Compact Header with Search in One Line - Centered */}
+      <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-3 pb-2 border-b border-border/50 dark:border-border">
+        {/* Place Select */}
+        <div className="w-full sm:w-auto sm:min-w-[200px]">
+          <Label className="text-[13px] font-semibold mb-1.5 flex items-center justify-center gap-1.5 dark:text-foreground">
+            <MapPin className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+            Place *
+          </Label>
+          <Select value={selectedPlace} onValueChange={(value) => {
+            console.log('🏢 Place selected:', value)
+            setSelectedPlace(value)
+            const place = places.find(p => p.id === value)
+            console.log('📊 Place data found:', place)
+            setSelectedPlaceData(place || null)
+          }}>
+            <SelectTrigger className="h-9 text-[13px] dark:bg-card dark:border-border dark:text-foreground">
+              <SelectValue placeholder={isLoadingPlaces ? "Loading places..." : "Choose a place"} />
+            </SelectTrigger>
+            <SelectContent className="dark:bg-card dark:border-border">
+              {places.map(place => (
+                <SelectItem key={place.id} value={place.id} className="dark:text-foreground dark:hover:bg-muted text-[13px]">
+                  <div className="flex items-center gap-2">
+                    <Building2 className="h-3.5 w-3.5 text-gray-500 dark:text-gray-400" />
+                    <span className="font-medium dark:text-foreground">{place.name}</span>
+                    <Badge variant="outline" className="text-[11px] dark:border-border dark:text-foreground">
+                      <Users className="h-3 w-3 mr-1" />
+                      {place.capacity}
+                    </Badge>
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Date Input */}
+        <div className="w-full sm:w-[160px]">
+          <Label className="text-[13px] font-semibold mb-1.5 flex items-center justify-center gap-1.5 dark:text-foreground">
+            <CalendarCheck className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
+            Date *
+          </Label>
+          <Input
+            type="date"
+            value={selectedDate}
+            onChange={(e) => setSelectedDate(e.target.value)}
+            min={new Date().toISOString().split('T')[0]}
+            className="h-9 text-[13px] dark:bg-card dark:border-border dark:text-foreground"
+          />
+        </div>
+
+        {/* Action Button */}
+        <div className="w-full sm:w-auto flex items-end justify-center">
+          <Button
+            onClick={checkAvailability}
+            disabled={!selectedPlace || !selectedDate || isChecking}
+            className="w-full sm:w-auto h-9 px-4 text-[13px] bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 dark:from-blue-500 dark:to-purple-500 dark:hover:from-blue-600 dark:hover:to-purple-600 shadow-lg"
+          >
+            {isChecking ? (
+              <>
+                <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                Analyzing...
+              </>
+            ) : (
+              <>
+                <Search className="h-3.5 w-3.5 mr-1.5" />
+                Check
+              </>
+            )}
+          </Button>
         </div>
       </div>
 
-      {/* Premium Search Card */}
-      <Card className="border-2 shadow-lg">
-        <CardHeader className="bg-gradient-to-r from-blue-50 to-purple-50 pb-3">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Search className="h-4 w-4 text-blue-600" />
-            Search Availability
-          </CardTitle>
-          <p className="text-xs text-muted-foreground">Select place and date to analyze availability</p>
-        </CardHeader>
-        <CardContent className="pt-4">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            {/* Place Select */}
-            <div className="md:col-span-2">
-              <Label className="text-sm font-semibold mb-2 flex items-center gap-2">
-                <MapPin className="h-4 w-4 text-blue-600" />
-                Select Place *
-              </Label>
-              <Select value={selectedPlace} onValueChange={(value) => {
-                console.log('🏢 Place selected:', value)
-                setSelectedPlace(value)
-                const place = places.find(p => p.id === value)
-                console.log('📊 Place data found:', place)
-                setSelectedPlaceData(place || null)
-              }}>
-                <SelectTrigger className="h-11">
-                  <SelectValue placeholder={isLoadingPlaces ? "Loading places..." : "Choose a place"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {places.map(place => (
-                    <SelectItem key={place.id} value={place.id}>
-                      <div className="flex items-center gap-2">
-                        <Building2 className="h-4 w-4 text-gray-500" />
-                        <span className="font-medium">{place.name}</span>
-                        <Badge variant="outline" className="text-xs">
-                          <Users className="h-3 w-3 mr-1" />
-                          {place.capacity}
-                        </Badge>
-                        <Badge variant="secondary" className="text-xs">{place.place_type}</Badge>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Date Input */}
-            <div>
-              <Label className="text-sm font-semibold mb-2 flex items-center gap-2">
-                <CalendarCheck className="h-4 w-4 text-purple-600" />
-                Select Date *
-              </Label>
-              <Input
-                type="date"
-                value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                min={new Date().toISOString().split('T')[0]}
-                className="h-11"
-              />
-            </div>
-
-            {/* Action Button */}
-            <div className="flex items-end">
-              <Button
-                onClick={checkAvailability}
-                disabled={!selectedPlace || !selectedDate || isChecking}
-                className="w-full h-11 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-lg"
-                size="lg"
-              >
-                {isChecking ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Analyzing...
-                  </>
-                ) : (
-                  <>
-                    <Search className="h-4 w-4 mr-2" />
-                    Check Availability
-                  </>
-                )}
-              </Button>
-            </div>
-          </div>
-
-          {/* Selected Place Info */}
-          {selectedPlaceData && (
-            <div className="mt-3 p-3 bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg">
-              <p className="text-xs text-blue-600 font-semibold mb-2">SELECTED PLACE DETAILS</p>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                <div className="flex items-center gap-2">
-                  <Building2 className="h-5 w-5 text-blue-600" />
-                  <div>
-                    <p className="text-xs text-gray-600">Place</p>
-                    <p className="text-sm font-bold text-gray-900">{selectedPlaceData.name}</p>
-                  </div>
+      {/* Selected Place Info - Compact */}
+      {selectedPlaceData && (
+        <Card className="border shadow-sm dark:bg-card dark:border-border">
+          <CardContent className="p-2.5">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
+              <div className="flex items-center gap-2">
+                <Building2 className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                <div>
+                  <p className="text-[11px] text-muted-foreground dark:text-muted-foreground">Place</p>
+                  <p className="text-[13px] font-semibold dark:text-foreground">{selectedPlaceData.name}</p>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Users className="h-5 w-5 text-purple-600" />
-                  <div>
-                    <p className="text-xs text-gray-600">Capacity</p>
-                    <p className="text-sm font-bold text-gray-900">{selectedPlaceData.capacity} People</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <MapPin className="h-5 w-5 text-pink-600" />
-                  <div>
-                    <p className="text-xs text-gray-600">Type</p>
-                    <p className="text-sm font-bold text-gray-900">{selectedPlaceData.place_type}</p>
-                  </div>
-                </div>
-                {hasChecked && placeConfig && (
-                  <div className="flex items-center gap-2">
-                    <Clock className="h-5 w-5 text-orange-600" />
-                    <div>
-                      <p className="text-xs text-gray-600">Operating Hours</p>
-                      <p className="text-sm font-bold text-gray-900">
-                        {placeConfig.start_time.substring(0, 5)} - {placeConfig.end_time.substring(0, 5)}
-                      </p>
-                    </div>
-                  </div>
-                )}
               </div>
+              <div className="flex items-center gap-2">
+                <Users className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                <div>
+                  <p className="text-[11px] text-muted-foreground dark:text-muted-foreground">Capacity</p>
+                  <p className="text-[13px] font-semibold dark:text-foreground">{selectedPlaceData.capacity}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <MapPin className="h-4 w-4 text-pink-600 dark:text-pink-400" />
+                <div>
+                  <p className="text-[11px] text-muted-foreground dark:text-muted-foreground">Type</p>
+                  <p className="text-[13px] font-semibold dark:text-foreground">{selectedPlaceData.place_type}</p>
+                </div>
+              </div>
+              {hasChecked && placeConfig && (
+                <div className="flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                  <div>
+                    <p className="text-[11px] text-muted-foreground dark:text-muted-foreground">Hours</p>
+                    <p className="text-[13px] font-semibold dark:text-foreground">
+                      {placeConfig.start_time.substring(0, 5)} - {placeConfig.end_time.substring(0, 5)}
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
-          )}
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
       {hasChecked && (
         <>
-          {/* Premium Analytics Dashboard */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-            {/* Total Bookings */}
-            <Card className="border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-blue-100">
-              <CardContent className="pt-4 pb-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-blue-700">Total Bookings</p>
-                    <p className="text-3xl font-bold text-blue-900 mt-1">{existingBookings.length}</p>
-                  </div>
-                  <div className="p-3 bg-blue-500 rounded-lg">
-                    <Calendar className="h-6 w-6 text-white" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+          {/* Compact Analytics Table */}
+          <Card className="border shadow-sm dark:bg-card dark:border-border">
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableBody>
+                    <TableRow className="hover:bg-transparent border-b dark:border-border">
+                      <TableCell className="py-2.5 px-4 font-medium text-[13px] dark:text-foreground">
+                        <div className="flex items-center gap-2">
+                          <Calendar className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                          Total Bookings
+                        </div>
+                      </TableCell>
+                      <TableCell className="py-2.5 px-4 text-right dark:text-foreground">
+                        <span className="text-xl font-bold text-blue-600 dark:text-blue-400">{existingBookings.length}</span>
+                      </TableCell>
+                      <TableCell className="py-2.5 px-4 font-medium text-[13px] dark:text-foreground">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
+                          Available Slots
+                        </div>
+                      </TableCell>
+                      <TableCell className="py-2.5 px-4 text-right dark:text-foreground">
+                        <span className="text-xl font-bold text-green-600 dark:text-green-400">{availableSlots.length}</span>
+                      </TableCell>
+                      <TableCell className="py-2.5 px-4 font-medium text-[13px] dark:text-foreground">
+                        <div className="flex items-center gap-2">
+                          <TrendingUp className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                          Utilization
+                        </div>
+                      </TableCell>
+                      <TableCell className="py-2.5 px-4 text-right dark:text-foreground">
+                        <span className="text-xl font-bold text-orange-600 dark:text-orange-400">{calculateUtilization()}%</span>
+                      </TableCell>
+                      <TableCell className="py-2.5 px-4 font-medium text-[13px] dark:text-foreground">
+                        <div className="flex items-center gap-2">
+                          <Timer className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                          Free Hours
+                        </div>
+                      </TableCell>
+                      <TableCell className="py-2.5 px-4 text-right dark:text-foreground">
+                        <span className="text-xl font-bold text-purple-600 dark:text-purple-400">
+                          {calculateTotalAvailableHours().hours}h {calculateTotalAvailableHours().mins}m
+                        </span>
+                      </TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
 
-            {/* Available Slots */}
-            <Card className="border-2 border-green-200 bg-gradient-to-br from-green-50 to-green-100">
-              <CardContent className="pt-4 pb-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-green-700">Available Slots</p>
-                    <p className="text-3xl font-bold text-green-900 mt-1">{availableSlots.length}</p>
-                  </div>
-                  <div className="p-3 bg-green-500 rounded-lg">
-                    <CheckCircle className="h-6 w-6 text-white" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Utilization Rate */}
-            <Card className="border-2 border-orange-200 bg-gradient-to-br from-orange-50 to-orange-100">
-              <CardContent className="pt-4 pb-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-orange-700">Utilization</p>
-                    <p className="text-3xl font-bold text-orange-900 mt-1">{calculateUtilization()}%</p>
-                  </div>
-                  <div className="p-3 bg-orange-500 rounded-lg">
-                    <TrendingUp className="h-6 w-6 text-white" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Available Hours */}
-            <Card className="border-2 border-purple-200 bg-gradient-to-br from-purple-50 to-purple-100">
-              <CardContent className="pt-4 pb-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-purple-700">Free Hours</p>
-                    <p className="text-3xl font-bold text-purple-900 mt-1">
-                      {calculateTotalAvailableHours().hours}h {calculateTotalAvailableHours().mins}m
-                    </p>
-                  </div>
-                  <div className="p-3 bg-purple-500 rounded-lg">
-                    <Timer className="h-6 w-6 text-white" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Available Time Slots */}
+          {/* Available Time Slots - Compact */}
           {availableSlots.length > 0 && (
-            <Card className="border-2 border-green-300 shadow-lg">
-              <CardHeader className="bg-gradient-to-r from-green-50 to-emerald-50 pb-3">
-                <CardTitle className="flex items-center gap-2 text-green-800 text-base">
-                  <CheckCircle className="h-4 w-4" />
+            <Card className="border shadow-md dark:bg-card dark:border-border">
+              <CardHeader className="pb-2.5 dark:border-border">
+                <CardTitle className="flex items-center gap-2 text-[13px] font-semibold dark:text-foreground">
+                  <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
                   Available Time Slots ({availableSlots.length})
                 </CardTitle>
-                <p className="text-xs text-muted-foreground">Click any slot to create a booking</p>
               </CardHeader>
-              <CardContent className="pt-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <CardContent className="pt-0 pb-3 dark:bg-card">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
                   {availableSlots.map((slot, idx) => (
                     <div
                       key={idx}
-                      className="group relative overflow-hidden p-3 bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-300 rounded-lg hover:shadow-lg hover:scale-102 transition-all cursor-pointer"
-                      onClick={() => {
-                        const url = `/admin/bookings/new?place=${selectedPlace}&date=${selectedDate}&startTime=${encodeURIComponent(slot.start)}&endTime=${encodeURIComponent(slot.end)}`
-                        window.location.href = url
-                      }}
+                      className="p-2.5 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 border border-green-300 dark:border-green-700 rounded-lg"
                     >
-                      <div className="absolute top-0 right-0 w-16 h-16 bg-green-200 rounded-full blur-2xl opacity-20 group-hover:opacity-40 transition-opacity"></div>
-                      <div className="relative">
-                        <div className="flex items-center justify-between mb-2">
-                          <Badge className="bg-green-600 text-white font-semibold text-xs">
-                            <Timer className="h-3 w-3 mr-1" />
-                            {slot.duration}
-                          </Badge>
-                          <div className="flex items-center gap-1">
-                            <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
-                            <span className="text-xs font-medium text-green-700">Available</span>
-                          </div>
-                        </div>
-                        <div className="text-xl font-bold text-green-900 mb-1">
-                          {slot.start} - {slot.end}
-                        </div>
-                        <div className="flex items-center gap-2 text-xs text-green-700 group-hover:text-green-900 transition-colors">
-                          <span className="font-medium">Book this slot</span>
-                          <ArrowRight className="h-3 w-3 group-hover:translate-x-1 transition-transform" />
-                        </div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <Badge className="bg-green-600 dark:bg-green-500 text-white font-semibold text-[10px] px-1.5 py-0.5">
+                          <Timer className="h-2.5 w-2.5 mr-1" />
+                          {slot.duration}
+                        </Badge>
+                        <div className="w-1.5 h-1.5 bg-green-500 dark:bg-green-400 rounded-full animate-pulse"></div>
+                      </div>
+                      <div className="text-sm font-bold text-green-900 dark:text-green-200">
+                        {slot.start} - {slot.end}
                       </div>
                     </div>
                   ))}
@@ -660,42 +600,46 @@ export function AvailabilityChecker() {
             </Card>
           )}
 
-          {/* Existing Bookings */}
+          {/* Existing Bookings - Compact */}
           {existingBookings.length > 0 && (
-            <Card className="border-2 border-orange-300 shadow-lg">
-              <CardHeader className="bg-gradient-to-r from-orange-50 to-red-50 pb-3">
-                <CardTitle className="flex items-center gap-2 text-orange-800 text-base">
-                  <Calendar className="h-4 w-4" />
+            <Card className="border shadow-md dark:bg-card dark:border-border">
+              <CardHeader className="pb-2.5 dark:border-border">
+                <CardTitle className="flex items-center gap-2 text-[13px] font-semibold dark:text-foreground">
+                  <Calendar className="h-4 w-4 text-orange-600 dark:text-orange-400" />
                   Existing Bookings ({existingBookings.length})
                 </CardTitle>
-                <p className="text-xs text-muted-foreground">Current bookings for this date and place</p>
               </CardHeader>
-              <CardContent className="pt-4">
-                <div className="max-h-[450px] overflow-y-auto space-y-3 pr-2">
+              <CardContent className="pt-0 pb-3 dark:bg-card">
+                <div className="max-h-[calc(5*60px)] overflow-y-auto table-scroll-container-vertical space-y-2 pr-2">
                   {existingBookings
                     .sort((a, b) => a.start_time.localeCompare(b.start_time))
                     .map((booking) => (
                     <div
                       key={booking.id}
-                      className="p-3 bg-gradient-to-r from-orange-50 via-red-50 to-pink-50 border-2 border-orange-300 rounded-lg hover:shadow-md transition-shadow"
+                      className="p-2.5 bg-gradient-to-r from-orange-50 via-red-50 to-pink-50 dark:from-orange-950/30 dark:via-red-950/30 dark:to-pink-950/30 border border-orange-300 dark:border-orange-700 rounded-lg"
                     >
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="flex items-start gap-2">
-                          <div className="p-1.5 bg-orange-500 rounded-lg">
-                            <CircleDot className="h-4 w-4 text-white" />
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-start gap-2 flex-1 min-w-0">
+                          <div className="p-1 bg-orange-500 dark:bg-orange-600 rounded">
+                            <CircleDot className="h-3 w-3 text-white" />
                           </div>
-                          <div>
-                            <h4 className="font-bold text-base text-orange-900">{booking.title}</h4>
-                            {booking.booking_ref_id && (
-                              <p className="text-xs text-gray-600">Ref: {booking.booking_ref_id}</p>
-                            )}
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-semibold text-[13px] text-orange-900 dark:text-orange-200 truncate">{booking.title}</h4>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <p className="text-[11px] text-gray-600 dark:text-gray-400">
+                                {booking.start_time.substring(0, 5)} - {booking.end_time.substring(0, 5)}
+                              </p>
+                              {booking.booking_ref_id && (
+                                <p className="text-[11px] text-gray-600 dark:text-gray-400">• Ref: {booking.booking_ref_id}</p>
+                              )}
+                            </div>
                           </div>
                         </div>
                         <Badge className={
-                          booking.status === 'ongoing' ? 'bg-green-500 text-white text-xs' :
-                          booking.status === 'upcoming' ? 'bg-orange-500 text-white text-xs' :
-                          booking.status === 'completed' ? 'bg-blue-500 text-white text-xs' :
-                          'bg-gray-500 text-white text-xs'
+                          booking.status === 'ongoing' ? 'bg-green-500 dark:bg-green-600 text-white text-[10px] ml-2' :
+                          booking.status === 'upcoming' ? 'bg-orange-500 dark:bg-orange-600 text-white text-[10px] ml-2' :
+                          booking.status === 'completed' ? 'bg-blue-500 dark:bg-blue-600 text-white text-[10px] ml-2' :
+                          'bg-gray-500 dark:bg-gray-600 text-white text-[10px] ml-2'
                         }>
                           {booking.status}
                         </Badge>
@@ -739,20 +683,19 @@ export function AvailabilityChecker() {
 
           {/* Fully Available */}
           {availableSlots.length === 0 && existingBookings.length === 0 && (
-            <Card className="border-2 border-green-300 shadow-xl">
-              <CardContent className="py-8">
+            <Card className="border-2 border-green-300 dark:border-green-700 shadow-md dark:bg-card dark:border-border">
+              <CardContent className="py-6">
                 <div className="text-center">
-                  <div className="mx-auto w-20 h-20 bg-gradient-to-br from-green-400 to-emerald-500 rounded-full flex items-center justify-center mb-4">
-                    <CheckCircle className="h-10 w-10 text-white" />
+                  <div className="mx-auto w-16 h-16 bg-gradient-to-br from-green-400 to-emerald-500 dark:from-green-500 dark:to-emerald-600 rounded-full flex items-center justify-center mb-3">
+                    <CheckCircle className="h-8 w-8 text-white" />
                   </div>
-                  <h3 className="text-2xl font-bold text-green-700 mb-2">Fully Available!</h3>
-                  <p className="text-gray-600 mb-6">This place has no bookings for the selected date. Entire day is free.</p>
+                  <h3 className="text-lg font-bold text-green-700 dark:text-green-300 mb-1.5">Fully Available!</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">This place has no bookings for the selected date. Entire day is free.</p>
                   <Button
                     onClick={() => window.location.href = `/admin/bookings/new?place=${selectedPlace}&date=${selectedDate}`}
-                    className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 shadow-lg"
-                    size="lg"
+                    className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 dark:from-green-500 dark:to-emerald-500 dark:hover:from-green-600 dark:hover:to-emerald-600 shadow-lg h-9 text-[13px]"
                   >
-                    <CalendarCheck className="h-5 w-5 mr-2" />
+                    <CalendarCheck className="h-4 w-4 mr-1.5" />
                     Create New Booking
                   </Button>
                 </div>
@@ -762,14 +705,14 @@ export function AvailabilityChecker() {
 
           {/* Fully Booked */}
           {availableSlots.length === 0 && existingBookings.length > 0 && (
-            <Card className="border-2 border-red-300 shadow-xl">
-              <CardContent className="py-8">
+            <Card className="border-2 border-red-300 dark:border-red-700 shadow-md dark:bg-card dark:border-border">
+              <CardContent className="py-6">
                 <div className="text-center">
-                  <div className="mx-auto w-20 h-20 bg-gradient-to-br from-red-400 to-orange-500 rounded-full flex items-center justify-center mb-4">
-                    <XCircle className="h-10 w-10 text-white" />
+                  <div className="mx-auto w-16 h-16 bg-gradient-to-br from-red-400 to-orange-500 dark:from-red-500 dark:to-orange-600 rounded-full flex items-center justify-center mb-3">
+                    <XCircle className="h-8 w-8 text-white" />
                   </div>
-                  <h3 className="text-2xl font-bold text-red-700 mb-2">Fully Booked</h3>
-                  <p className="text-gray-600">No free time slots available for this date and place.</p>
+                  <h3 className="text-lg font-bold text-red-700 dark:text-red-300 mb-1.5">Fully Booked</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">No free time slots available for this date and place.</p>
                 </div>
               </CardContent>
             </Card>
@@ -778,12 +721,12 @@ export function AvailabilityChecker() {
       )}
 
       {!hasChecked && (
-        <Card className="border-2 border-dashed border-gray-300">
-          <CardContent className="py-10">
-            <div className="text-center text-gray-500">
-              <AlertTriangle className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-              <p className="text-lg font-medium mb-2">No Analysis Yet</p>
-              <p className="text-sm">Select a place and date above, then click "Check Availability" to see detailed insights</p>
+        <Card className="border-2 border-dashed border-gray-300 dark:border-gray-700 shadow-sm dark:bg-card dark:border-border">
+          <CardContent className="py-8">
+            <div className="text-center text-gray-500 dark:text-gray-400">
+              <AlertTriangle className="h-10 w-10 mx-auto mb-3 text-gray-400 dark:text-gray-500" />
+              <p className="text-sm font-medium mb-1.5 dark:text-foreground">No Analysis Yet</p>
+              <p className="text-xs dark:text-muted-foreground">Select a place and date above, then click "Check Availability" to see detailed insights</p>
             </div>
           </CardContent>
         </Card>

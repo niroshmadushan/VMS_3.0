@@ -135,17 +135,16 @@ const getBookingParticipants = async (req, res) => {
             WHERE bp.booking_id = ? AND bp.is_deleted = 0 AND bp.employee_email IS NOT NULL
         `;
         
-        // Get external participants - NO member_type field
-        const externalQuery = `
-            SELECT 
-                ep.id,
-                ep.full_name,
-                ep.email,
-                ep.phone,
-                ep.company_name
-            FROM external_participants ep
-            WHERE ep.booking_id = ? AND ep.is_deleted = 0 AND ep.email IS NOT NULL
-        `;
+            const externalQuery = `
+                SELECT 
+                    ep.id,
+                    ep.full_name,
+                    ep.email,
+                    ep.phone,
+                    ep.company_name
+                FROM external_participants ep
+                WHERE ep.booking_id = ? AND ep.is_deleted = 0 AND ep.email IS NOT NULL
+            `;
         
         console.log('📧 External Query:', externalQuery);
         console.log('📧 Query Parameters:', [bookingId]);
@@ -779,16 +778,16 @@ const sendBookingReminderEmail = async (req, res) => {
             WHERE bp.booking_id = ? AND bp.is_deleted = 0 AND bp.employee_email IS NOT NULL
         `;
         
-        const externalQuery = `
-            SELECT 
-                ep.id,
-                ep.full_name,
-                ep.email,
-                ep.phone,
-                ep.company_name
-            FROM external_participants ep
-            WHERE ep.booking_id = ? AND ep.is_deleted = 0 AND ep.email IS NOT NULL
-        `;
+            const externalQuery = `
+                SELECT 
+                    ep.id,
+                    ep.full_name,
+                    ep.email,
+                    ep.phone,
+                    ep.company_name
+                FROM external_participants ep
+                WHERE ep.booking_id = ? AND ep.is_deleted = 0 AND ep.email IS NOT NULL
+            `;
         
         const internalResult = await executeQuery(internalQuery, [bookingId]);
         const externalResult = await executeQuery(externalQuery, [bookingId]);
@@ -920,7 +919,10 @@ const getBookingEmailHistory = async (req, res) => {
 
 // Helper functions
 const generateBookingEmail = (booking, participant, emailType, customMessage) => {
-    const subject = `Booking Details - ${booking.title}`;
+    // Include booking reference ID in subject if available
+    const subject = booking.booking_ref_id
+        ? `Booking Details - ${booking.title} [Ref: ${booking.booking_ref_id}]`
+        : `Booking Details - ${booking.title}`;
     
     // Format date and time properly
     // booking_date is DATE field (YYYY-MM-DD)
@@ -989,9 +991,15 @@ const generateBookingEmail = (booking, participant, emailType, customMessage) =>
             <div style="background-color: #ffffff; border: 1px solid #dee2e6; padding: 20px; border-radius: 8px; margin: 20px 0;">
                 <h3 style="color: #495057; margin-top: 0;">${booking.title}</h3>
                 ${booking.booking_ref_id ? `
-                <div style="background-color: #e3f2fd; padding: 12px; border-radius: 5px; text-align: center; margin: 15px 0;">
-                    <p style="margin: 0; color: #1976d2; font-family: monospace; font-size: 18px; font-weight: bold;">
-                        Booking Reference: ${booking.booking_ref_id}
+                <div style="background-color: #e3f2fd; padding: 15px; border-radius: 5px; text-align: center; margin: 15px 0; border: 2px solid #1976d2;">
+                    <p style="margin: 0 0 8px 0; color: #1565c0; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">
+                        Meeting Reference ID
+                    </p>
+                    <p style="margin: 0; color: #1976d2; font-family: 'Courier New', monospace; font-size: 24px; font-weight: bold; letter-spacing: 2px;">
+                        ${booking.booking_ref_id}
+                    </p>
+                    <p style="margin: 8px 0 0 0; color: #1565c0; font-size: 11px;">
+                        ⚠️ Please keep this reference ID for check-in
                     </p>
                 </div>
                 ` : ''}
@@ -1030,7 +1038,12 @@ const generateBookingEmail = (booking, participant, emailType, customMessage) =>
         Here are the details for your upcoming booking:
         
         ${booking.title}
-        ${booking.booking_ref_id ? `Booking Reference: ${booking.booking_ref_id}` : ''}
+        ${booking.booking_ref_id ? `
+        ============================================
+        MEETING REFERENCE ID: ${booking.booking_ref_id}
+        ⚠️ Please keep this reference ID for check-in
+        ============================================
+        ` : ''}
         Date: ${formattedDate}
         Time: ${formattedStartTime} - ${formattedEndTime}
         Location: ${booking.place_name || 'Not specified'}
@@ -1352,8 +1365,26 @@ const sendBookingEmailFromFrontend = async (req, res) => {
         const formattedStartTime = formatTime(startTime);
         const formattedEndTime = formatTime(endTime);
 
+        // Normalize bookingRefId - ensure it's a string and not empty
+        const normalizedBookingRefId = bookingRefId && typeof bookingRefId === 'string' && bookingRefId.trim() !== '' 
+            ? bookingRefId.trim() 
+            : null;
+        
+        console.log('📧 ==========================================');
+        console.log('📧 BOOKING REFERENCE ID PROCESSING');
+        console.log('📧 ==========================================');
+        console.log('📧 Raw bookingRefId from request:', bookingRefId);
+        console.log('📧 bookingRefId type:', typeof bookingRefId);
+        console.log('📧 bookingRefId length:', bookingRefId ? bookingRefId.length : 0);
+        console.log('📧 Normalized bookingRefId:', normalizedBookingRefId || '(not provided or empty)');
+        console.log('📧 Will display in email:', normalizedBookingRefId ? 'YES ✅' : 'NO ❌');
+        console.log('📧 ==========================================');
+
         // Generate email content
-        const subject = `Booking Details - ${meetingName}`;
+        // Include booking reference ID in subject if available
+        const subject = normalizedBookingRefId 
+            ? `Booking Details - ${meetingName} [Ref: ${normalizedBookingRefId}]`
+            : `Booking Details - ${meetingName}`;
         
         const html = `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
@@ -1366,10 +1397,16 @@ const sendBookingEmailFromFrontend = async (req, res) => {
                 
                 <div style="background-color: #ffffff; border: 1px solid #dee2e6; padding: 20px; border-radius: 8px; margin: 20px 0;">
                     <h3 style="color: #495057; margin-top: 0;">${meetingName}</h3>
-                    ${bookingRefId ? `
-                    <div style="background-color: #e3f2fd; padding: 12px; border-radius: 5px; text-align: center; margin: 15px 0;">
-                        <p style="margin: 0; color: #1976d2; font-family: monospace; font-size: 18px; font-weight: bold;">
-                            Booking Reference: ${bookingRefId}
+                    ${normalizedBookingRefId ? `
+                    <div style="background-color: #e3f2fd; padding: 15px; border-radius: 5px; text-align: center; margin: 15px 0; border: 2px solid #1976d2;">
+                        <p style="margin: 0 0 8px 0; color: #1565c0; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">
+                            Meeting Reference ID
+                        </p>
+                        <p style="margin: 0; color: #1976d2; font-family: 'Courier New', monospace; font-size: 24px; font-weight: bold; letter-spacing: 2px;">
+                            ${normalizedBookingRefId}
+                        </p>
+                        <p style="margin: 8px 0 0 0; color: #1565c0; font-size: 11px;">
+                            ⚠️ Please keep this reference ID for check-in
                         </p>
                     </div>
                     ` : ''}
@@ -1415,7 +1452,12 @@ const sendBookingEmailFromFrontend = async (req, res) => {
             Here are the details for your upcoming booking:
             
             ${meetingName}
-            ${bookingRefId ? `Booking Reference: ${bookingRefId}` : ''}
+            ${normalizedBookingRefId ? `
+            ============================================
+            MEETING REFERENCE ID: ${normalizedBookingRefId}
+            ⚠️ Please keep this reference ID for check-in
+            ============================================
+            ` : ''}
             Date: ${formattedDate}
             Time: ${formattedStartTime} - ${formattedEndTime}
             ${place ? `Location: ${place}` : ''}
@@ -1576,6 +1618,7 @@ const sendBookingEmailFromFrontend = async (req, res) => {
         console.log('📧 EMAIL SENDING COMPLETE - SUMMARY');
         console.log('📧 ==========================================');
         console.log('📧 Meeting Name:', meetingName);
+        console.log('📧 Booking Reference ID:', normalizedBookingRefId || '(not provided)');
         console.log('📧 Date:', formattedDate);
         console.log('📧 Time:', `${formattedStartTime} - ${formattedEndTime}`);
         console.log('📧 Place:', place || 'Not specified');

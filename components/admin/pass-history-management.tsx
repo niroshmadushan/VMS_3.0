@@ -11,6 +11,7 @@ import {
 } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
+import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table"
 import { placeManagementAPI } from "@/lib/place-management-api"
 import toast from "react-hot-toast"
 
@@ -356,15 +357,15 @@ export function PassHistoryManagement() {
   const getActionBadge = (action: string) => {
     switch (action) {
       case 'assigned':
-        return <Badge className="bg-green-500 text-white">ASSIGNED</Badge>
+        return <Badge className="bg-green-500 dark:bg-green-600 text-white text-[11px]">ASSIGNED</Badge>
       case 'returned':
-        return <Badge className="bg-blue-500 text-white">RETURNED</Badge>
+        return <Badge className="bg-blue-500 dark:bg-blue-600 text-white text-[11px]">RETURNED</Badge>
       case 'lost':
-        return <Badge className="bg-red-500 text-white">LOST</Badge>
+        return <Badge className="bg-red-500 dark:bg-red-600 text-white text-[11px]">LOST</Badge>
       case 'damaged':
-        return <Badge className="bg-orange-500 text-white">DAMAGED</Badge>
+        return <Badge className="bg-orange-500 dark:bg-orange-600 text-white text-[11px]">DAMAGED</Badge>
       default:
-        return <Badge className="bg-gray-500 text-white">{action.toUpperCase()}</Badge>
+        return <Badge className="bg-gray-500 dark:bg-gray-600 text-white text-[11px]">{action.toUpperCase()}</Badge>
     }
   }
 
@@ -391,103 +392,88 @@ export function PassHistoryManagement() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600"></div>
+      <div className="flex items-center justify-center h-96 dark:bg-background">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-blue-600 dark:border-blue-400"></div>
       </div>
     )
   }
 
   return (
-    <div className="text-[13px] leading-tight">
-      {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-3 mb-4">
-        <Card className="border border-blue-200 bg-gradient-to-br from-blue-50 to-blue-100">
-          <CardContent className="pt-4 pb-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-[12px] font-medium text-blue-700">Total Records</p>
-                <p className="text-2xl font-bold text-blue-900 mt-1">{assignments.length}</p>
-              </div>
-              <div className="p-2.5 bg-blue-500 rounded-lg">
-                <History className="h-5 w-5 text-white" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border border-green-200 bg-gradient-to-br from-green-50 to-green-100">
-          <CardContent className="pt-4 pb-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-[12px] font-medium text-green-700">Assigned</p>
-                <p className="text-2xl font-bold text-green-900 mt-1">{totalAssigned}</p>
-                <p className="text-[11px] text-green-600">{currentlyAssigned} active</p>
-              </div>
-              <div className="p-2.5 bg-green-500 rounded-lg">
-                <CreditCard className="h-5 w-5 text-white" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border border-purple-200 bg-gradient-to-br from-purple-50 to-purple-100">
-          <CardContent className="pt-4 pb-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-[12px] font-medium text-purple-700">Returned</p>
-                <p className="text-2xl font-bold text-purple-900 mt-1">{totalReturned}</p>
-              </div>
-              <div className="p-2.5 bg-purple-500 rounded-lg">
-                <CheckCircle className="h-5 w-5 text-white" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border border-red-200 bg-gradient-to-br from-red-50 to-red-100">
-          <CardContent className="pt-4 pb-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-[12px] font-medium text-red-700">Lost/Damaged</p>
-                <p className="text-2xl font-bold text-red-900 mt-1">{totalLost}</p>
-              </div>
-              <div className="p-2.5 bg-red-500 rounded-lg">
-                <AlertTriangle className="h-5 w-5 text-white" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-2 border-orange-300 bg-gradient-to-br from-orange-50 to-orange-100">
-          <CardContent className="pt-4 pb-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-[12px] font-medium text-orange-700">⚠ Overdue</p>
-                <p className="text-2xl font-bold text-orange-900 mt-1">{overdueCount}</p>
-                <p className="text-[11px] text-orange-600">Past & Not Returned</p>
-              </div>
-              <div className="p-2.5 bg-orange-500 rounded-lg">
-                <Clock className="h-5 w-5 text-white" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+    <>
+      <div className="space-y-3 px-2 sm:px-4 max-w-[98vw] mx-auto dark:bg-background text-[13px] leading-tight">
+      {/* Statistics Table - Compact Design */}
+      <Card className="border shadow-md dark:bg-card dark:border-border mb-3">
+        <CardContent className="p-0">
+          <Table>
+            <TableBody>
+              <TableRow className="hover:bg-transparent">
+                <TableCell className="py-2.5 px-4 border-r dark:border-border">
+                  <div className="flex items-center gap-1.5">
+                    <History className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+                    <div>
+                      <p className="text-[13px] text-muted-foreground dark:text-muted-foreground">Total Records</p>
+                      <p className="text-xl font-bold text-blue-900 dark:text-blue-400">{assignments.length}</p>
+                    </div>
+                  </div>
+                </TableCell>
+                <TableCell className="py-2.5 px-4 border-r dark:border-border">
+                  <div className="flex items-center gap-1.5">
+                    <CreditCard className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
+                    <div>
+                      <p className="text-[13px] text-muted-foreground dark:text-muted-foreground">Assigned</p>
+                      <p className="text-xl font-bold text-green-900 dark:text-green-400">{totalAssigned}</p>
+                      <p className="text-[11px] text-green-600 dark:text-green-400">{currentlyAssigned} active</p>
+                    </div>
+                  </div>
+                </TableCell>
+                <TableCell className="py-2.5 px-4 border-r dark:border-border">
+                  <div className="flex items-center gap-1.5">
+                    <CheckCircle className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
+                    <div>
+                      <p className="text-[13px] text-muted-foreground dark:text-muted-foreground">Returned</p>
+                      <p className="text-xl font-bold text-purple-900 dark:text-purple-400">{totalReturned}</p>
+                    </div>
+                  </div>
+                </TableCell>
+                <TableCell className="py-2.5 px-4 border-r dark:border-border">
+                  <div className="flex items-center gap-1.5">
+                    <AlertTriangle className="h-3.5 w-3.5 text-red-600 dark:text-red-400" />
+                    <div>
+                      <p className="text-[13px] text-muted-foreground dark:text-muted-foreground">Lost/Damaged</p>
+                      <p className="text-xl font-bold text-red-900 dark:text-red-400">{totalLost}</p>
+                    </div>
+                  </div>
+                </TableCell>
+                <TableCell className="py-2.5 px-4 dark:border-border">
+                  <div className="flex items-center gap-1.5">
+                    <Clock className="h-3.5 w-3.5 text-orange-600 dark:text-orange-400" />
+                    <div>
+                      <p className="text-[13px] text-muted-foreground dark:text-muted-foreground">⚠ Overdue</p>
+                      <p className="text-xl font-bold text-orange-900 dark:text-orange-400">{overdueCount}</p>
+                      <p className="text-[11px] text-orange-600 dark:text-orange-400">Past & Not Returned</p>
+                    </div>
+                  </div>
+                </TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
 
       {/* Filters */}
-      <Card className="mb-3 border">
-        <CardContent className="pt-3 pb-3">
-          <div className="space-y-3">
+      <Card className="mb-3 border shadow-md dark:bg-card dark:border-border">
+        <CardContent className="pt-2.5 pb-2.5 px-3 dark:bg-card">
+          <div className="space-y-2.5">
             {/* Search Bar */}
-            <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex flex-col md:flex-row gap-2.5">
               <div className="flex-1">
                 <div className="relative">
-                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground dark:text-muted-foreground" />
                   <Input
                     placeholder="Search by holder name, pass number, booking..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-8 h-8"
+                    className="pl-8 h-9 text-[13px] dark:bg-card dark:border-border dark:text-foreground"
                   />
                 </div>
               </div>
@@ -498,35 +484,35 @@ export function PassHistoryManagement() {
               <Button 
                 variant={actionFilter === 'all' ? 'default' : 'outline'}
                 onClick={() => setActionFilter('all')}
-                className="h-8"
+                className="h-9 px-3 text-[13px] dark:border-border dark:hover:bg-muted"
               >
                 All
               </Button>
               <Button 
                 variant={actionFilter === 'overdue' ? 'default' : 'outline'}
                 onClick={() => setActionFilter('overdue')}
-                className={`h-8 ${actionFilter === 'overdue' ? 'bg-orange-500 hover:bg-orange-600' : ''}`}
+                className={`h-9 px-3 text-[13px] ${actionFilter === 'overdue' ? 'bg-orange-500 hover:bg-orange-600 dark:bg-orange-600 dark:hover:bg-orange-700' : 'dark:border-border dark:hover:bg-muted'}`}
               >
                 ⚠ Overdue ({overdueCount})
               </Button>
               <Button 
                 variant={actionFilter === 'assigned' ? 'default' : 'outline'}
                 onClick={() => setActionFilter('assigned')}
-                className={`h-8 ${actionFilter === 'assigned' ? 'bg-green-500' : ''}`}
+                className={`h-9 px-3 text-[13px] ${actionFilter === 'assigned' ? 'bg-green-500 hover:bg-green-600 dark:bg-green-600 dark:hover:bg-green-700' : 'dark:border-border dark:hover:bg-muted'}`}
               >
                 Assigned
               </Button>
               <Button 
                 variant={actionFilter === 'returned' ? 'default' : 'outline'}
                 onClick={() => setActionFilter('returned')}
-                className={`h-8 ${actionFilter === 'returned' ? 'bg-blue-500' : ''}`}
+                className={`h-9 px-3 text-[13px] ${actionFilter === 'returned' ? 'bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700' : 'dark:border-border dark:hover:bg-muted'}`}
               >
                 Returned
               </Button>
               <Button 
                 variant={actionFilter === 'lost' ? 'default' : 'outline'}
                 onClick={() => setActionFilter('lost')}
-                className={`h-8 ${actionFilter === 'lost' ? 'bg-red-500' : ''}`}
+                className={`h-9 px-3 text-[13px] ${actionFilter === 'lost' ? 'bg-red-500 hover:bg-red-600 dark:bg-red-600 dark:hover:bg-red-700' : 'dark:border-border dark:hover:bg-muted'}`}
               >
                 Lost
               </Button>
@@ -552,28 +538,28 @@ export function PassHistoryManagement() {
                 <Button 
                   variant={dateFilter === 'yesterday' ? 'default' : 'outline'}
                   onClick={() => handleDateFilterChange('yesterday')}
-                  className={`h-8 ${dateFilter === 'yesterday' ? 'bg-gray-500' : ''}`}
+                  className={`h-9 px-3 text-[13px] ${dateFilter === 'yesterday' ? 'bg-indigo-500 hover:bg-indigo-600 dark:bg-indigo-600 dark:hover:bg-indigo-700' : 'dark:border-border dark:hover:bg-muted'}`}
                 >
                   Yesterday
                 </Button>
                 <Button 
                   variant={dateFilter === 'last_week' ? 'default' : 'outline'}
                   onClick={() => handleDateFilterChange('last_week')}
-                  className={`h-8 ${dateFilter === 'last_week' ? 'bg-purple-500' : ''}`}
+                  className={`h-9 px-3 text-[13px] ${dateFilter === 'last_week' ? 'bg-purple-500 hover:bg-purple-600 dark:bg-purple-600 dark:hover:bg-purple-700' : 'dark:border-border dark:hover:bg-muted'}`}
                 >
                   Last 7 Days
                 </Button>
                 <Button 
                   variant={dateFilter === 'last_month' ? 'default' : 'outline'}
                   onClick={() => handleDateFilterChange('last_month')}
-                  className={`h-8 ${dateFilter === 'last_month' ? 'bg-indigo-500' : ''}`}
+                  className={`h-9 px-3 text-[13px] ${dateFilter === 'last_month' ? 'bg-indigo-500 hover:bg-indigo-600 dark:bg-indigo-600 dark:hover:bg-indigo-700' : 'dark:border-border dark:hover:bg-muted'}`}
                 >
                   Last 30 Days
                 </Button>
                 <Button 
                   variant={dateFilter === 'custom' ? 'default' : 'outline'}
                   onClick={() => handleDateFilterChange('custom')}
-                  className={`h-8 ${dateFilter === 'custom' ? 'bg-teal-500' : ''}`}
+                  className={`h-9 px-3 text-[13px] ${dateFilter === 'custom' ? 'bg-teal-500 hover:bg-teal-600 dark:bg-teal-600 dark:hover:bg-teal-700' : 'dark:border-border dark:hover:bg-muted'}`}
                 >
                   Custom Range
                 </Button>
@@ -583,23 +569,23 @@ export function PassHistoryManagement() {
               {dateFilter === 'custom' && (
                 <div className="flex gap-2 items-center">
                   <div>
-                    <Label htmlFor="startDate" className="text-xs text-muted-foreground">From:</Label>
+                    <Label htmlFor="startDate" className="text-[12px] text-muted-foreground dark:text-muted-foreground">From:</Label>
                     <Input
                       id="startDate"
                       type="date"
                       value={startDate}
                       onChange={(e) => setStartDate(e.target.value)}
-                      className="h-8 w-36"
+                      className="h-9 w-36 text-[13px] dark:bg-card dark:border-border dark:text-foreground"
                     />
                   </div>
                   <div>
-                    <Label htmlFor="endDate" className="text-xs text-muted-foreground">To:</Label>
+                    <Label htmlFor="endDate" className="text-[12px] text-muted-foreground dark:text-muted-foreground">To:</Label>
                     <Input
                       id="endDate"
                       type="date"
                       value={endDate}
                       onChange={(e) => setEndDate(e.target.value)}
-                      className="h-8 w-36"
+                      className="h-9 w-36 text-[13px] dark:bg-card dark:border-border dark:text-foreground"
                     />
                   </div>
                 </div>
@@ -610,45 +596,42 @@ export function PassHistoryManagement() {
       </Card>
 
       {/* History Table */}
-      <Card className="border shadow-md">
-        <CardHeader className="bg-gradient-to-r from-blue-50 to-purple-50 border-b">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <History className="h-5 w-5 text-blue-600" />
+      <Card className="border shadow-md dark:bg-card dark:border-border">
+        <CardHeader className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/20 dark:to-purple-950/20 dark:bg-card border-b dark:border-border/50 pb-2 pt-2.5 px-3">
+          <CardTitle className="flex items-center gap-2 text-[13px] font-semibold dark:text-foreground">
+            <History className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
             Pass Assignment History
-            <Badge className="ml-auto bg-blue-600 text-white text-[12px] px-2.5 py-1">
+            <Badge className="ml-auto bg-blue-600 dark:bg-blue-600 text-white text-[11px] px-2.5 py-1">
               {filteredAssignments.length} Records
             </Badge>
           </CardTitle>
         </CardHeader>
-        <CardContent className="pt-3">
+        <CardContent className="pt-2.5 px-3 pb-3 dark:bg-card">
           {filteredAssignments.length === 0 ? (
-            <div className="text-center py-8 border border-dashed rounded-lg">
-              <History className="h-10 w-10 mx-auto text-muted-foreground mb-2" />
-              <p className="text-sm font-semibold text-muted-foreground">No pass history records</p>
+            <div className="text-center py-8 border border-dashed rounded-lg dark:border-border">
+              <History className="h-10 w-10 mx-auto text-muted-foreground dark:text-muted-foreground mb-2" />
+              <p className="text-[13px] font-semibold text-muted-foreground dark:text-muted-foreground">No pass history records</p>
             </div>
           ) : (
-            <div className="border rounded-lg overflow-hidden shadow-sm">
-              <div className="relative overflow-x-auto">
-                <table className="w-full text-[12px]">
-                  <thead className="bg-gradient-to-r from-blue-100 to-purple-100">
-                    <tr>
-                      <th className="text-left p-2 font-semibold min-w-[120px]">Pass</th>
-                      <th className="text-left p-2 font-semibold min-w-[100px]">Action</th>
-                      <th className="text-left p-2 font-semibold min-w-[180px]">Holder</th>
-                      <th className="text-left p-2 font-semibold min-w-[150px]">Booking</th>
-                      <th className="text-left p-2 font-semibold min-w-[140px]">Assigned</th>
-                      <th className="text-left p-2 font-semibold min-w-[140px]">Returned</th>
-                      <th className="text-left p-2 font-semibold min-w-[100px]">Duration</th>
-                      <th className="text-left p-2 font-semibold min-w-[120px]">By</th>
-                      <th className="text-center p-2 font-semibold min-w-[100px]">Status</th>
-                      <th className="text-center p-2 font-semibold min-w-[140px]">Actions</th>
-                    </tr>
-                  </thead>
-                </table>
-              </div>
-              <div className="max-h-[450px] overflow-y-auto overflow-x-auto">
-                <table className="w-full text-[12px]">
-                  <tbody>
+            <div className="border rounded-lg overflow-hidden shadow-sm dark:border-border">
+              <div className="overflow-x-auto">
+                <div className="max-h-[calc(7*60px)] overflow-y-auto table-scroll-container-vertical">
+                  <table className="w-full text-[12px]" style={{ minWidth: '1200px' }}>
+                    <thead className="bg-gradient-to-r from-blue-100 to-purple-100 dark:from-blue-950/30 dark:to-purple-950/30 sticky top-0 z-10">
+                      <tr>
+                        <th className="text-left p-2 font-semibold w-[110px] dark:text-foreground">Pass</th>
+                        <th className="text-left p-2 font-semibold w-[90px] dark:text-foreground">Action</th>
+                        <th className="text-left p-2 font-semibold w-[160px] dark:text-foreground">Holder</th>
+                        <th className="text-left p-2 font-semibold w-[130px] dark:text-foreground">Booking</th>
+                        <th className="text-left p-2 font-semibold w-[120px] dark:text-foreground">Assigned</th>
+                        <th className="text-left p-2 font-semibold w-[120px] dark:text-foreground">Returned</th>
+                        <th className="text-left p-2 font-semibold w-[90px] dark:text-foreground">Duration</th>
+                        <th className="text-left p-2 font-semibold w-[110px] dark:text-foreground">By</th>
+                        <th className="text-center p-2 font-semibold w-[90px] dark:text-foreground">Status</th>
+                        <th className="text-center p-2 font-semibold w-[120px] dark:text-foreground sticky right-0 bg-gradient-to-r from-blue-100 to-purple-100 dark:from-blue-950/30 dark:to-purple-950/30 z-10">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
                     {filteredAssignments.map((assignment, idx) => {
                       const isActive = assignment.action_type === 'assigned' && !assignment.actual_return_date
                       const isReturned = assignment.action_type === 'returned' || assignment.actual_return_date
@@ -657,50 +640,50 @@ export function PassHistoryManagement() {
                       return (
                         <tr 
                           key={assignment.id}
-                          className={`border-t hover:bg-blue-50 transition-colors ${
-                            idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'
-                          } ${isActive ? 'border-l-2 border-l-green-500' : ''}`}
+                          className={`border-t hover:bg-blue-50 dark:hover:bg-muted/30 transition-colors ${
+                            idx % 2 === 0 ? 'bg-white dark:bg-card' : 'bg-gray-50/50 dark:bg-muted/20'
+                          } ${isActive ? 'border-l-2 border-l-green-500 dark:border-l-green-600' : ''}`}
                         >
-                          <td className="p-2 min-w-[120px]">
-                            <Badge className="bg-blue-600 text-white font-mono font-bold text-[12px] px-2 py-0.5">
+                          <td className="p-2 w-[110px] dark:text-foreground">
+                            <Badge className="bg-blue-600 dark:bg-blue-600 text-white font-mono font-bold text-[11px] px-1.5 py-0.5">
                               {assignment.pass_display_name || `#${assignment.pass_number}`}
                             </Badge>
-                            <p className="text-[11px] text-muted-foreground mt-0.5">
+                            <p className="text-[10px] text-muted-foreground dark:text-muted-foreground mt-0.5 truncate">
                               {assignment.pass_type_name}
                             </p>
                           </td>
                           
-                          <td className="p-2 min-w-[100px]">
+                          <td className="p-2 w-[90px]">
                             {getActionBadge(assignment.action_type)}
                           </td>
                           
-                          <td className="p-2 min-w-[180px]">
+                          <td className="p-2 w-[160px] dark:text-foreground">
                             <div className="space-y-0.5">
-                              <p className="font-bold">{assignment.holder_name}</p>
+                              <p className="font-bold text-[12px] truncate">{assignment.holder_name}</p>
                               {assignment.holder_contact && (
-                                <p className="text-[11px] text-muted-foreground">
+                                <p className="text-[10px] text-muted-foreground dark:text-muted-foreground truncate">
                                   {assignment.holder_contact}
                                 </p>
                               )}
-                              <Badge variant="outline" className="text-[11px]">
+                              <Badge variant="outline" className="text-[10px] dark:border-border dark:text-foreground">
                                 {assignment.holder_type}
                               </Badge>
                             </div>
                           </td>
                           
-                          <td className="p-2 min-w-[150px]">
+                          <td className="p-2 w-[130px] dark:text-foreground">
                             {assignment.booking_title ? (
-                              <p className="font-medium">{assignment.booking_title}</p>
+                              <p className="font-medium text-[12px] truncate" title={assignment.booking_title}>{assignment.booking_title}</p>
                             ) : (
-                              <span className="text-muted-foreground">—</span>
+                              <span className="text-muted-foreground dark:text-muted-foreground">—</span>
                             )}
                           </td>
                           
-                          <td className="p-2 min-w-[140px]">
-                            <div className="flex items-center gap-1.5">
-                              <Calendar className="h-3.5 w-3.5 text-blue-600" />
-                              <div>
-                                <p className="font-medium">
+                          <td className="p-2 w-[120px] dark:text-foreground">
+                            <div className="flex items-center gap-1">
+                              <Calendar className="h-3 w-3 text-blue-600 dark:text-blue-400 flex-shrink-0" />
+                              <div className="min-w-0">
+                                <p className="font-medium text-[11px]">
                                   {(() => {
                                     const date = new Date(assignment.assigned_date)
                                     const sriLankanDate = new Date(date.getTime() + (5.5 * 60 * 60 * 1000))
@@ -711,7 +694,7 @@ export function PassHistoryManagement() {
                                     })
                                   })()}
                                 </p>
-                                <p className="text-[11px] text-muted-foreground">
+                                <p className="text-[10px] text-muted-foreground dark:text-muted-foreground">
                                   {(() => {
                                     const date = new Date(assignment.assigned_date)
                                     const sriLankanDate = new Date(date.getTime() + (5.5 * 60 * 60 * 1000))
@@ -725,12 +708,12 @@ export function PassHistoryManagement() {
                             </div>
                           </td>
                           
-                          <td className="p-2 min-w-[140px]">
+                          <td className="p-2 w-[120px] dark:text-foreground">
                             {assignment.action_type === 'returned' ? (
-                              <div className="flex items-center gap-1.5">
-                                <CheckCircle className="h-3.5 w-3.5 text-green-600" />
-                                <div>
-                                  <p className="font-medium text-green-700">
+                              <div className="flex items-center gap-1">
+                                <CheckCircle className="h-3 w-3 text-green-600 dark:text-green-400 flex-shrink-0" />
+                                <div className="min-w-0">
+                                  <p className="font-medium text-green-700 dark:text-green-400 text-[11px]">
                                     {(() => {
                                       const date = new Date(assignment.assigned_date)
                                       const sriLankanDate = new Date(date.getTime() + (5.5 * 60 * 60 * 1000))
@@ -740,7 +723,7 @@ export function PassHistoryManagement() {
                                       })
                                     })()}
                                   </p>
-                                  <p className="text-[11px] text-muted-foreground">
+                                  <p className="text-[10px] text-muted-foreground dark:text-muted-foreground">
                                     {(() => {
                                       const date = new Date(assignment.assigned_date)
                                       const sriLankanDate = new Date(date.getTime() + (5.5 * 60 * 60 * 1000))
@@ -753,64 +736,65 @@ export function PassHistoryManagement() {
                                 </div>
                               </div>
                             ) : (
-                              <Badge variant="outline" className="text-orange-600 border-orange-400 text-[11px]">
+                              <Badge variant="outline" className="text-orange-600 dark:text-orange-400 border-orange-400 dark:border-orange-600 text-[10px]">
                                 Not Returned
                               </Badge>
                             )}
                           </td>
                           
-                          <td className="p-2 min-w-[100px]">
-                            <p className="font-medium">
+                          <td className="p-2 w-[90px] dark:text-foreground">
+                            <p className="font-medium text-[12px]">
                               {calculateDuration(assignment.assigned_date, assignment.actual_return_date)}
                             </p>
                           </td>
                           
-                          <td className="p-2 min-w-[120px]">
-                            <div className="flex items-center gap-1.5">
-                              <User className="h-3.5 w-3.5 text-purple-600" />
-                              <p className="text-[12px]">{assignment.assigned_by_name}</p>
+                          <td className="p-2 w-[110px] dark:text-foreground">
+                            <div className="flex items-center gap-1">
+                              <User className="h-3 w-3 text-purple-600 dark:text-purple-400 flex-shrink-0" />
+                              <p className="text-[11px] truncate">{assignment.assigned_by_name}</p>
                             </div>
                           </td>
                           
-                          <td className="p-2 text-center min-w-[100px]">
+                          <td className="p-2 text-center w-[90px]">
                             {isActive ? (
-                              <Badge className="bg-green-500 text-white px-2.5 py-0.5 flex items-center gap-1 justify-center w-fit mx-auto text-[11px]">
+                              <Badge className="bg-green-500 dark:bg-green-600 text-white px-2 py-0.5 flex items-center gap-1 justify-center w-fit mx-auto text-[10px]">
                                 <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
                                 ACTIVE
                               </Badge>
                             ) : isReturned ? (
-                              <Badge className="bg-blue-500 text-white px-2.5 py-0.5 text-[11px]">
+                              <Badge className="bg-blue-500 dark:bg-blue-600 text-white px-2 py-0.5 text-[10px]">
                                 COMPLETED
                               </Badge>
                             ) : isLost ? (
-                              <Badge className="bg-red-500 text-white px-2.5 py-0.5 text-[11px]">
+                              <Badge className="bg-red-500 dark:bg-red-600 text-white px-2 py-0.5 text-[10px]">
                                 LOST
                               </Badge>
                             ) : (
-                              <Badge className="bg-gray-500 text-white px-2.5 py-0.5 text-[11px]">
+                              <Badge className="bg-gray-500 dark:bg-gray-600 text-white px-2 py-0.5 text-[10px]">
                                 ARCHIVED
                               </Badge>
                             )}
                           </td>
                           
-                          <td className="p-2 text-center min-w-[140px]">
+                          <td className="p-2 text-center w-[120px] sticky right-0 bg-white dark:bg-card z-10">
                             {assignment.is_overdue && (
                               <Button
                                 size="sm"
                                 variant="outline"
                                 onClick={() => openManualReturnDialog(assignment)}
-                                className="h-7 text-[11px] text-orange-600 hover:bg-orange-50 border-orange-300"
+                                className="h-7 px-2 text-[10px] text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-950/20 border-orange-300 dark:border-orange-600"
                               >
                                 <RotateCcw className="h-3 w-3 mr-1" />
-                                Set Return Time
+                                Set Return
                               </Button>
                             )}
                           </td>
                         </tr>
                       )
                     })}
-                  </tbody>
-                </table>
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           )}
@@ -819,43 +803,43 @@ export function PassHistoryManagement() {
 
       {/* Manual Return Time Dialog */}
       <Dialog open={isManualReturnDialogOpen} onOpenChange={setIsManualReturnDialogOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-orange-900">
-              <div className="p-2 bg-orange-100 rounded-full">
-                <Clock className="h-6 w-6 text-orange-600" />
+        <DialogContent className="max-w-md dark:bg-card dark:border-border">
+          <DialogHeader className="dark:border-border/50">
+            <DialogTitle className="flex items-center gap-2 text-orange-900 dark:text-orange-400 text-[13px] font-semibold">
+              <div className="p-2 bg-orange-100 dark:bg-orange-950/20 rounded-full">
+                <Clock className="h-5 w-5 text-orange-600 dark:text-orange-400" />
               </div>
               Set Return Time
             </DialogTitle>
           </DialogHeader>
           
           {selectedAssignment && (
-            <div className="space-y-4">
-              <div className="p-4 bg-orange-50 border-2 border-orange-200 rounded-lg">
-                <p className="text-sm font-medium text-orange-900 mb-3">
+            <div className="space-y-3">
+              <div className="p-3 bg-orange-50 dark:bg-orange-950/20 border-2 border-orange-200 dark:border-orange-800 rounded-lg">
+                <p className="text-[13px] font-medium text-orange-900 dark:text-orange-300 mb-2.5">
                   ⚠ This pass was assigned for a past date but never returned systematically.
                 </p>
-                <div className="space-y-2 text-sm">
+                <div className="space-y-1.5 text-[13px]">
                   <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Pass:</span>
-                    <Badge className="bg-blue-600 text-white font-bold">
+                    <span className="text-muted-foreground dark:text-muted-foreground">Pass:</span>
+                    <Badge className="bg-blue-600 dark:bg-blue-600 text-white font-bold text-[12px]">
                       {selectedAssignment.pass_display_name}
                     </Badge>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Holder:</span>
-                    <span className="font-bold">{selectedAssignment.holder_name}</span>
+                    <span className="text-muted-foreground dark:text-muted-foreground">Holder:</span>
+                    <span className="font-bold dark:text-foreground">{selectedAssignment.holder_name}</span>
                   </div>
                   {selectedAssignment.booking_title && (
                     <div className="flex items-center justify-between">
-                      <span className="text-muted-foreground">Booking:</span>
-                      <span className="font-medium">{selectedAssignment.booking_title}</span>
+                      <span className="text-muted-foreground dark:text-muted-foreground">Booking:</span>
+                      <span className="font-medium dark:text-foreground">{selectedAssignment.booking_title}</span>
                     </div>
                   )}
                   {selectedAssignment.booking_date && (
                     <div className="flex items-center justify-between">
-                      <span className="text-muted-foreground">Booking Date:</span>
-                      <span className="font-medium text-red-600">
+                      <span className="text-muted-foreground dark:text-muted-foreground">Booking Date:</span>
+                      <span className="font-medium text-red-600 dark:text-red-400">
                         {(() => {
                           const date = new Date(selectedAssignment.booking_date)
                           const sriLankanDate = new Date(date.getTime() + (5.5 * 60 * 60 * 1000))
@@ -872,23 +856,23 @@ export function PassHistoryManagement() {
               </div>
 
               <div>
-                <Label htmlFor="returnTime">When was the pass actually returned? *</Label>
+                <Label htmlFor="returnTime" className="text-[13px] dark:text-foreground">When was the pass actually returned? *</Label>
                 <Input
                   id="returnTime"
                   type="datetime-local"
                   value={manualReturnTime}
                   onChange={(e) => setManualReturnTime(e.target.value)}
                   max={new Date().toISOString().slice(0, 16)}
-                  className="mt-1"
+                  className="mt-1.5 h-9 text-[13px] dark:bg-card dark:border-border dark:text-foreground"
                 />
-                <p className="text-xs text-muted-foreground mt-1">
+                <p className="text-[12px] text-muted-foreground dark:text-muted-foreground mt-1">
                   ⚠ Cannot be in the future. Select when the visitor actually returned the pass.
                 </p>
               </div>
 
-              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-xs text-blue-900 flex items-center gap-2">
-                  <CheckCircle className="h-4 w-4" />
+              <div className="p-2.5 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                <p className="text-[12px] text-blue-900 dark:text-blue-300 flex items-center gap-2">
+                  <CheckCircle className="h-3.5 w-3.5" />
                   Pass will be marked as available for future assignments
                 </p>
               </div>
@@ -902,14 +886,15 @@ export function PassHistoryManagement() {
                     setSelectedAssignment(null)
                     setManualReturnTime("")
                   }}
+                  className="h-9 px-3 text-[13px] dark:border-border dark:text-foreground dark:hover:bg-muted"
                 >
                   Cancel
                 </Button>
                 <Button 
                   onClick={handleManualReturn}
-                  className="bg-orange-600 hover:bg-orange-700"
+                  className="bg-orange-600 hover:bg-orange-700 dark:bg-orange-600 dark:hover:bg-orange-700 h-9 px-3 text-[13px]"
                 >
-                  <Clock className="h-4 w-4 mr-2" />
+                  <Clock className="h-3.5 w-3.5 mr-1.5" />
                   Confirm Return
                 </Button>
               </div>
@@ -917,6 +902,7 @@ export function PassHistoryManagement() {
           )}
         </DialogContent>
       </Dialog>
-    </div>
+      </div>
+    </>
   )
 }

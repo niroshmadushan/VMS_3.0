@@ -10,8 +10,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { 
   ArrowLeft, User, Mail, Phone, Building2, MapPin, FileText, 
   Calendar, Clock, ShieldAlert, Activity, BarChart3, TrendingUp,
-  CheckCircle, XCircle
+  CheckCircle, XCircle, Loader2
 } from "lucide-react"
+import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table"
 import { placeManagementAPI } from "@/lib/place-management-api"
 import toast from "react-hot-toast"
 import { requireAuth } from "@/lib/auth"
@@ -44,11 +45,34 @@ export default function ExternalMemberDetailsPage() {
 
   const [member, setMember] = useState<ExternalMember | null>(null)
   const [bookings, setBookings] = useState<any[]>([])
+  const [missingBookings, setMissingBookings] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isLoadingBookings, setIsLoadingBookings] = useState(false)
+  const [isLoadingMissingBookings, setIsLoadingMissingBookings] = useState(false)
+
+  // Get user role to determine correct back path
+  const getUserRole = (): string | null => {
+    if (typeof window !== 'undefined') {
+      try {
+        const userData = localStorage.getItem('userData')
+        if (userData) {
+          const user = JSON.parse(userData)
+          return user?.role || null
+        }
+      } catch (error) {
+        console.error('Error getting user role:', error)
+      }
+    }
+    return null
+  }
+
+  const getBackPath = (): string => {
+    const role = getUserRole()
+    return role === 'staff' ? '/staff/external-members' : '/admin/external-members'
+  }
 
   useEffect(() => {
-    requireAuth(["admin"])
+    requireAuth(["admin", "staff"])
     loadMemberData()
     loadMemberBookings()
   }, [memberId])
@@ -64,11 +88,11 @@ export default function ExternalMemberDetailsPage() {
         setMember(foundMember)
       } else {
         toast.error('Member not found')
-        router.push('/admin/external-members')
+        router.push(getBackPath())
       }
     } catch (error) {
       toast.error('Failed to load member')
-      router.push('/admin/external-members')
+      router.push(getBackPath())
     } finally {
       setIsLoading(false)
     }
@@ -95,10 +119,12 @@ export default function ExternalMemberDetailsPage() {
       const bookingsResponse = await placeManagementAPI.getTableData('bookings', { limit: 500 })
       const allBookings = Array.isArray(bookingsResponse) ? bookingsResponse : []
       
+      // Filter out missing bookings (is_missing_booking = 1 or true)
       const memberBookingsList = allBookings
         .filter((b: any) => 
           bookingIds.includes(b.id) && 
-          (b.is_deleted === false || b.is_deleted === 0)
+          (b.is_deleted === false || b.is_deleted === 0) &&
+          (b.is_missing_booking === 0 || b.is_missing_booking === false || b.is_missing_booking === null || b.is_missing_booking === undefined)
         )
         .map((b: any) => ({
           id: b.id,
@@ -121,11 +147,65 @@ export default function ExternalMemberDetailsPage() {
     }
   }
 
+  const loadMissingBookings = async () => {
+    try {
+      setIsLoadingMissingBookings(true)
+      
+      // Get external participants for this member
+      const participantsResponse = await placeManagementAPI.getTableData('external_participants', { limit: 500 })
+      const participants = Array.isArray(participantsResponse) ? 
+        participantsResponse.filter((p: any) => 
+          p.member_id === memberId && 
+          (p.is_deleted === false || p.is_deleted === 0)
+        ) : []
+      
+      const bookingIds = participants.map((p: any) => p.booking_id)
+      
+      if (bookingIds.length === 0) {
+        setMissingBookings([])
+        return
+      }
+      
+      // Get all bookings
+      const bookingsResponse = await placeManagementAPI.getTableData('bookings', { limit: 500 })
+      const allBookings = Array.isArray(bookingsResponse) ? bookingsResponse : []
+      
+      // Filter for missing bookings (is_missing_booking = 1 or true)
+      const missingBookingsList = allBookings
+        .filter((b: any) => 
+          bookingIds.includes(b.id) && 
+          (b.is_deleted === false || b.is_deleted === 0) &&
+          (b.is_missing_booking === 1 || b.is_missing_booking === true)
+        )
+        .map((b: any) => ({
+          id: b.id,
+          title: b.title,
+          date: b.booking_date,
+          startTime: b.start_time,
+          endTime: b.end_time,
+          place: b.place_name,
+          status: b.status,
+          bookingRefId: b.booking_ref_id,
+          description: b.description
+        }))
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      
+      setMissingBookings(missingBookingsList)
+    } catch (error) {
+      console.error('Failed to load missing bookings:', error)
+    } finally {
+      setIsLoadingMissingBookings(false)
+    }
+  }
+
   if (isLoading) {
     return (
       <DashboardLayout title="Loading..." subtitle="Please wait">
-        <div className="flex items-center justify-center h-96">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-purple-600"></div>
+        <div className="flex items-center justify-center h-96 dark:bg-background">
+          <div className="text-center">
+            <Loader2 className="h-10 w-10 animate-spin mx-auto text-purple-600 dark:text-purple-400 mb-3" />
+            <p className="text-muted-foreground dark:text-muted-foreground text-[13px]">Loading member details...</p>
+          </div>
         </div>
       </DashboardLayout>
     )
@@ -144,84 +224,73 @@ export default function ExternalMemberDetailsPage() {
       title={member.full_name} 
       subtitle="External Member Details & Analytics"
     >
-      <div className="space-y-6">
+      <div className="space-y-3 px-2 sm:px-4 max-w-[98vw] mx-auto dark:bg-background">
         {/* Header Actions */}
         <div className="flex items-center justify-between">
           <Button 
             variant="outline" 
-            onClick={() => router.push('/admin/external-members')}
-            className="gap-2"
+            onClick={() => router.push(getBackPath())}
+            className="gap-1.5 h-8 px-2.5 text-[13px] dark:border-border dark:text-foreground dark:hover:bg-muted cursor-pointer"
           >
-            <ArrowLeft className="h-4 w-4" />
+            <ArrowLeft className="h-3.5 w-3.5" />
             Back to Members
           </Button>
           
           {member.is_blacklisted && (
-            <Badge variant="destructive" className="text-lg px-4 py-2">
-              <ShieldAlert className="h-5 w-5 mr-2" />
+            <Badge variant="destructive" className="text-[13px] px-2.5 py-1 dark:bg-red-600">
+              <ShieldAlert className="h-3.5 w-3.5 mr-1.5" />
               BLACKLISTED
             </Badge>
           )}
         </div>
 
-        {/* Analytics Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <Card className="border-2 border-purple-200 bg-gradient-to-br from-purple-50 to-purple-100">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-purple-700">Total Bookings</p>
-                  <p className="text-4xl font-bold text-purple-900 mt-2">{bookings.length}</p>
-                </div>
-                <div className="p-4 bg-purple-500 rounded-lg">
-                  <Calendar className="h-8 w-8 text-white" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-blue-100">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-blue-700">Completed</p>
-                  <p className="text-4xl font-bold text-blue-900 mt-2">{completedBookings}</p>
-                </div>
-                <div className="p-4 bg-blue-500 rounded-lg">
-                  <CheckCircle className="h-8 w-8 text-white" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-2 border-orange-200 bg-gradient-to-br from-orange-50 to-orange-100">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-orange-700">Upcoming</p>
-                  <p className="text-4xl font-bold text-orange-900 mt-2">{upcomingBookings}</p>
-                </div>
-                <div className="p-4 bg-orange-500 rounded-lg">
-                  <TrendingUp className="h-8 w-8 text-white" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-2 border-green-200 bg-gradient-to-br from-green-50 to-green-100">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-green-700">Visit Count</p>
-                  <p className="text-4xl font-bold text-green-900 mt-2">{member.visit_count}</p>
-                </div>
-                <div className="p-4 bg-green-500 rounded-lg">
-                  <Activity className="h-8 w-8 text-white" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        {/* Analytics Table - Compact Design */}
+        <Card className="border shadow-md dark:bg-card dark:border-border">
+          <CardContent className="p-0">
+            <Table>
+              <TableBody>
+                <TableRow className="hover:bg-transparent">
+                  <TableCell className="py-2.5 px-4 border-r dark:border-border">
+                    <div className="flex items-center gap-1.5">
+                      <Calendar className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
+                      <span className="text-[13px] text-muted-foreground dark:text-muted-foreground">Total Bookings</span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="py-2.5 px-4 text-right border-r dark:border-border">
+                    <span className="text-xl font-bold text-purple-600 dark:text-purple-400">{bookings.length}</span>
+                  </TableCell>
+                  <TableCell className="py-2.5 px-4 border-r dark:border-border">
+                    <div className="flex items-center gap-1.5">
+                      <CheckCircle className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+                      <span className="text-[13px] text-muted-foreground dark:text-muted-foreground">Completed</span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="py-2.5 px-4 text-right border-r dark:border-border">
+                    <span className="text-xl font-bold text-blue-600 dark:text-blue-400">{completedBookings}</span>
+                  </TableCell>
+                  <TableCell className="py-2.5 px-4 border-r dark:border-border">
+                    <div className="flex items-center gap-1.5">
+                      <TrendingUp className="h-3.5 w-3.5 text-orange-600 dark:text-orange-400" />
+                      <span className="text-[13px] text-muted-foreground dark:text-muted-foreground">Upcoming</span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="py-2.5 px-4 text-right border-r dark:border-border">
+                    <span className="text-xl font-bold text-orange-600 dark:text-orange-400">{upcomingBookings}</span>
+                  </TableCell>
+                  <TableCell className="py-2.5 px-4">
+                    <div className="flex items-center gap-1.5">
+                      <Activity className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
+                      <span className="text-[13px] text-muted-foreground dark:text-muted-foreground">Visit Count</span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="py-2.5 px-4 text-right">
+                    <span className="text-xl font-bold text-green-600 dark:text-green-400">{member.visit_count}</span>
+                  </TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
 
         {/* Tabs for Profile and History */}
         <Tabs defaultValue="profile" className="space-y-6">
@@ -231,135 +300,135 @@ export default function ExternalMemberDetailsPage() {
           </TabsList>
 
           {/* PROFILE TAB */}
-          <TabsContent value="profile">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <TabsContent value="profile" className="space-y-3">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
               {/* Personal Information */}
-              <Card className="border-2 shadow-lg">
-                <CardHeader className="bg-gradient-to-r from-blue-50 to-purple-50">
-                  <CardTitle className="flex items-center gap-2">
-                    <User className="h-5 w-5 text-blue-600" />
+              <Card className="border shadow-md dark:bg-card dark:border-border">
+                <CardHeader className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/20 dark:to-purple-950/20 dark:bg-card border-b dark:border-border/50 pb-2 pt-2.5">
+                  <CardTitle className="flex items-center gap-1.5 text-[13px] font-semibold dark:text-foreground">
+                    <User className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
                     Personal Information
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="pt-6 space-y-4">
+                <CardContent className="pt-2.5 pb-2.5 dark:bg-card space-y-2">
                   <div>
-                    <p className="text-sm text-muted-foreground mb-1">Full Name</p>
-                    <p className="text-lg font-bold">{member.full_name}</p>
+                    <p className="text-[12px] text-muted-foreground dark:text-muted-foreground mb-0.5">Full Name</p>
+                    <p className="text-[13px] font-bold dark:text-foreground">{member.full_name}</p>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <p className="text-sm text-muted-foreground mb-1">Email</p>
-                      <div className="flex items-center gap-2">
-                        <Mail className="h-4 w-4 text-muted-foreground" />
-                        <p className="text-sm font-medium">{member.email}</p>
+                      <p className="text-[12px] text-muted-foreground dark:text-muted-foreground mb-0.5">Email</p>
+                      <div className="flex items-center gap-1.5">
+                        <Mail className="h-3 w-3 text-muted-foreground dark:text-muted-foreground" />
+                        <p className="text-[13px] font-medium dark:text-foreground">{member.email}</p>
                       </div>
                     </div>
                     <div>
-                      <p className="text-sm text-muted-foreground mb-1">Phone</p>
-                      <div className="flex items-center gap-2">
-                        <Phone className="h-4 w-4 text-muted-foreground" />
-                        <p className="text-sm font-medium">{member.phone}</p>
+                      <p className="text-[12px] text-muted-foreground dark:text-muted-foreground mb-0.5">Phone</p>
+                      <div className="flex items-center gap-1.5">
+                        <Phone className="h-3 w-3 text-muted-foreground dark:text-muted-foreground" />
+                        <p className="text-[13px] font-medium dark:text-foreground">{member.phone}</p>
                       </div>
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <p className="text-sm text-muted-foreground mb-1">Reference Type</p>
-                      <p className="text-sm font-medium">{member.reference_type}</p>
+                      <p className="text-[12px] text-muted-foreground dark:text-muted-foreground mb-0.5">Reference Type</p>
+                      <p className="text-[13px] font-medium dark:text-foreground">{member.reference_type}</p>
                     </div>
                     <div>
-                      <p className="text-sm text-muted-foreground mb-1">Reference Value</p>
-                      <p className="text-sm font-medium font-mono">{member.reference_value}</p>
+                      <p className="text-[12px] text-muted-foreground dark:text-muted-foreground mb-0.5">Reference Value</p>
+                      <p className="text-[13px] font-medium font-mono dark:text-foreground">{member.reference_value}</p>
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
               {/* Professional Information */}
-              <Card className="border-2 shadow-lg">
-                <CardHeader className="bg-gradient-to-r from-green-50 to-blue-50">
-                  <CardTitle className="flex items-center gap-2">
-                    <Building2 className="h-5 w-5 text-green-600" />
+              <Card className="border shadow-md dark:bg-card dark:border-border">
+                <CardHeader className="bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-950/20 dark:to-blue-950/20 dark:bg-card border-b dark:border-border/50 pb-2 pt-2.5">
+                  <CardTitle className="flex items-center gap-1.5 text-[13px] font-semibold dark:text-foreground">
+                    <Building2 className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
                     Professional Information
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="pt-6 space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+                <CardContent className="pt-2.5 pb-2.5 dark:bg-card space-y-2">
+                  <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <p className="text-sm text-muted-foreground mb-1">Company</p>
-                      <p className="text-sm font-medium">{member.company_name || '—'}</p>
+                      <p className="text-[12px] text-muted-foreground dark:text-muted-foreground mb-0.5">Company</p>
+                      <p className="text-[13px] font-medium dark:text-foreground">{member.company_name || '—'}</p>
                     </div>
                     <div>
-                      <p className="text-sm text-muted-foreground mb-1">Designation</p>
-                      <p className="text-sm font-medium">{member.designation || '—'}</p>
+                      <p className="text-[12px] text-muted-foreground dark:text-muted-foreground mb-0.5">Designation</p>
+                      <p className="text-[13px] font-medium dark:text-foreground">{member.designation || '—'}</p>
                     </div>
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground mb-1">Address</p>
-                    <div className="flex items-start gap-2">
-                      <MapPin className="h-4 w-4 text-muted-foreground mt-0.5" />
-                      <p className="text-sm">{member.address || '—'}</p>
+                    <p className="text-[12px] text-muted-foreground dark:text-muted-foreground mb-0.5">Address</p>
+                    <div className="flex items-start gap-1.5">
+                      <MapPin className="h-3 w-3 text-muted-foreground dark:text-muted-foreground mt-0.5" />
+                      <p className="text-[13px] dark:text-foreground">{member.address || '—'}</p>
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <p className="text-sm text-muted-foreground mb-1">City</p>
-                      <p className="text-sm font-medium">{member.city || '—'}</p>
+                      <p className="text-[12px] text-muted-foreground dark:text-muted-foreground mb-0.5">City</p>
+                      <p className="text-[13px] font-medium dark:text-foreground">{member.city || '—'}</p>
                     </div>
                     <div>
-                      <p className="text-sm text-muted-foreground mb-1">Country</p>
-                      <p className="text-sm font-medium">{member.country || '—'}</p>
+                      <p className="text-[12px] text-muted-foreground dark:text-muted-foreground mb-0.5">Country</p>
+                      <p className="text-[13px] font-medium dark:text-foreground">{member.country || '—'}</p>
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
               {/* Additional Information */}
-              <Card className="border-2 shadow-lg lg:col-span-2">
-                <CardHeader className="bg-gradient-to-r from-yellow-50 to-orange-50">
-                  <CardTitle className="flex items-center gap-2">
-                    <FileText className="h-5 w-5 text-yellow-600" />
+              <Card className="border shadow-md dark:bg-card dark:border-border lg:col-span-2">
+                <CardHeader className="bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-950/20 dark:to-orange-950/20 dark:bg-card border-b dark:border-border/50 pb-2 pt-2.5">
+                  <CardTitle className="flex items-center gap-1.5 text-[13px] font-semibold dark:text-foreground">
+                    <FileText className="h-3.5 w-3.5 text-yellow-600 dark:text-yellow-400" />
                     Additional Information
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="pt-6 space-y-4">
-                  <div className="grid grid-cols-3 gap-4">
+                <CardContent className="pt-2.5 pb-2.5 dark:bg-card space-y-2">
+                  <div className="grid grid-cols-3 gap-2">
                     <div>
-                      <p className="text-sm text-muted-foreground mb-1">Status</p>
-                      <Badge className={member.is_active ? 'bg-green-500' : 'bg-gray-500'}>
+                      <p className="text-[12px] text-muted-foreground dark:text-muted-foreground mb-0.5">Status</p>
+                      <Badge className={`text-[11px] px-2 py-0.5 ${member.is_active ? 'bg-green-500 dark:bg-green-600 text-white' : 'bg-gray-500 dark:bg-gray-600 text-white'}`}>
                         {member.is_active ? 'Active' : 'Inactive'}
                       </Badge>
                     </div>
                     <div>
-                      <p className="text-sm text-muted-foreground mb-1">Last Visit</p>
-                      <p className="text-sm font-medium">
+                      <p className="text-[12px] text-muted-foreground dark:text-muted-foreground mb-0.5">Last Visit</p>
+                      <p className="text-[13px] font-medium dark:text-foreground">
                         {member.last_visit_date 
                           ? new Date(member.last_visit_date).toLocaleDateString() 
                           : 'Never'}
                       </p>
                     </div>
                     <div>
-                      <p className="text-sm text-muted-foreground mb-1">Member Since</p>
-                      <p className="text-sm font-medium">
+                      <p className="text-[12px] text-muted-foreground dark:text-muted-foreground mb-0.5">Member Since</p>
+                      <p className="text-[13px] font-medium dark:text-foreground">
                         {new Date(member.created_at).toLocaleDateString()}
                       </p>
                     </div>
                   </div>
                   {member.notes && (
                     <div>
-                      <p className="text-sm text-muted-foreground mb-1">Notes</p>
-                      <p className="text-sm bg-yellow-50 p-3 rounded border border-yellow-200">
+                      <p className="text-[12px] text-muted-foreground dark:text-muted-foreground mb-0.5">Notes</p>
+                      <p className="text-[13px] bg-yellow-50 dark:bg-yellow-950/20 p-2 rounded border border-yellow-200 dark:border-yellow-800 dark:text-foreground">
                         {member.notes}
                       </p>
                     </div>
                   )}
                   {member.is_blacklisted && (
-                    <div className="p-4 bg-red-50 border-2 border-red-300 rounded-lg">
-                      <p className="font-bold text-red-900 mb-2 flex items-center gap-2">
-                        <ShieldAlert className="h-5 w-5" />
+                    <div className="p-2.5 bg-red-50 dark:bg-red-950/20 border-2 border-red-300 dark:border-red-800 rounded-lg">
+                      <p className="font-bold text-red-900 dark:text-red-400 mb-1 flex items-center gap-1.5 text-[13px]">
+                        <ShieldAlert className="h-3.5 w-3.5" />
                         BLACKLISTED
                       </p>
-                      <p className="text-sm text-red-700">
+                      <p className="text-[12px] text-red-700 dark:text-red-400">
                         {member.blacklist_reason || 'No reason provided'}
                       </p>
                     </div>
@@ -370,110 +439,220 @@ export default function ExternalMemberDetailsPage() {
           </TabsContent>
 
           {/* HISTORY TAB */}
-          <TabsContent value="history">
-            <Card className="border-2 shadow-xl">
-              <CardHeader className="bg-gradient-to-r from-purple-50 to-blue-50 border-b-2">
-                <CardTitle className="flex items-center gap-2 text-xl">
-                  <BarChart3 className="h-6 w-6 text-purple-600" />
+          <TabsContent value="history" className="space-y-3">
+            <Card className="border shadow-md dark:bg-card dark:border-border">
+              <CardHeader className="bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-950/20 dark:to-blue-950/20 dark:bg-card border-b dark:border-border/50 pb-2 pt-2.5">
+                <CardTitle className="flex items-center gap-1.5 text-[13px] font-semibold dark:text-foreground">
+                  <BarChart3 className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
                   Complete Booking History
-                  <Badge className="ml-auto bg-purple-600 text-white text-base px-4 py-2">
+                  <Badge className="ml-auto bg-purple-600 dark:bg-purple-600 text-white text-[11px] px-2 py-0.5">
                     {bookings.length} Total Bookings
                   </Badge>
                 </CardTitle>
               </CardHeader>
-              <CardContent className="pt-6">
+              <CardContent className="pt-2.5 pb-2.5 dark:bg-card">
                 {isLoadingBookings ? (
-                  <div className="text-center py-12">
-                    <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-purple-600 mx-auto mb-4"></div>
-                    <p className="text-lg text-muted-foreground">Loading booking history...</p>
+                  <div className="text-center py-8">
+                    <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2 text-purple-600 dark:text-purple-400" />
+                    <p className="text-[13px] text-muted-foreground dark:text-muted-foreground">Loading booking history...</p>
                   </div>
                 ) : bookings.length === 0 ? (
-                  <div className="text-center py-16 border-2 border-dashed rounded-lg">
-                    <Calendar className="h-20 w-20 mx-auto text-muted-foreground mb-4" />
-                    <p className="text-muted-foreground font-bold text-xl">No booking history</p>
-                    <p className="text-sm text-muted-foreground mt-2">
+                  <div className="text-center py-12 border-2 border-dashed rounded-lg dark:border-border">
+                    <Calendar className="h-16 w-16 mx-auto text-muted-foreground dark:text-muted-foreground mb-3 opacity-30" />
+                    <p className="text-muted-foreground dark:text-muted-foreground font-bold text-[13px]">No booking history</p>
+                    <p className="text-[12px] text-muted-foreground dark:text-muted-foreground mt-1">
                       This member hasn't participated in any bookings yet
                     </p>
                   </div>
                 ) : (
-                  <div className="border-2 rounded-lg overflow-hidden shadow-lg">
+                  <div className="border rounded-lg overflow-hidden shadow-sm dark:border-border">
                     <div className="overflow-x-auto">
-                      <table className="w-full">
-                        <thead className="bg-gradient-to-r from-purple-100 to-blue-100">
+                      <table className="w-full text-[13px]">
+                        <thead className="bg-muted/50 dark:bg-muted/30 border-b dark:border-border">
                           <tr>
-                            <th className="text-left p-4 font-bold">Ref ID</th>
-                            <th className="text-left p-4 font-bold">Booking Title</th>
-                            <th className="text-left p-4 font-bold">Date</th>
-                            <th className="text-left p-4 font-bold">Time</th>
-                            <th className="text-left p-4 font-bold">Place</th>
-                            <th className="text-center p-4 font-bold">Status</th>
+                            <th className="text-left p-2.5 font-semibold text-foreground dark:text-foreground min-w-[120px]">Ref ID</th>
+                            <th className="text-left p-2.5 font-semibold text-foreground dark:text-foreground min-w-[180px]">Booking Title</th>
+                            <th className="text-left p-2.5 font-semibold text-foreground dark:text-foreground min-w-[120px]">Date</th>
+                            <th className="text-left p-2.5 font-semibold text-foreground dark:text-foreground min-w-[120px]">Time</th>
+                            <th className="text-left p-2.5 font-semibold text-foreground dark:text-foreground min-w-[140px]">Place</th>
+                            <th className="text-center p-2.5 font-semibold text-foreground dark:text-foreground min-w-[100px]">Status</th>
                           </tr>
                         </thead>
-                        <tbody>
-                          {bookings.map((b, idx) => (
-                            <tr 
-                              key={b.id} 
-                              className={`border-t-2 hover:bg-purple-50 transition-all ${
-                                idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'
-                              }`}
-                            >
-                              <td className="p-4">
-                                {b.bookingRefId ? (
-                                  <Badge variant="outline" className="font-mono font-bold">
-                                    {b.bookingRefId}
-                                  </Badge>
-                                ) : (
-                                  <span className="text-muted-foreground">—</span>
-                                )}
-                              </td>
-                              <td className="p-4">
-                                <p className="font-bold">{b.title}</p>
-                              </td>
-                              <td className="p-4">
-                                <div className="flex items-center gap-2">
-                                  <Calendar className="h-5 w-5 text-purple-600" />
-                                  <span className="font-medium">
-                                    {new Date(b.date).toLocaleDateString('en-US', { 
-                                      month: 'short', 
-                                      day: 'numeric', 
-                                      year: 'numeric' 
-                                    })}
-                                  </span>
-                                </div>
-                              </td>
-                              <td className="p-4">
-                                <div className="flex items-center gap-2">
-                                  <Clock className="h-5 w-5 text-blue-600" />
-                                  <span className="font-mono font-medium">
-                                    {b.startTime?.substring(0,5)} - {b.endTime?.substring(0,5)}
-                                  </span>
-                                </div>
-                              </td>
-                              <td className="p-4">
-                                <div className="flex items-center gap-2">
-                                  <MapPin className="h-5 w-5 text-green-600" />
-                                  <span className="font-medium">{b.place}</span>
-                                </div>
-                              </td>
-                              <td className="p-4 text-center">
-                                <Badge className={`px-4 py-1.5 font-bold ${
-                                  b.status === 'completed' ? 'bg-blue-500 text-white' : 
-                                  b.status === 'upcoming' ? 'bg-orange-500 text-white' : 
-                                  b.status === 'ongoing' ? 'bg-green-500 text-white' :
-                                  'bg-gray-500 text-white'
-                                }`}>
-                                  {b.status?.toUpperCase()}
-                                </Badge>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
                       </table>
+                      <div className="max-h-[calc(7*60px)] overflow-y-auto table-scroll-container-vertical">
+                        <table className="w-full text-[13px]">
+                          <tbody>
+                            {bookings.map((b, idx) => (
+                              <tr 
+                                key={b.id} 
+                                className={`border-b border-border/30 dark:border-border hover:bg-muted/20 dark:hover:bg-muted/30 transition-colors ${
+                                  idx % 2 === 0 ? 'bg-transparent' : 'bg-muted/10 dark:bg-muted/10'
+                                }`}
+                              >
+                                <td className="p-2.5 min-w-[120px]">
+                                  {b.bookingRefId ? (
+                                    <Badge variant="outline" className="font-mono font-bold text-[11px] px-2 py-0.5 dark:border-border dark:text-foreground">
+                                      {b.bookingRefId}
+                                    </Badge>
+                                  ) : (
+                                    <span className="text-muted-foreground dark:text-muted-foreground">—</span>
+                                  )}
+                                </td>
+                                <td className="p-2.5 min-w-[180px]">
+                                  <p className="font-bold dark:text-foreground">{b.title}</p>
+                                </td>
+                                <td className="p-2.5 min-w-[120px]">
+                                  <div className="flex items-center gap-1.5">
+                                    <Calendar className="h-3 w-3 text-purple-600 dark:text-purple-400" />
+                                    <span className="font-medium dark:text-foreground">
+                                      {new Date(b.date).toLocaleDateString('en-US', { 
+                                        month: 'short', 
+                                        day: 'numeric', 
+                                        year: 'numeric' 
+                                      })}
+                                    </span>
+                                  </div>
+                                </td>
+                                <td className="p-2.5 min-w-[120px]">
+                                  <div className="flex items-center gap-1.5">
+                                    <Clock className="h-3 w-3 text-blue-600 dark:text-blue-400" />
+                                    <span className="font-mono font-medium dark:text-foreground">
+                                      {b.startTime?.substring(0,5)} - {b.endTime?.substring(0,5)}
+                                    </span>
+                                  </div>
+                                </td>
+                                <td className="p-2.5 min-w-[140px]">
+                                  <div className="flex items-center gap-1.5">
+                                    <MapPin className="h-3 w-3 text-green-600 dark:text-green-400" />
+                                    <span className="font-medium dark:text-foreground">{b.place}</span>
+                                  </div>
+                                </td>
+                                <td className="p-2.5 text-center min-w-[100px]">
+                                  <Badge className={`text-[11px] px-2 py-0.5 font-bold ${
+                                    b.status === 'completed' ? 'bg-blue-500 dark:bg-blue-600 text-white' : 
+                                    b.status === 'upcoming' ? 'bg-orange-500 dark:bg-orange-600 text-white' : 
+                                    b.status === 'ongoing' ? 'bg-green-500 dark:bg-green-600 text-white' :
+                                    'bg-gray-500 dark:bg-gray-600 text-white'
+                                  }`}>
+                                    {b.status?.toUpperCase()}
+                                  </Badge>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
                   </div>
                 )}
               </CardContent>
             </Card>
+
+            {/* Missing Bookings Section */}
+            {missingBookings.length > 0 && (
+              <Card className="border shadow-md dark:bg-card dark:border-border">
+                <CardHeader className="bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/20 dark:to-orange-950/20 dark:bg-card border-b dark:border-border/50 pb-2 pt-2.5">
+                  <CardTitle className="flex items-center gap-1.5 text-[13px] font-semibold dark:text-foreground">
+                    <FileText className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                    Missing Booking Records
+                    <Badge className="ml-auto bg-amber-600 dark:bg-amber-600 text-white text-[11px] px-2 py-0.5">
+                      {missingBookings.length} Records
+                    </Badge>
+                  </CardTitle>
+                  <p className="text-[11px] text-muted-foreground dark:text-muted-foreground mt-1">
+                    These are completed booking records collected separately and do not affect regular bookings
+                  </p>
+                </CardHeader>
+                <CardContent className="pt-2.5 pb-2.5 dark:bg-card">
+                  {isLoadingMissingBookings ? (
+                    <div className="text-center py-8">
+                      <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2 text-amber-600 dark:text-amber-400" />
+                      <p className="text-[13px] text-muted-foreground dark:text-muted-foreground">Loading missing booking records...</p>
+                    </div>
+                  ) : (
+                    <div className="border rounded-lg overflow-hidden shadow-sm dark:border-border">
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-[13px]">
+                          <thead className="bg-muted/50 dark:bg-muted/30 border-b dark:border-border">
+                            <tr>
+                              <th className="text-left p-2.5 font-semibold text-foreground dark:text-foreground min-w-[120px]">Ref ID</th>
+                              <th className="text-left p-2.5 font-semibold text-foreground dark:text-foreground min-w-[180px]">Booking Title</th>
+                              <th className="text-left p-2.5 font-semibold text-foreground dark:text-foreground min-w-[120px]">Date</th>
+                              <th className="text-left p-2.5 font-semibold text-foreground dark:text-foreground min-w-[120px]">Time</th>
+                              <th className="text-left p-2.5 font-semibold text-foreground dark:text-foreground min-w-[140px]">Place</th>
+                              <th className="text-center p-2.5 font-semibold text-foreground dark:text-foreground min-w-[100px]">Status</th>
+                            </tr>
+                          </thead>
+                        </table>
+                        <div className="max-h-[calc(7*60px)] overflow-y-auto table-scroll-container-vertical">
+                          <table className="w-full text-[13px]">
+                            <tbody>
+                              {missingBookings.map((b, idx) => (
+                                <tr 
+                                  key={b.id} 
+                                  className={`border-b border-border/30 dark:border-border hover:bg-muted/20 dark:hover:bg-muted/30 transition-colors ${
+                                    idx % 2 === 0 ? 'bg-transparent' : 'bg-muted/10 dark:bg-muted/10'
+                                  }`}
+                                >
+                                  <td className="p-2.5 min-w-[120px]">
+                                    {b.bookingRefId ? (
+                                      <Badge variant="outline" className="font-mono font-bold text-[11px] px-2 py-0.5 dark:border-amber-500 dark:text-amber-400 border-amber-500 text-amber-600">
+                                        {b.bookingRefId}
+                                      </Badge>
+                                    ) : (
+                                      <span className="text-muted-foreground dark:text-muted-foreground">—</span>
+                                    )}
+                                  </td>
+                                  <td className="p-2.5 min-w-[180px]">
+                                    <p className="font-bold dark:text-foreground">{b.title}</p>
+                                    {b.description && (
+                                      <p className="text-[11px] text-muted-foreground dark:text-muted-foreground mt-0.5 line-clamp-1">
+                                        {b.description}
+                                      </p>
+                                    )}
+                                  </td>
+                                  <td className="p-2.5 min-w-[120px]">
+                                    <div className="flex items-center gap-1.5">
+                                      <Calendar className="h-3 w-3 text-amber-600 dark:text-amber-400" />
+                                      <span className="font-medium dark:text-foreground">
+                                        {b.date ? new Date(b.date).toLocaleDateString('en-US', {
+                                          month: 'short',
+                                          day: 'numeric',
+                                          year: 'numeric'
+                                        }) : '—'}
+                                      </span>
+                                    </div>
+                                  </td>
+                                  <td className="p-2.5 min-w-[120px]">
+                                    <div className="flex items-center gap-1.5">
+                                      <Clock className="h-3 w-3 text-amber-600 dark:text-amber-400" />
+                                      <span className="font-mono font-medium dark:text-foreground">
+                                        {b.startTime?.substring(0,5) || '—'} - {b.endTime?.substring(0,5) || '—'}
+                                      </span>
+                                    </div>
+                                  </td>
+                                  <td className="p-2.5 min-w-[140px]">
+                                    <div className="flex items-center gap-1.5">
+                                      <MapPin className="h-3 w-3 text-amber-600 dark:text-amber-400" />
+                                      <span className="font-medium dark:text-foreground">{b.place || '—'}</span>
+                                    </div>
+                                  </td>
+                                  <td className="p-2.5 text-center min-w-[100px]">
+                                    <Badge className="text-[11px] px-2 py-0.5 font-bold bg-amber-500 dark:bg-amber-600 text-white">
+                                      MISSING RECORD
+                                    </Badge>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
         </Tabs>
       </div>

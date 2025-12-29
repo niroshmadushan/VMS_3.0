@@ -652,7 +652,12 @@ export function BookingManagement() {
         limit: 100
       })
       
-      const bookingsData: any[] = Array.isArray(bookingsResponse) ? bookingsResponse : []
+      let bookingsData: any[] = Array.isArray(bookingsResponse) ? bookingsResponse : []
+      
+      // Filter out missing bookings (is_missing_booking = 1 or true)
+      bookingsData = bookingsData.filter((b: any) => 
+        (b.is_missing_booking === 0 || b.is_missing_booking === false || b.is_missing_booking === null || b.is_missing_booking === undefined)
+      )
       
       // Fetch ALL cancellations once at the start (more reliable than filtering per booking)
       console.log('\n  🔍 ========== FETCHING ALL CANCELLATIONS ==========')
@@ -1978,8 +1983,24 @@ export function BookingManagement() {
 
       await placeManagementAPI.insertRecord('booking_cancellations', cancellationData)
       
-      // Refresh bookings to get the cancellation reason
-      await fetchBookings()
+      // Update booking in state instead of reloading all data
+      setBookings(prevBookings => prevBookings.map(b => {
+        if (b.id === bookingToCancel) {
+          return {
+            ...b,
+            status: 'cancelled',
+            cancellation: {
+              id: cancellationData.id,
+              booking_id: cancellationData.booking_id,
+              cancelled_by: cancellationData.cancelled_by,
+              cancellation_reason: cancellationData.cancellation_reason,
+              cancellation_type: cancellationData.cancellation_type,
+              cancelled_at: cancellationData.cancelled_at
+            }
+          }
+        }
+        return b
+      }))
       
       toast.success('Booking cancelled successfully', {
         position: 'top-center',
@@ -3090,7 +3111,7 @@ export function BookingManagement() {
   }, [])
 
   return (
-    <div className="space-y-4 px-2 sm:px-4 max-w-[98vw] mx-auto">
+    <div className="space-y-3 px-2 sm:px-4 max-w-[98vw] mx-auto dark:bg-background">
       {/* Compact Header with Filters and Actions in One Line */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4">
         {/* Search */}
@@ -3133,15 +3154,35 @@ export function BookingManagement() {
           </SelectContent>
         </Select>
 
+        {/* Date Range Filter */}
+        <div className="flex items-center gap-2">
+          <Input
+            type="date"
+            placeholder="From Date"
+            value={filterDateFrom}
+            onChange={(e) => setFilterDateFrom(e.target.value)}
+            className="w-full sm:w-[140px]"
+          />
+          <span className="text-muted-foreground hidden sm:inline">to</span>
+          <Input
+            type="date"
+            placeholder="To Date"
+            value={filterDateTo}
+            onChange={(e) => setFilterDateTo(e.target.value)}
+            className="w-full sm:w-[140px]"
+            min={filterDateFrom || undefined}
+          />
+        </div>
+
         {/* New Booking Button */}
         <Button 
-          onClick={() => window.location.href = '/admin/bookings/new'} 
+            onClick={() => window.location.href = '/admin/bookings/new'}
             className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-lg w-full sm:w-auto whitespace-nowrap"
         >
-              <Plus className="h-4 w-4" />
+          <Plus className="h-4 w-4" />
             <span className="hidden sm:inline">New Booking</span>
             <span className="sm:hidden">New</span>
-            </Button>
+        </Button>
         </div>
       </div>
 
@@ -3799,14 +3840,14 @@ export function BookingManagement() {
         </TabsList>
 
         <TabsContent value="list">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+          <Card className="dark:bg-card dark:border-border shadow-md">
+            <CardHeader className="dark:border-border/50">
+              <CardTitle className="flex items-center gap-2 dark:text-foreground">
                 <Calendar className="h-5 w-5" />
                 All Bookings ({filteredBookings.length})
               </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="dark:bg-card">
               {isLoadingBookings ? (
                 <div className="flex items-center justify-center py-12">
                   <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -3828,175 +3869,182 @@ export function BookingManagement() {
                   </p>
                 </div>
               ) : (
-              <div className="border rounded-lg overflow-hidden w-full">
-                <div className="overflow-x-auto overflow-y-auto" style={{ maxHeight: 'calc(50vh)', maxWidth: '98vw' }}>
-                  <div className="inline-block min-w-full align-middle">
-                    <Table className="w-full" style={{ minWidth: 'max-content' }}>
-                      <TableHeader className="sticky top-0 bg-white z-10 shadow-sm">
+              <div className="border rounded-lg overflow-hidden dark:border-border">
+                <div className="overflow-x-auto">
+                  <div className="max-h-[calc(7*60px)] overflow-y-auto table-scroll-container-vertical">
+                    <Table>
+                      <TableHeader className="sticky top-0 z-10 bg-background dark:bg-card">
                         <TableRow>
-                          <TableHead className="whitespace-nowrap text-xs">Ref ID</TableHead>
-                          <TableHead className="whitespace-nowrap text-xs">Title</TableHead>
-                          <TableHead className="whitespace-nowrap text-xs">Date & Time</TableHead>
-                          <TableHead className="whitespace-nowrap text-xs">Place</TableHead>
-                          <TableHead className="whitespace-nowrap text-xs">Responsible</TableHead>
-                          <TableHead className="whitespace-nowrap text-xs">Participants</TableHead>
-                          <TableHead className="whitespace-nowrap text-xs">Status</TableHead>
-                          <TableHead className="whitespace-nowrap text-xs sticky right-0 bg-white z-10 shadow-[2px_0_5px_rgba(0,0,0,0.1)]">Actions</TableHead>
+                          <TableHead className="w-[100px] text-[12px]">Ref ID</TableHead>
+                          <TableHead className="min-w-[200px] text-[12px]">Title</TableHead>
+                          <TableHead className="w-[150px] text-[12px]">Date & Time</TableHead>
+                          <TableHead className="w-[120px] text-[12px]">Place</TableHead>
+                          <TableHead className="min-w-[150px] text-[12px]">Responsible</TableHead>
+                          <TableHead className="w-[120px] text-[12px]">Participants</TableHead>
+                          <TableHead className="w-[100px] text-[12px]">Status</TableHead>
+                          <TableHead className="w-[180px] text-[12px]">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {filteredBookings.map((booking) => (
-                          <TableRow key={booking.id}>
-                            <TableCell className="text-xs whitespace-nowrap">
-                              {booking.bookingRefId ? (
-                                <Badge variant="secondary" className="font-mono font-bold text-xs">
-                                  {booking.bookingRefId}
-                                </Badge>
-                              ) : (
-                                <span className="text-xs text-muted-foreground">—</span>
-                              )}
-                            </TableCell>
-                            <TableCell className="text-xs">
-                              <div>
-                                <div className="flex items-center gap-1 flex-wrap">
-                                  <p className="font-medium text-xs truncate max-w-[150px]">{booking.title}</p>
-                                  {booking.refreshments?.required && (
-                                    <Badge variant="outline" className="text-orange-600 border-orange-600 text-[10px] px-1 py-0">
-                                      🍽️
-                                    </Badge>
-                                  )}
-                                </div>
-                                {booking.description && (
-                                  <p className="text-[10px] text-muted-foreground truncate max-w-[150px]">{booking.description}</p>
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-xs whitespace-nowrap">
-                              <div className="flex items-center gap-1">
-                                <Calendar className="h-3 w-3 text-muted-foreground" />
-                                <div>
-                                  <p className="text-xs font-medium">{formatDate(booking.date)}</p>
-                                  <p className="text-[10px] text-muted-foreground">
-                                    {formatTime(booking.startTime)} - {formatTime(booking.endTime)}
-                                  </p>
-                                </div>
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-xs whitespace-nowrap">
-                              <div className="flex items-center gap-1">
-                                <MapPin className="h-3 w-3 text-muted-foreground" />
-                                <span className="truncate max-w-[120px]">{booking.place}</span>
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-xs">
-                              {booking.responsiblePerson ? (
-                                <div className="flex items-center gap-1">
-                                  <Avatar className="h-5 w-5">
-                                    <AvatarFallback className="text-[10px]">
-                                      {booking.responsiblePerson.name
-                                        .split(" ")
-                                        .map((n) => n[0])
-                                        .join("")}
-                                    </AvatarFallback>
-                                  </Avatar>
-                                  <div>
-                                    <p className="text-xs font-medium truncate max-w-[100px]">{booking.responsiblePerson.name}</p>
-                                    <p className="text-[10px] text-muted-foreground truncate max-w-[100px]">{booking.responsiblePerson.department}</p>
-                                  </div>
-                                </div>
-                              ) : (
-                                <span className="text-muted-foreground text-xs">Not assigned</span>
-                              )}
-                            </TableCell>
-                            <TableCell className="text-xs whitespace-nowrap">
-                              <div className="flex items-center gap-1">
-                                <Users className="h-3 w-3 text-muted-foreground" />
-                                <span className="text-xs">
-                                  {booking.totalParticipantsCount ?? (booking.selectedEmployees.length + booking.externalParticipants.length)}
-                                </span>
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-xs whitespace-nowrap">
-                              <Badge {...getStatusBadgeProps(booking.status)} className="text-xs">{booking.status}</Badge>
-                            </TableCell>
-                            <TableCell className="sticky right-0 bg-white z-10 shadow-[2px_0_5px_rgba(0,0,0,0.1)] whitespace-nowrap">
-                              <div className="flex items-center gap-1 flex-wrap">
-                                {/* Only show Mail button if booking is NOT cancelled or completed */}
-                                {booking.status !== "cancelled" && booking.status !== "completed" && (
+                        <TableRow key={booking.id} onClick={(e) => e.stopPropagation()}>
+                      <TableCell>
+                        {booking.bookingRefId ? (
+                          <Badge variant="secondary" className="font-mono font-bold text-sm">
+                            {booking.bookingRefId}
+                          </Badge>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium">{booking.title}</p>
+                            {booking.refreshments?.required && (
+                              <Badge variant="outline" className="text-orange-600 border-orange-600">
+                                🍽️ Refreshments
+                              </Badge>
+                            )}
+                          </div>
+                          {booking.description && (
+                            <p className="text-sm text-muted-foreground">{booking.description}</p>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Calendar className="h-4 w-4 text-muted-foreground" />
+                          <div>
+                            <p className="text-sm font-medium">{formatDate(booking.date)}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {formatTime(booking.startTime)} - {formatTime(booking.endTime)}
+                            </p>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <MapPin className="h-4 w-4 text-muted-foreground" />
+                          {booking.place}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {booking.responsiblePerson ? (
+                          <div className="flex items-center gap-2">
+                            <Avatar className="h-6 w-6">
+                              <AvatarFallback className="text-xs">
+                                {booking.responsiblePerson.name
+                                  .split(" ")
+                                  .map((n) => n[0])
+                                  .join("")}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <p className="text-sm font-medium">{booking.responsiblePerson.name}</p>
+                              <p className="text-xs text-muted-foreground">{booking.responsiblePerson.department}</p>
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">Not assigned</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Users className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-sm">
+                            {booking.totalParticipantsCount ?? (booking.selectedEmployees.length + booking.externalParticipants.length)} participants
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge {...getStatusBadgeProps(booking.status)}>{booking.status}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {(() => {
+                            // Check booking status (handle all case variations)
+                            const bookingStatus = String(booking.status || '').toLowerCase().trim()
+                            const isCancelled = bookingStatus === 'cancelled'
+                            const isCompleted = booking.status === "completed"
+                            const isCancelledOrCompleted = isCancelled || isCompleted
+
+                            return (
+                              <>
+                                {/* Mail Button - Only show if NOT cancelled or completed */}
+                                {!isCancelledOrCompleted && (
                                   <Button 
                                     variant="outline" 
                                     size="sm" 
-                                    onClick={() => handleSendEmailClick(booking)}
-                                    className="text-blue-600 border-blue-600 hover:bg-blue-50 text-xs h-7 px-2"
+                                    onClick={(e) => {
+                                      e.preventDefault()
+                                      e.stopPropagation()
+                                      handleSendEmailClick(booking)
+                                    }}
+                                    className="text-blue-600 border-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:border-blue-400 dark:hover:bg-blue-950/30 h-7 px-2"
                                     title="Send email to participants"
                                   >
-                                    <Mail className="h-3 w-3" />
+                                    <Mail className="h-3.5 w-3.5" />
                                   </Button>
                                 )}
                                 
-                                <Button 
-                                  variant="outline" 
-                                  size="sm" 
-                                  onClick={() => handleEdit(booking)}
-                                  disabled={booking.status === "completed" || booking.status === "cancelled"}
-                                  className="text-xs h-7 px-2"
-                                  title={
-                                    booking.status === "completed" ? "Cannot edit completed bookings" :
-                                    booking.status === "cancelled" ? "Cannot edit cancelled bookings" :
-                                    "Edit booking"
-                                  }
-                                >
-                                  <Edit className="h-3 w-3" />
-                                </Button>
+                                {/* Edit Button - Hide completely if cancelled or completed */}
+                                {!isCancelled && !isCompleted && (
+                                  <Button 
+                                    variant="outline" 
+                                    size="sm" 
+                                    onClick={(e) => {
+                                      e.preventDefault()
+                                      e.stopPropagation()
+                                      handleEdit(booking)
+                                    }}
+                                    className="h-7 px-2 dark:hover:bg-muted"
+                                    title="Edit booking"
+                                  >
+                                    <Edit className="h-3.5 w-3.5" />
+                                  </Button>
+                                )}
                                 
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => handleCancel(booking.id)}
-                                  disabled={booking.status === "completed" || booking.status === "cancelled"}
-                                  className="text-red-600 hover:text-red-700 hover:border-red-600 disabled:opacity-50 disabled:cursor-not-allowed text-xs h-7 px-2"
-                                  title={
-                                    booking.status === "completed" || booking.status === "cancelled" 
-                                      ? "Cannot cancel this booking" 
-                                      : "Cancel booking"
-                                  }
-                                >
-                                  <Trash2 className="h-3 w-3" />
-                                </Button>
+                                {/* Delete/Cancel Button - Only show if NOT cancelled and NOT completed */}
+                                {!isCancelled && !isCompleted && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={(e) => {
+                                      e.preventDefault()
+                                      e.stopPropagation()
+                                      handleCancel(booking.id)
+                                    }}
+                                    className="text-red-600 hover:text-red-700 hover:border-red-600 dark:text-red-400 dark:hover:text-red-300 dark:border-red-400 dark:hover:border-red-300 dark:hover:bg-red-950/30 h-7 px-2"
+                                    title="Cancel booking"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </Button>
+                                )}
 
-                                {/* Always show cancellation reason button for ALL cancelled bookings */}
-                                {(() => {
-                                  // Check if booking is cancelled (handle all case variations)
-                                  const bookingStatus = String(booking.status || '').toLowerCase().trim()
-                                  const isCancelled = bookingStatus === 'cancelled'
-                                  
-                                  if (!isCancelled) return null
-                                  
-                                  // Get cancellation reason with fallbacks
-                                  const reason = booking.cancellation?.cancellation_reason || 
-                                               booking.cancellation?.['cancellation_reason'] ||
-                                               booking.cancellation?.cancellationReason ||
-                                               booking.cancellation?.reason ||
-                                               ''
-                                  
-                                  const hasReason = reason && String(reason).trim().length > 0
-                                  
-                                  return (
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => handleShowCancellationReason(booking)}
-                                        className="text-blue-600 hover:text-blue-700 hover:border-blue-600 text-xs h-7 px-2"
-                                        title={hasReason ? `View cancellation reason: ${String(reason).substring(0, 50)}...` : "View cancellation details"}
-                                      >
-                                        <Info className="h-3 w-3" />
-                                      </Button>
-                                  )
-                                })()}
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))}
+                                {/* Info Button - Show ONLY for cancelled bookings to view cancellation reason */}
+                                {isCancelled && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={(e) => {
+                                      e.preventDefault()
+                                      e.stopPropagation()
+                                      handleShowCancellationReason(booking)
+                                    }}
+                                    className="text-blue-600 hover:text-blue-700 hover:border-blue-600 dark:text-blue-400 dark:hover:text-blue-300 dark:border-blue-400 dark:hover:border-blue-300 dark:hover:bg-blue-950/30 h-7 px-2"
+                                    title="View cancellation details"
+                                  >
+                                    <Info className="h-3.5 w-3.5" />
+                                  </Button>
+                                )}
+                              </>
+                            )
+                          })()}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                    ))}
                       </TableBody>
                     </Table>
                   </div>

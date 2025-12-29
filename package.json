@@ -6,7 +6,10 @@
     "build": "next build",
     "dev": "next dev",
     "lint": "next lint",
-    "start": "next start"
+    "start": "next start",
+    "merge:production": "node scripts/merge-to-production.js",
+    "build:production": "node scripts/build-production.js",
+    "workflow": "node scripts/dev-workflow.js"
   },
   "dependencies": {
     "@emotion/is-prop-valid": "latest",

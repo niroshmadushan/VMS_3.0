@@ -11,8 +11,9 @@ import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { 
-  Users, Search, Plus, Building2, Mail, Phone, 
-  Calendar, ShieldAlert, CheckCircle, TrendingUp, Activity
+  Users, Search, Plus, Edit, Trash2, AlertTriangle, Building2, Mail, Phone, 
+  Calendar, ShieldAlert, CheckCircle, XCircle, TrendingUp, Eye, Activity,
+  BarChart3, Loader2
 } from "lucide-react"
 import { placeManagementAPI } from "@/lib/place-management-api"
 import toast from "react-hot-toast"
@@ -45,6 +46,10 @@ export function StaffExternalMembersView() {
   const [filterStatus, setFilterStatus] = useState<string>("all")
   const [isLoading, setIsLoading] = useState(true)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [isBlacklistDialogOpen, setIsBlacklistDialogOpen] = useState(false)
+  const [blacklistMember, setBlacklistMember] = useState<ExternalMember | null>(null)
+  const [blacklistReason, setBlacklistReason] = useState("")
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const [formData, setFormData] = useState({
     full_name: "", email: "", phone: "", company_name: "", designation: "",
@@ -96,37 +101,185 @@ export function StaffExternalMembersView() {
     setIsDialogOpen(true)
   }
 
-  const checkDuplicate = async (email: string, phone: string): Promise<boolean> => {
-    const duplicates = members.filter(m => m.email === email || m.phone === phone)
+  const checkDuplicate = async (email: string, phone: string, currentId?: string): Promise<boolean> => {
+    // Check in loaded members first
+    const duplicates = members.filter(m => {
+      if (currentId && m.id === currentId) return false
+      return (m.email.toLowerCase().trim() === email.toLowerCase().trim() || 
+              m.phone.trim() === phone.trim())
+    })
+    
     if (duplicates.length > 0) {
       const dup = duplicates[0]
-      toast.error(dup.email === email ? `Email exists: ${dup.full_name}` : `Phone exists: ${dup.full_name}`)
+      toast.error(dup.email.toLowerCase().trim() === email.toLowerCase().trim() 
+        ? `Email already exists: ${dup.full_name}` 
+        : `Phone number already exists: ${dup.full_name}`, {
+        position: 'top-center',
+        duration: 4000
+      })
       return true
     }
+    
+    // Also check against database for more accurate validation
+    try {
+      const response = await placeManagementAPI.getTableData('external_members', {
+        is_deleted: 'false'
+      })
+      const allMembers = Array.isArray(response) ? response : response.data || []
+      
+      const dbDuplicate = allMembers.find((m: any) => {
+        return (m.email?.toLowerCase().trim() === email.toLowerCase().trim() || 
+                m.phone?.trim() === phone.trim())
+      })
+      
+      if (dbDuplicate) {
+        toast.error(dbDuplicate.email?.toLowerCase().trim() === email.toLowerCase().trim()
+          ? `Email already exists in database: ${dbDuplicate.full_name}`
+          : `Phone number already exists in database: ${dbDuplicate.full_name}`, {
+          position: 'top-center',
+          duration: 4000
+        })
+        return true
+      }
+    } catch (error) {
+      console.error('Error checking duplicates in database:', error)
+      // Continue with local check if database check fails
+    }
+    
+    // Check company + email combination if company is provided
+    if (formData.company_name && formData.company_name.trim()) {
+      const companyDup = members.find(m => 
+        m.company_name?.toLowerCase().trim() === formData.company_name.toLowerCase().trim() && 
+        m.email?.toLowerCase().trim() === email.toLowerCase().trim()
+      )
+      if (companyDup) {
+        toast.error(`Email already exists for company ${formData.company_name}: ${companyDup.full_name}`, {
+          position: 'top-center',
+          duration: 4000
+        })
+        return true
+      }
+    }
+    
     return false
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!formData.full_name || !formData.email || !formData.phone || !formData.reference_value) {
-      toast.error('Fill required fields')
+    
+    // Validate required fields
+    if (!formData.full_name || !formData.full_name.trim()) {
+      toast.error('Full name is required', { position: 'top-center' })
       return
     }
-    const isDup = await checkDuplicate(formData.email, formData.phone)
-    if (isDup) return
-
+    if (!formData.email || !formData.email.trim()) {
+      toast.error('Email is required', { position: 'top-center' })
+      return
+    }
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(formData.email.trim())) {
+      toast.error('Please enter a valid email address', { position: 'top-center' })
+      return
+    }
+    if (!formData.phone || !formData.phone.trim()) {
+      toast.error('Phone number is required', { position: 'top-center' })
+      return
+    }
+    if (!formData.reference_value || !formData.reference_value.trim()) {
+      toast.error('Reference value is required', { position: 'top-center' })
+      return
+    }
+    
+    setIsSubmitting(true)
+    
     try {
-      const data = { ...formData, is_active: true, is_deleted: false, visit_count: 0 }
+      // Check for duplicates
+      const isDup = await checkDuplicate(formData.email.trim(), formData.phone.trim())
+      if (isDup) {
+        setIsSubmitting(false)
+        return
+      }
+
+      // Prepare data with trimmed values
+      const data = {
+        full_name: formData.full_name.trim(),
+        email: formData.email.trim().toLowerCase(),
+        phone: formData.phone.trim(),
+        company_name: formData.company_name?.trim() || null,
+        designation: formData.designation?.trim() || null,
+        reference_type: formData.reference_type,
+        reference_value: formData.reference_value.trim(),
+        address: formData.address?.trim() || null,
+        city: formData.city?.trim() || null,
+        country: formData.country?.trim() || 'Sri Lanka',
+        notes: formData.notes?.trim() || null,
+        is_active: true,
+        is_deleted: false,
+        visit_count: 0,
+        is_blacklisted: false,
+        blacklist_reason: null
+      }
+      
+      // Create new member (staff can only add, not edit)
+      const newId = crypto.randomUUID()
       await placeManagementAPI.insertRecord('external_members', { 
-        id: crypto.randomUUID(), 
+        id: newId, 
         ...data, 
         created_at: new Date().toISOString() 
       })
-      toast.success('Member added successfully')
+      toast.success(`Member "${data.full_name}" added successfully!`, {
+        position: 'top-center',
+        duration: 3000
+      })
+      
       setIsDialogOpen(false)
+      // Reset form
+      setFormData({
+        full_name: "", email: "", phone: "", company_name: "", designation: "",
+        reference_type: "NIC", reference_value: "", address: "", city: "",
+        country: "Sri Lanka", notes: ""
+      })
+      // Reload members
+      await loadMembers()
+    } catch (error: any) {
+      console.error('Error saving external member:', error)
+      toast.error(error.message || 'Failed to save member. Please try again.', {
+        position: 'top-center',
+        duration: 4000
+      })
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleToggleBlacklist = (member: ExternalMember) => {
+    setBlacklistMember(member)
+    setBlacklistReason(member.blacklist_reason || "")
+    setIsBlacklistDialogOpen(true)
+  }
+
+  const confirmBlacklist = async () => {
+    if (!blacklistMember) return
+
+    const isBlacklisting = !blacklistMember.is_blacklisted
+
+    if (isBlacklisting && !blacklistReason.trim()) {
+      toast.error('Please provide a blacklist reason')
+      return
+    }
+
+    try {
+      await placeManagementAPI.updateRecord('external_members', { id: blacklistMember.id }, {
+        is_blacklisted: isBlacklisting,
+        blacklist_reason: isBlacklisting ? blacklistReason : null
+      })
+      toast.success(isBlacklisting ? 'Member blacklisted' : 'Member unblocked')
+      setIsBlacklistDialogOpen(false)
+      setBlacklistReason("")
       loadMembers()
     } catch (error: any) {
-      toast.error(error.message || 'Failed to add member')
+      toast.error('Failed')
     }
   }
 
@@ -142,266 +295,567 @@ export function StaffExternalMembersView() {
   const companiesCount = new Set(members.filter(m => m.company_name).map(m => m.company_name)).size
 
   return (
-    <>
-    <Tabs defaultValue="analytics" className="space-y-6">
-      <TabsList className="grid w-full grid-cols-2 max-w-md">
-        <TabsTrigger value="analytics">📊 Analytics</TabsTrigger>
-        <TabsTrigger value="members">👥 Members</TabsTrigger>
-      </TabsList>
-
-      <TabsContent value="analytics" className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card className="border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-blue-100">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-blue-700">Total Members</p>
-                  <p className="text-3xl font-bold text-blue-900 mt-1">{members.length}</p>
-                  <p className="text-xs text-blue-600 mt-1">All records</p>
-                </div>
-                <div className="p-3 bg-blue-500 rounded-lg">
-                  <Users className="h-6 w-6 text-white" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-2 border-green-200 bg-gradient-to-br from-green-50 to-green-100">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-green-700">Active</p>
-                  <p className="text-3xl font-bold text-green-900 mt-1">{activeCount}</p>
-                  <p className="text-xs text-green-600 mt-1">{((activeCount/members.length)*100).toFixed(0)}% of total</p>
-                </div>
-                <div className="p-3 bg-green-500 rounded-lg">
-                  <CheckCircle className="h-6 w-6 text-white" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-2 border-purple-200 bg-gradient-to-br from-purple-50 to-purple-100">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-purple-700">Total Visits</p>
-                  <p className="text-3xl font-bold text-purple-900 mt-1">{totalVisits}</p>
-                  <p className="text-xs text-purple-600 mt-1">Avg: {avgVisits} per member</p>
-                </div>
-                <div className="p-3 bg-purple-500 rounded-lg">
-                  <Activity className="h-6 w-6 text-white" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-2 border-orange-200 bg-gradient-to-br from-orange-50 to-orange-100">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-orange-700">Companies</p>
-                  <p className="text-3xl font-bold text-orange-900 mt-1">{companiesCount}</p>
-                  <p className="text-xs text-orange-600 mt-1">Organizations</p>
-                </div>
-                <div className="p-3 bg-orange-500 rounded-lg">
-                  <Building2 className="h-6 w-6 text-white" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+    <div className="space-y-3 px-2 sm:px-4 max-w-[98vw] mx-auto dark:bg-background">
+      <Tabs defaultValue="members" className="space-y-3">
+        {/* Premium Header: Search, Filters, Analytics Tab, Members Tab, Add Button in One Line */}
+        <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-2 lg:gap-2 pb-3 border-b border-border/50 dark:border-border">
+        {/* Search Bar */}
+        <div className="flex-1 min-w-0 relative">
+          <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground dark:text-muted-foreground z-10" />
+          <Input
+            placeholder="Search by name, email, phone, or company..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-9 h-9 text-[13px] border-border/50 dark:border-border focus:border-primary/50 dark:focus:border-primary/30 shadow-sm dark:bg-card dark:text-foreground"
+          />
         </div>
 
-        <Card className="border-2 shadow-lg">
-          <CardHeader className="bg-gradient-to-r from-purple-50 to-pink-50">
-            <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5 text-purple-600" />
+        {/* Status Filter */}
+        <Select value={filterStatus} onValueChange={setFilterStatus}>
+          <SelectTrigger className="w-full lg:w-[140px] h-9 border-border/50 dark:border-border shadow-sm text-[13px] dark:bg-card dark:text-foreground">
+            <SelectValue placeholder="All Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Status</SelectItem>
+            <SelectItem value="active">Active Only</SelectItem>
+            <SelectItem value="blacklisted">Blacklisted</SelectItem>
+            <SelectItem value="inactive">Inactive</SelectItem>
+          </SelectContent>
+        </Select>
+
+        {/* Tabs - Analytics and Members */}
+        <TabsList className="inline-flex h-9 items-center justify-center rounded-lg bg-muted/50 dark:bg-muted p-1 border border-border/50 dark:border-border shadow-sm">
+          <TabsTrigger 
+            value="analytics" 
+            className="data-[state=active]:bg-background dark:data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:text-primary dark:data-[state=active]:text-primary px-3 text-[13px]"
+          >
+            <BarChart3 className="h-3.5 w-3.5 mr-1.5" />
+            <span className="hidden sm:inline">Analytics</span>
+            <span className="sm:hidden">Stats</span>
+          </TabsTrigger>
+          <TabsTrigger 
+            value="members" 
+            className="data-[state=active]:bg-background dark:data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:text-primary dark:data-[state=active]:text-primary px-3 text-[13px]"
+          >
+            <Users className="h-3.5 w-3.5 mr-1.5" />
+            Members
+          </TabsTrigger>
+        </TabsList>
+
+        {/* Add Member Button */}
+        <Button 
+          onClick={handleOpenDialog} 
+          className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 dark:from-blue-500 dark:to-purple-500 dark:hover:from-blue-600 dark:hover:to-purple-600 shadow-md hover:shadow-lg transition-all h-9 whitespace-nowrap font-semibold text-[13px]"
+        >
+          <Plus className="h-3.5 w-3.5 mr-1.5" />
+          <span className="hidden sm:inline">Add Member</span>
+          <span className="sm:hidden">Add</span>
+        </Button>
+        </div>
+
+        <TabsContent value="analytics" className="space-y-3">
+        {/* Compact Statistics Table */}
+        <Card className="border border-border/50 dark:border-border shadow-sm dark:bg-card">
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full text-[13px]">
+                <tbody>
+                  <tr className="hover:bg-transparent border-b dark:border-border">
+                    <td className="py-2.5 px-4 font-medium dark:text-foreground">
+                      <div className="flex items-center gap-2">
+                        <Users className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+                        <span>Total Members</span>
+                      </div>
+                    </td>
+                    <td className="py-2.5 px-4 text-right">
+                      <span className="text-lg font-bold text-blue-600 dark:text-blue-400">{members.length}</span>
+                    </td>
+                    <td className="py-2.5 px-4 font-medium dark:text-foreground">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
+                        <span>Active</span>
+                      </div>
+                    </td>
+                    <td className="py-2.5 px-4 text-right">
+                      <span className="text-lg font-bold text-green-600 dark:text-green-400">{activeCount}</span>
+                    </td>
+                    <td className="py-2.5 px-4 font-medium dark:text-foreground">
+                      <div className="flex items-center gap-2">
+                        <Activity className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
+                        <span>Total Visits</span>
+                      </div>
+                    </td>
+                    <td className="py-2.5 px-4 text-right">
+                      <span className="text-lg font-bold text-purple-600 dark:text-purple-400">{totalVisits}</span>
+                    </td>
+                    <td className="py-2.5 px-4 font-medium dark:text-foreground">
+                      <div className="flex items-center gap-2">
+                        <Building2 className="h-3.5 w-3.5 text-orange-600 dark:text-orange-400" />
+                        <span>Companies</span>
+                      </div>
+                    </td>
+                    <td className="py-2.5 px-4 text-right">
+                      <span className="text-lg font-bold text-orange-600 dark:text-orange-400">{companiesCount}</span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border border-border/50 dark:border-border shadow-sm dark:bg-card">
+          <CardHeader className="pb-2.5 border-b border-border/50 dark:border-border">
+            <CardTitle className="flex items-center gap-2 text-[13px] font-semibold dark:text-foreground">
+              <TrendingUp className="h-4 w-4 text-purple-600 dark:text-purple-400" />
               Top 5 Frequent Visitors
             </CardTitle>
           </CardHeader>
-          <CardContent className="pt-6">
-            <div className="space-y-3">
-              {topVisitors.map((member, idx) => (
-                <div key={member.id} className="flex items-center gap-4 p-3 bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-lg">
-                  <div className="flex items-center justify-center w-10 h-10 bg-purple-500 text-white font-bold rounded-full">
-                    #{idx + 1}
+          <CardContent className="pt-3 dark:bg-card">
+            <div className="space-y-2">
+              {topVisitors.length > 0 ? (
+                topVisitors.map((member, idx) => (
+                  <div key={member.id} className="flex items-center gap-3 p-2.5 bg-muted/20 dark:bg-muted/30 border border-border/30 dark:border-border rounded-lg hover:bg-muted/30 dark:hover:bg-muted/40 transition-colors">
+                    <div className="flex items-center justify-center w-8 h-8 bg-purple-600 dark:bg-purple-600 text-white font-bold rounded-lg flex-shrink-0 text-[11px]">
+                      #{idx + 1}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-[13px] text-foreground dark:text-foreground">{member.full_name}</p>
+                      <p className="text-[11px] text-muted-foreground dark:text-muted-foreground truncate mt-0.5">{member.email} • {member.company_name || 'No company'}</p>
+                    </div>
+                    <Badge className="bg-purple-600 dark:bg-purple-600 text-white px-2.5 py-1 flex-shrink-0 text-[11px] border-0">
+                      <Calendar className="h-3 w-3 mr-1" />
+                      {member.visit_count} visits
+                    </Badge>
                   </div>
-                  <div className="flex-1">
-                    <p className="font-bold text-base">{member.full_name}</p>
-                    <p className="text-sm text-muted-foreground">{member.email} • {member.company_name || 'No company'}</p>
-                  </div>
-                  <Badge className="bg-purple-600 text-white text-lg px-4 py-1">
-                    <Calendar className="h-4 w-4 mr-1" />
-                    {member.visit_count} visits
-                  </Badge>
+                ))
+              ) : (
+                <div className="text-center py-6 text-muted-foreground dark:text-muted-foreground">
+                  <Users className="h-10 w-10 mx-auto mb-2 opacity-30" />
+                  <p className="text-[13px]">No visitor data available</p>
                 </div>
-              ))}
+              )}
             </div>
           </CardContent>
         </Card>
 
         {blacklistedCount > 0 && (
-          <Card className="border-2 border-red-300 bg-red-50">
-            <CardContent className="pt-6">
+          <Card className="border border-red-300 dark:border-red-600 bg-red-50/50 dark:bg-red-950/20 shadow-sm">
+            <CardContent className="p-3">
               <div className="flex items-center gap-3">
-                <ShieldAlert className="h-8 w-8 text-red-600" />
+                <div className="p-2 bg-red-600 dark:bg-red-600 rounded-lg">
+                  <ShieldAlert className="h-4 w-4 text-white" />
+                </div>
                 <div>
-                  <p className="font-bold text-red-900">⚠️ {blacklistedCount} Blacklisted Member{blacklistedCount > 1 ? 's' : ''}</p>
-                  <p className="text-sm text-red-700">These members are blocked (admin only can unblock)</p>
+                  <p className="font-semibold text-red-900 dark:text-red-400 text-[13px]">
+                    {blacklistedCount} Blacklisted Member{blacklistedCount > 1 ? 's' : ''}
+                  </p>
+                  <p className="text-[11px] text-red-700 dark:text-red-400 mt-0.5">Review blacklisted members in the Members tab</p>
                 </div>
               </div>
             </CardContent>
           </Card>
         )}
-      </TabsContent>
+        </TabsContent>
 
-      <TabsContent value="members" className="space-y-6">
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex flex-col md:flex-row gap-4">
-              <div className="flex-1 relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input placeholder="Search..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10" />
-              </div>
-              <Select value={filterStatus} onValueChange={setFilterStatus}>
-                <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Members</SelectItem>
-                  <SelectItem value="active">Active Only</SelectItem>
-                  <SelectItem value="blacklisted">Blacklisted</SelectItem>
-                  <SelectItem value="inactive">Inactive</SelectItem>
-                </SelectContent>
-              </Select>
-              <Button onClick={handleOpenDialog} className="bg-gradient-to-r from-blue-600 to-purple-600">
-                <Plus className="h-4 w-4 mr-2" />Add Member
-              </Button>
+        <TabsContent value="members" className="space-y-3">
+        {/* Compact Statistics Table */}
+        <Card className="border border-border/50 dark:border-border shadow-sm dark:bg-card">
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full text-[13px]">
+                <tbody>
+                  <tr className="hover:bg-transparent border-b dark:border-border">
+                    <td className="py-2.5 px-4 font-medium dark:text-foreground">
+                      <div className="flex items-center gap-2">
+                        <Users className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+                        <span>Total Members</span>
+                      </div>
+                    </td>
+                    <td className="py-2.5 px-4 text-right">
+                      <span className="text-lg font-bold text-blue-600 dark:text-blue-400">{members.length}</span>
+                    </td>
+                    <td className="py-2.5 px-4 font-medium dark:text-foreground">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
+                        <span>Active</span>
+                      </div>
+                    </td>
+                    <td className="py-2.5 px-4 text-right">
+                      <span className="text-lg font-bold text-green-600 dark:text-green-400">{activeCount}</span>
+                    </td>
+                    <td className="py-2.5 px-4 font-medium dark:text-foreground">
+                      <div className="flex items-center gap-2">
+                        <Activity className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
+                        <span>Total Visits</span>
+                      </div>
+                    </td>
+                    <td className="py-2.5 px-4 text-right">
+                      <span className="text-lg font-bold text-purple-600 dark:text-purple-400">{totalVisits}</span>
+                    </td>
+                    <td className="py-2.5 px-4 font-medium dark:text-foreground">
+                      <div className="flex items-center gap-2">
+                        <ShieldAlert className="h-3.5 w-3.5 text-red-600 dark:text-red-400" />
+                        <span>Blacklisted</span>
+                      </div>
+                    </td>
+                    <td className="py-2.5 px-4 text-right">
+                      <span className="text-lg font-bold text-red-600 dark:text-red-400">{blacklistedCount}</span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border-2 shadow-lg">
-          <CardHeader>
-            <CardTitle>Members Directory ({filteredMembers.length})</CardTitle>
+        <Card className="border border-border/50 dark:border-border shadow-sm dark:bg-card">
+          <CardHeader className="pb-2.5 border-b border-border/50 dark:border-border">
+            <CardTitle className="flex items-center gap-2 text-[13px] font-semibold dark:text-foreground">
+              <Users className="h-4 w-4" />
+              Members Directory ({filteredMembers.length})
+            </CardTitle>
           </CardHeader>
-          <CardContent>
-            {isLoading ? <div className="text-center py-8">Loading...</div> : 
-             filteredMembers.length === 0 ? <div className="text-center py-8">No members</div> :
-             <div className="border rounded-lg overflow-hidden">
-              <div className="relative overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-gradient-to-r from-gray-100 to-gray-200">
-                    <tr>
-                      <th className="text-left p-3 font-semibold min-w-[200px]">Name</th>
-                      <th className="text-left p-3 font-semibold min-w-[180px]">Contact</th>
-                      <th className="text-left p-3 font-semibold min-w-[150px]">Company</th>
-                      <th className="text-center p-3 font-semibold min-w-[100px]">Visits</th>
-                      <th className="text-center p-3 font-semibold min-w-[120px]">Status</th>
+          <CardContent className="p-0 dark:bg-card">
+            {isLoading ? (
+              <div className="text-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2 text-primary dark:text-primary" />
+                <p className="text-[13px] text-muted-foreground dark:text-muted-foreground">Loading members...</p>
+              </div>
+            ) : filteredMembers.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground dark:text-muted-foreground">
+                <Users className="h-10 w-10 mx-auto mb-2 opacity-30" />
+                <p className="text-[13px]">No members found matching your criteria.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-[13px]">
+                  <thead>
+                    <tr className="bg-muted/50 dark:bg-muted/30 border-b border-border/50 dark:border-border">
+                      <th className="text-left p-2.5 font-semibold text-foreground dark:text-foreground min-w-[180px]">Name</th>
+                      <th className="text-left p-2.5 font-semibold text-foreground dark:text-foreground min-w-[180px]">Contact</th>
+                      <th className="text-left p-2.5 font-semibold text-foreground dark:text-foreground min-w-[140px]">Company</th>
+                      <th className="text-center p-2.5 font-semibold text-foreground dark:text-foreground min-w-[90px]">Visits</th>
+                      <th className="text-center p-2.5 font-semibold text-foreground dark:text-foreground min-w-[110px]">Status</th>
+                      <th className="text-center p-2.5 font-semibold text-foreground dark:text-foreground min-w-[120px]">Actions</th>
                     </tr>
                   </thead>
                 </table>
-              </div>
-              <div className="max-h-[450px] overflow-y-auto overflow-x-auto">
-                <table className="w-full text-sm">
-                  <tbody>
-                    {filteredMembers.map((m) => (
-                      <tr key={m.id} className="border-t hover:bg-muted/50 transition-colors">
-                        <td className="p-3 min-w-[200px]">
-                          <p className="font-bold">{m.full_name}</p>
-                          <p className="text-xs text-muted-foreground">{m.designation || 'No designation'}</p>
-                        </td>
-                        <td className="p-3 min-w-[180px]">
-                          <div className="flex items-center gap-1 mb-1">
-                            <Mail className="h-3 w-3 text-muted-foreground" />
-                            <span className="text-xs">{m.email}</span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Phone className="h-3 w-3 text-muted-foreground" />
-                            <span className="text-xs">{m.phone}</span>
-                          </div>
-                        </td>
-                        <td className="p-3 min-w-[150px]">
-                          {m.company_name ? (
-                            <div className="flex items-center gap-1">
-                              <Building2 className="h-3 w-3 text-muted-foreground" />
-                              <span>{m.company_name}</span>
+                <div className="max-h-[calc(5*48px)] overflow-y-auto table-scroll-container-vertical">
+                  <table className="w-full text-[13px]">
+                    <tbody>
+                      {filteredMembers.map((m) => (
+                        <tr key={m.id} className="border-b border-border/30 dark:border-border hover:bg-muted/20 dark:hover:bg-muted/30 transition-colors">
+                          <td className="p-2.5 min-w-[180px]">
+                            <p className="font-semibold text-[13px] text-foreground dark:text-foreground">{m.full_name}</p>
+                            <p className="text-[11px] text-muted-foreground dark:text-muted-foreground mt-0.5">{m.designation || 'No designation'}</p>
+                          </td>
+                          <td className="p-2.5 min-w-[180px]">
+                            <div className="flex items-center gap-1.5 mb-1.5">
+                              <Mail className="h-3 w-3 text-muted-foreground dark:text-muted-foreground flex-shrink-0" />
+                              <span className="text-[13px] dark:text-foreground">{m.email}</span>
                             </div>
-                          ) : (
-                            <span className="text-muted-foreground text-xs">No company</span>
-                          )}
-                        </td>
-                        <td className="p-3 text-center min-w-[100px]">
-                          <Badge variant="outline" className="bg-purple-50">
-                            <Calendar className="h-3 w-3 mr-1" />
-                            {m.visit_count}
-                          </Badge>
-                        </td>
-                        <td className="p-3 text-center min-w-[120px]">
-                          {m.is_blacklisted ? (
-                            <Badge variant="destructive" className="text-xs">
-                              <ShieldAlert className="h-3 w-3 mr-1" />Blacklisted
+                            <div className="flex items-center gap-1.5">
+                              <Phone className="h-3 w-3 text-muted-foreground dark:text-muted-foreground flex-shrink-0" />
+                              <span className="text-[13px] dark:text-foreground">{m.phone}</span>
+                            </div>
+                          </td>
+                          <td className="p-2.5 min-w-[140px]">
+                            {m.company_name ? (
+                              <div className="flex items-center gap-1.5">
+                                <Building2 className="h-3 w-3 text-muted-foreground dark:text-muted-foreground flex-shrink-0" />
+                                <span className="text-[13px] dark:text-foreground">{m.company_name}</span>
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground dark:text-muted-foreground text-[13px]">No company</span>
+                            )}
+                          </td>
+                          <td className="p-2.5 text-center min-w-[90px]">
+                            <Badge variant="outline" className="bg-purple-50 dark:bg-purple-950/20 border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-400 text-[11px] px-2 py-0.5">
+                              <Calendar className="h-3 w-3 mr-1" />
+                              {m.visit_count}
                             </Badge>
-                          ) : m.is_active ? (
-                            <Badge className="bg-green-500 text-white text-xs">
-                              <CheckCircle className="h-3 w-3 mr-1" />Active
-                            </Badge>
-                          ) : (
-                            <Badge variant="secondary" className="text-xs">Inactive</Badge>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                          </td>
+                          <td className="p-2.5 text-center min-w-[110px]">
+                            {m.is_blacklisted ? (
+                              <Badge variant="destructive" className="text-[11px] px-2 py-0.5">
+                                <ShieldAlert className="h-3 w-3 mr-1" />Blacklisted
+                              </Badge>
+                            ) : m.is_active ? (
+                              <Badge className="bg-green-500 dark:bg-green-600 text-white text-[11px] px-2 py-0.5 border-0">
+                                <CheckCircle className="h-3 w-3 mr-1" />Active
+                              </Badge>
+                            ) : (
+                              <Badge variant="secondary" className="text-[11px] px-2 py-0.5 dark:border-border dark:text-foreground">Inactive</Badge>
+                            )}
+                          </td>
+                          <td className="p-2.5 min-w-[120px]">
+                            <div className="flex gap-1 justify-center">
+                              <Button size="sm" variant="ghost" onClick={() => {
+                                window.location.href = `/admin/external-members/${m.id}`;
+                              }} title="View Full Profile" className="h-7 w-7 p-0 hover:bg-blue-50 dark:hover:bg-blue-950/20 hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer">
+                                <Eye className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button size="sm" variant="ghost" onClick={() => handleToggleBlacklist(m)} title={m.is_blacklisted ? "Unblock" : "Blacklist"} className={`h-7 w-7 p-0 ${m.is_blacklisted ? 'text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 hover:bg-green-50 dark:hover:bg-green-950/20' : 'text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-950/20'}`}>
+                                {m.is_blacklisted ? <CheckCircle className="h-3.5 w-3.5" /> : <ShieldAlert className="h-3.5 w-3.5" />}
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            </div>}
+            )}
           </CardContent>
         </Card>
-      </TabsContent>
-    </Tabs>
+        </TabsContent>
+      </Tabs>
 
-    {/* Add Member Dialog */}
+      {/* Add Member Dialog */}
     <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader><DialogTitle>Add New Member</DialogTitle></DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div><Label>Full Name *</Label><Input value={formData.full_name} onChange={(e) => setFormData({...formData, full_name: e.target.value})} required /></div>
-            <div><Label>Email *</Label><Input type="email" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} required /></div>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto dark:bg-card dark:border-border">
+        <DialogHeader className="dark:border-border/50">
+          <DialogTitle className="dark:text-foreground text-[13px] font-semibold">Add New Member</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-3 dark:bg-card">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-[13px] dark:text-foreground">Full Name *</Label>
+              <Input 
+                value={formData.full_name} 
+                onChange={(e) => setFormData({...formData, full_name: e.target.value})} 
+                required 
+                className="h-9 text-[13px] dark:bg-card dark:border-border dark:text-foreground"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-[13px] dark:text-foreground">Email *</Label>
+              <Input 
+                type="email" 
+                value={formData.email} 
+                onChange={(e) => setFormData({...formData, email: e.target.value})} 
+                required 
+                className="h-9 text-[13px] dark:bg-card dark:border-border dark:text-foreground"
+              />
+            </div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div><Label>Phone *</Label><Input value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value})} placeholder="+94771234567" required /></div>
-            <div><Label>Company</Label><Input value={formData.company_name} onChange={(e) => setFormData({...formData, company_name: e.target.value})} /></div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-[13px] dark:text-foreground">Phone *</Label>
+              <Input 
+                value={formData.phone} 
+                onChange={(e) => setFormData({...formData, phone: e.target.value})} 
+                placeholder="+94771234567" 
+                required 
+                className="h-9 text-[13px] dark:bg-card dark:border-border dark:text-foreground"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-[13px] dark:text-foreground">Company</Label>
+              <Input 
+                value={formData.company_name} 
+                onChange={(e) => setFormData({...formData, company_name: e.target.value})} 
+                className="h-9 text-[13px] dark:bg-card dark:border-border dark:text-foreground"
+              />
+            </div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div><Label>Designation</Label><Input value={formData.designation} onChange={(e) => setFormData({...formData, designation: e.target.value})} /></div>
-            <div><Label>Reference Type *</Label>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-[13px] dark:text-foreground">Designation</Label>
+              <Input 
+                value={formData.designation} 
+                onChange={(e) => setFormData({...formData, designation: e.target.value})} 
+                className="h-9 text-[13px] dark:bg-card dark:border-border dark:text-foreground"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-[13px] dark:text-foreground">Reference Type *</Label>
               <Select value={formData.reference_type} onValueChange={(v) => setFormData({...formData, reference_type: v})}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="NIC">NIC</SelectItem>
-                  <SelectItem value="Passport">Passport</SelectItem>
-                  <SelectItem value="Driving License">Driving License</SelectItem>
-                  <SelectItem value="Employee ID">Employee ID</SelectItem>
-                  <SelectItem value="Other">Other</SelectItem>
+                <SelectTrigger className="h-9 text-[13px] dark:bg-card dark:border-border dark:text-foreground">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="dark:bg-card dark:border-border">
+                  <SelectItem value="NIC" className="dark:text-foreground">NIC</SelectItem>
+                  <SelectItem value="Passport" className="dark:text-foreground">Passport</SelectItem>
+                  <SelectItem value="Driving License" className="dark:text-foreground">Driving License</SelectItem>
+                  <SelectItem value="Employee ID" className="dark:text-foreground">Employee ID</SelectItem>
+                  <SelectItem value="Other" className="dark:text-foreground">Other</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
-          <div><Label>Reference Value *</Label><Input value={formData.reference_value} onChange={(e) => setFormData({...formData, reference_value: e.target.value})} placeholder="NIC: 199012345678" required /></div>
-          <div className="grid grid-cols-2 gap-4">
-            <div><Label>City</Label><Input value={formData.city} onChange={(e) => setFormData({...formData, city: e.target.value})} /></div>
-            <div><Label>Country</Label><Input value={formData.country} onChange={(e) => setFormData({...formData, country: e.target.value})} /></div>
+          <div className="space-y-1.5">
+            <Label className="text-[13px] dark:text-foreground">Reference Value *</Label>
+            <Input 
+              value={formData.reference_value} 
+              onChange={(e) => setFormData({...formData, reference_value: e.target.value})} 
+              placeholder="NIC: 199012345678" 
+              required 
+              className="h-9 text-[13px] dark:bg-card dark:border-border dark:text-foreground"
+            />
           </div>
-          <div><Label>Address</Label><Textarea value={formData.address} onChange={(e) => setFormData({...formData, address: e.target.value})} rows={2} /></div>
-          <div><Label>Notes</Label><Textarea value={formData.notes} onChange={(e) => setFormData({...formData, notes: e.target.value})} rows={2} /></div>
-          <div className="flex gap-2 justify-end">
-            <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
-            <Button type="submit">Add Member</Button>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-[13px] dark:text-foreground">City</Label>
+              <Input 
+                value={formData.city} 
+                onChange={(e) => setFormData({...formData, city: e.target.value})} 
+                className="h-9 text-[13px] dark:bg-card dark:border-border dark:text-foreground"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-[13px] dark:text-foreground">Country</Label>
+              <Input 
+                value={formData.country} 
+                onChange={(e) => setFormData({...formData, country: e.target.value})} 
+                className="h-9 text-[13px] dark:bg-card dark:border-border dark:text-foreground"
+              />
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-[13px] dark:text-foreground">Address</Label>
+            <Textarea 
+              value={formData.address} 
+              onChange={(e) => setFormData({...formData, address: e.target.value})} 
+              rows={2} 
+              className="text-[13px] dark:bg-card dark:border-border dark:text-foreground"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-[13px] dark:text-foreground">Notes</Label>
+            <Textarea 
+              value={formData.notes} 
+              onChange={(e) => setFormData({...formData, notes: e.target.value})} 
+              rows={2} 
+              className="text-[13px] dark:bg-card dark:border-border dark:text-foreground"
+            />
+          </div>
+          <div className="flex gap-2 justify-end pt-4 border-t dark:border-border">
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={() => {
+                setIsDialogOpen(false)
+                setFormData({
+                  full_name: "", email: "", phone: "", company_name: "", designation: "",
+                  reference_type: "NIC", reference_value: "", address: "", city: "",
+                  country: "Sri Lanka", notes: ""
+                })
+              }}
+              disabled={isSubmitting}
+              className="h-9 px-3 text-[13px] dark:border-border dark:text-foreground dark:hover:bg-muted"
+            >
+              Cancel
+            </Button>
+            <Button 
+              type="submit" 
+              disabled={isSubmitting}
+              className="min-w-[100px] h-9 px-3 text-[13px] bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 dark:from-blue-500 dark:to-purple-500 dark:hover:from-blue-600 dark:hover:to-purple-600"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                'Create Member'
+              )}
+            </Button>
           </div>
         </form>
       </DialogContent>
     </Dialog>
-    </>
+
+    {/* Blacklist Confirmation Dialog */}
+    <Dialog open={isBlacklistDialogOpen} onOpenChange={setIsBlacklistDialogOpen}>
+      <DialogContent className="max-w-md dark:bg-card dark:border-border">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-orange-900 dark:text-orange-400">
+            <div className="p-2 bg-orange-100 dark:bg-orange-950/20 rounded-full">
+              <AlertTriangle className="h-6 w-6 text-orange-600 dark:text-orange-400" />
+            </div>
+            {blacklistMember?.is_blacklisted ? 'Unblock Member' : 'Blacklist Member'}
+          </DialogTitle>
+        </DialogHeader>
+        
+        {blacklistMember && (
+          <div className="space-y-4">
+            <div className="p-4 bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-800 rounded-lg">
+              <p className="text-sm font-medium text-orange-900 dark:text-orange-300 mb-2">
+                {blacklistMember.is_blacklisted ? 
+                  'Are you sure you want to unblock this member?' :
+                  'Are you sure you want to blacklist this member?'
+                }
+              </p>
+              <p className="text-sm text-muted-foreground dark:text-muted-foreground">
+                <span className="font-bold">{blacklistMember.full_name}</span>
+                <br />
+                {blacklistMember.email} • {blacklistMember.company_name || 'No company'}
+              </p>
+            </div>
+
+            {!blacklistMember.is_blacklisted && (
+              <div className="space-y-2">
+                <Label className="text-red-900 dark:text-red-400 font-semibold">Blacklist Reason *</Label>
+                <Textarea
+                  value={blacklistReason}
+                  onChange={(e) => setBlacklistReason(e.target.value)}
+                  placeholder="Enter the reason for blacklisting this member..."
+                  rows={3}
+                  className="border-red-300 dark:border-red-800 focus:border-red-500 dark:focus:border-red-600 dark:bg-card dark:text-foreground"
+                  required
+                />
+                <p className="text-xs text-red-600 dark:text-red-400">
+                  ⚠️ This member will be blocked from all future bookings
+                </p>
+              </div>
+            )}
+
+            {blacklistMember.is_blacklisted && blacklistMember.blacklist_reason && (
+              <div className="p-3 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded-lg">
+                <p className="text-xs text-red-600 dark:text-red-400 font-semibold mb-1">Current Reason:</p>
+                <p className="text-sm text-red-900 dark:text-red-300">{blacklistMember.blacklist_reason}</p>
+              </div>
+            )}
+
+            <div className="flex gap-2 justify-end">
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={() => {
+                  setIsBlacklistDialogOpen(false)
+                  setBlacklistReason("")
+                }}
+                className="dark:border-border dark:text-foreground dark:hover:bg-muted"
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={confirmBlacklist}
+                variant={blacklistMember.is_blacklisted ? "default" : "destructive"}
+                className={blacklistMember.is_blacklisted ? "" : "bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-700"}
+              >
+                {blacklistMember.is_blacklisted ? (
+                  <>
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Unblock Member
+                  </>
+                ) : (
+                  <>
+                    <ShieldAlert className="h-4 w-4 mr-2" />
+                    Confirm Blacklist
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+
+    </div>
   )
 }
 

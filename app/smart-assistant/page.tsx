@@ -351,6 +351,18 @@ export default function SmartAssistantPage() {
   const handleConfirmAttendance = async () => {
     if (!selectedVisitor) return
 
+    // Check if already marked
+    const isAlreadyMarked = selectedVisitor.participation_status === 'confirmed' || 
+                           selectedVisitor.participation_status === 'checked_in' ||
+                           selectedVisitor.checked_in_at ||
+                           selectedVisitor.check_in_time
+    
+    if (isAlreadyMarked) {
+      toast.error('Attendance has already been marked for this visitor.')
+      setCurrentView('details')
+      return
+    }
+
     try {
       setIsLoading(true)
       
@@ -358,8 +370,18 @@ export default function SmartAssistantPage() {
         { id: selectedVisitor.id },
         { 
           participation_status: 'confirmed',
-          check_in_time: new Date().toISOString()
+          check_in_time: new Date().toISOString(),
+          checked_in_at: new Date().toISOString()
         }
+      )
+      
+      // Update local state to reflect the change
+      setExternalVisitors(prevVisitors => 
+        prevVisitors.map(v => 
+          v.id === selectedVisitor.id 
+            ? { ...v, participation_status: 'confirmed', checked_in_at: new Date().toISOString(), check_in_time: new Date().toISOString() }
+            : v
+        )
       )
       
       toast.success(`✅ Attendance confirmed for ${selectedVisitor.full_name}!`)
@@ -616,7 +638,7 @@ export default function SmartAssistantPage() {
       <Button
         onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
         size="sm"
-        className="rounded-full w-10 h-10 shadow-lg hover:scale-110 transition-transform"
+        className="rounded-full w-10 h-10 shadow-lg hover:scale-110 transition-transform dark:border-gray-700 dark:bg-gray-800/80 dark:text-gray-100 dark:hover:bg-gray-700 dark:backdrop-blur-sm"
         variant="outline"
       >
         {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
@@ -624,7 +646,7 @@ export default function SmartAssistantPage() {
       <Button
         onClick={handleLogout}
         size="sm"
-        className="rounded-full w-10 h-10 shadow-lg bg-red-600 hover:bg-red-700 text-white hover:scale-110 transition-transform"
+        className="rounded-full w-10 h-10 shadow-lg bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-500 text-white hover:scale-110 transition-transform"
       >
         <LogOut className="h-4 w-4" />
       </Button>
@@ -634,23 +656,23 @@ export default function SmartAssistantPage() {
   // Error View
   if (currentView === 'error') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-primary/5 to-secondary/5 p-4">
+      <div className="min-h-screen bg-gradient-to-br from-primary/5 to-secondary/5 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 p-4">
         <FloatingButtons />
         <div className="max-w-lg mx-auto">
-          <Card className="p-6">
+          <Card className="p-6 dark:bg-gray-800/80 dark:border-gray-700 dark:backdrop-blur-sm shadow-xl">
             <CardContent className="text-center space-y-4">
-              <div className="h-16 w-16 bg-destructive/10 rounded-full flex items-center justify-center mx-auto">
-                <AlertCircle className="h-8 w-8 text-destructive" />
+              <div className="h-16 w-16 bg-destructive/10 dark:bg-red-950/40 dark:border dark:border-red-500/40 rounded-full flex items-center justify-center mx-auto">
+                <AlertCircle className="h-8 w-8 text-destructive dark:text-red-400" />
               </div>
-              <h1 className="text-xl font-bold text-destructive">Meeting Not Found</h1>
-              <p className="text-sm text-muted-foreground">{errorMessage}</p>
+              <h1 className="text-xl font-bold text-destructive dark:text-red-400">Meeting Not Found</h1>
+              <p className="text-sm text-muted-foreground dark:text-gray-300">{errorMessage}</p>
 
-              <Button onClick={handleReset} className="w-full text-sm py-3">
+              <Button onClick={handleReset} className="w-full text-sm py-3 dark:bg-blue-500 dark:text-gray-950 dark:hover:bg-blue-400 dark:font-semibold shadow-md">
                 <Search className="h-4 w-4 mr-2" />
                 Try Another Search
               </Button>
 
-              <div className="text-center text-muted-foreground">
+              <div className="text-center text-muted-foreground dark:text-gray-400">
                 <p className="text-sm">Need help?</p>
                 <p className="text-xs">Contact reception or the meeting organizer</p>
               </div>
@@ -664,23 +686,23 @@ export default function SmartAssistantPage() {
   // Search View
   if (currentView === 'search') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-primary/5 to-secondary/5 p-4">
+      <div className="min-h-screen bg-gradient-to-br from-primary/5 to-secondary/5 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 p-4">
         <FloatingButtons />
         <div className="max-w-lg mx-auto">
           <div className="text-center mb-6">
             <div className="flex items-center justify-center gap-2 mb-3">
-              <div className="p-3 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl shadow-lg">
+              <div className="p-3 bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-500 dark:to-purple-500 rounded-xl shadow-lg dark:shadow-blue-500/20">
                 <UserCheck className="h-8 w-8 text-white" />
               </div>
             </div>
-            <h1 className="text-3xl font-bold text-foreground mb-2">Smart Assistant</h1>
-            <p className="text-base text-muted-foreground">Mark your attendance - No login required</p>
+            <h1 className="text-3xl font-bold text-foreground dark:text-gray-100 mb-2">Smart Assistant</h1>
+            <p className="text-base text-muted-foreground dark:text-gray-300">Mark your attendance - No login required</p>
           </div>
 
-          <Card className="p-6">
-            <CardHeader className="text-center pb-4">
-              <CardTitle className="text-xl">Find Your Meeting</CardTitle>
-              <CardDescription className="text-sm">Enter your 6-character Meeting ID</CardDescription>
+          <Card className="p-6 dark:bg-gray-800/80 dark:border-gray-700 dark:backdrop-blur-sm shadow-xl">
+            <CardHeader className="text-center pb-4 dark:border-gray-700">
+              <CardTitle className="text-xl dark:text-gray-100 font-semibold">Find Your Meeting</CardTitle>
+              <CardDescription className="text-sm dark:text-gray-300">Enter your 6-character Meeting ID</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {errorMessage && (
@@ -801,166 +823,182 @@ export default function SmartAssistantPage() {
   // Details View - Show external visitors list
   if (currentView === 'details' && meeting) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-primary/5 to-secondary/5 p-4">
+      <div className="min-h-screen bg-gradient-to-br from-primary/5 to-secondary/5 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 p-4">
         <FloatingButtons />
         <div className="max-w-2xl mx-auto">
-          <Button variant="outline" onClick={handleReset} className="mb-4 text-sm px-4 py-2">
+          <Button variant="outline" onClick={handleReset} className="mb-4 text-sm px-4 py-2 dark:border-gray-700 dark:bg-gray-800/50 dark:text-gray-100 dark:hover:bg-gray-800 dark:hover:border-gray-600">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Search
           </Button>
 
           <div className="space-y-4">
             {/* Meeting Details Card */}
-            <Card className="border-2 border-green-500 shadow-lg">
-              <CardHeader className="bg-gradient-to-r from-green-50 to-emerald-50 border-b-2 pb-3">
+            <Card className="border-2 border-green-500 dark:border-green-500/60 shadow-lg dark:bg-gray-800/80 dark:backdrop-blur-sm">
+              <CardHeader className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/50 dark:to-emerald-950/50 dark:border-green-500/30 border-b-2 dark:border-b-green-500/30 pb-3">
                 <div className="flex items-center justify-between">
                   <div>
-                    <CardTitle className="text-lg text-green-900">{meeting.title}</CardTitle>
-                    <CardDescription className="text-sm">Meeting Details</CardDescription>
+                    <CardTitle className="text-lg text-green-900 dark:text-green-300 font-bold">{meeting.title}</CardTitle>
+                    <CardDescription className="text-sm dark:text-green-400/80">Meeting Details</CardDescription>
                   </div>
-                  <Badge className="bg-green-600 text-white text-sm px-3 py-1">
+                  <Badge className="bg-green-600 dark:bg-green-500 dark:text-gray-950 dark:font-semibold text-white text-sm px-3 py-1 shadow-md">
                     {meeting.booking_ref_id}
                   </Badge>
                 </div>
               </CardHeader>
-              <CardContent className="pt-4">
+              <CardContent className="pt-4 dark:bg-gray-800/50">
                 {meeting.description && (
-                  <p className="text-muted-foreground mb-3 text-sm">{meeting.description}</p>
+                  <p className="text-muted-foreground dark:text-gray-300 mb-3 text-sm">{meeting.description}</p>
                 )}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                  <div className="flex items-center gap-2 p-2 bg-blue-50 rounded-lg">
-                    <Calendar className="h-4 w-4 text-blue-600" />
-                    <span className="font-medium">{formatDate(meeting.booking_date)}</span>
+                  <div className="flex items-center gap-2 p-2.5 bg-blue-50 dark:bg-blue-950/40 dark:border-blue-500/40 rounded-lg border dark:border-blue-500/40 shadow-sm">
+                    <Calendar className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                    <span className="font-medium dark:text-blue-200">{formatDate(meeting.booking_date)}</span>
                   </div>
-                  <div className="flex items-center gap-2 p-2 bg-purple-50 rounded-lg">
-                    <Clock className="h-4 w-4 text-purple-600" />
-                    <span className="font-medium">
+                  <div className="flex items-center gap-2 p-2.5 bg-purple-50 dark:bg-purple-950/40 dark:border-purple-500/40 rounded-lg border dark:border-purple-500/40 shadow-sm">
+                    <Clock className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                    <span className="font-medium dark:text-purple-200">
                       {formatTime(meeting.start_time)} - {formatTime(meeting.end_time)}
                     </span>
                   </div>
-                  <div className="flex items-center gap-2 p-2 bg-orange-50 rounded-lg">
-                    <MapPin className="h-4 w-4 text-orange-600" />
-                    <span className="font-medium">{meeting.place_name}</span>
+                  <div className="flex items-center gap-2 p-2.5 bg-orange-50 dark:bg-orange-950/40 dark:border-orange-500/40 rounded-lg border dark:border-orange-500/40 shadow-sm">
+                    <MapPin className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                    <span className="font-medium dark:text-orange-200">{meeting.place_name}</span>
                   </div>
-                  <div className="flex items-center gap-2 p-2 bg-pink-50 rounded-lg">
-                    <User className="h-4 w-4 text-pink-600" />
-                    <span className="font-medium">{meeting.responsible_person_name}</span>
+                  <div className="flex items-center gap-2 p-2.5 bg-pink-50 dark:bg-pink-950/40 dark:border-pink-500/40 rounded-lg border dark:border-pink-500/40 shadow-sm">
+                    <User className="h-4 w-4 text-pink-600 dark:text-pink-400" />
+                    <span className="font-medium dark:text-pink-200">{meeting.responsible_person_name}</span>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
                    {/* External Visitors List */}
-                   <Card className="border-2 shadow-lg">
-                     <CardHeader className={`bg-gradient-to-r ${isTodayBooking ? 'from-indigo-50 to-sky-50' : 'from-gray-50 to-slate-50'} pb-3`}>
+                   <Card className="border-2 shadow-lg dark:bg-gray-800/80 dark:border-gray-700 dark:backdrop-blur-sm">
+                     <CardHeader className={`bg-gradient-to-r ${isTodayBooking ? 'from-indigo-50 to-sky-50 dark:from-indigo-950/50 dark:to-sky-950/50 dark:border-indigo-500/30' : 'from-gray-50 to-slate-50 dark:from-gray-800/50 dark:to-slate-800/50 dark:border-gray-700'} border-b-2 dark:border-b-gray-700 pb-3`}>
                        <div className="flex items-center justify-between">
-                         <CardTitle className="text-lg flex items-center gap-2">
-                           <Users className="h-5 w-5 text-indigo-600" />
-                           {isTodayBooking ? 'Select Your Name to Mark Attendance' : 'External Visitors (View Only)'}
-                           <Badge className={`ml-2 ${isTodayBooking ? 'bg-indigo-600 text-white' : 'bg-gray-500 text-white'} text-xs`}>
+                         <CardTitle className="text-lg flex items-center gap-2 dark:text-gray-100 font-semibold">
+                           <Users className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                           <span className="dark:text-gray-100">{isTodayBooking ? 'Select Your Name to Mark Attendance' : 'External Visitors (View Only)'}</span>
+                           <Badge className={`ml-2 ${isTodayBooking ? 'bg-indigo-600 dark:bg-indigo-500 dark:text-gray-950 dark:font-semibold text-white' : 'bg-gray-500 dark:bg-gray-600 text-white'} text-xs shadow-md`}>
                              {externalVisitors.length} Visitors
                            </Badge>
                          </CardTitle>
                          <Button
                            onClick={() => setShowAddMemberDialog(true)}
                            size="sm"
-                           className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
+                           className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 dark:from-blue-500 dark:to-indigo-500 dark:hover:from-blue-400 dark:hover:to-indigo-400 dark:text-gray-950 dark:font-semibold shadow-md"
                          >
                            <Plus className="h-4 w-4 mr-2" />
                            Add Member
                          </Button>
                        </div>
                        {!isTodayBooking && (
-                         <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded-lg">
-                           <p className="text-amber-800 text-sm">
+                         <div className="mt-2 p-2.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-500/40 rounded-lg">
+                           <p className="text-amber-800 dark:text-amber-200 text-sm font-medium">
                              ⚠️ This meeting is not scheduled for today. Attendance marking is only available for today's bookings.
                            </p>
                          </div>
                        )}
                      </CardHeader>
-              <CardContent className="pt-4">
+              <CardContent className="pt-4 dark:bg-gray-800/50">
                 {externalVisitors.length === 0 ? (
                   <div className="text-center py-8">
-                    <Users className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
-                    <p className="text-base font-medium text-muted-foreground">No external visitors for this meeting</p>
+                    <Users className="h-12 w-12 mx-auto text-muted-foreground dark:text-gray-400 mb-3" />
+                    <p className="text-base font-medium text-muted-foreground dark:text-gray-300">No external visitors for this meeting</p>
                   </div>
                 ) : (
                   <div className="space-y-3">
                     {isTodayBooking ? (
-                      <Alert className="border-indigo-300 bg-indigo-50">
-                        <AlertDescription className="text-indigo-900 text-sm">
-                          <strong>Instructions:</strong> Please find your name below and click on your card to mark your attendance.
+                      <Alert className="border-indigo-300 dark:border-indigo-500/50 bg-indigo-50 dark:bg-indigo-950/40 dark:backdrop-blur-sm">
+                        <AlertDescription className="text-indigo-900 dark:text-indigo-200 text-sm font-medium">
+                          <strong className="dark:text-indigo-100">Instructions:</strong> Please find your name below and click on your card to mark your attendance. If you've already marked attendance, your card will show a green checkmark.
                         </AlertDescription>
                       </Alert>
                     ) : (
-                      <Alert className="border-amber-300 bg-amber-50">
-                        <AlertDescription className="text-amber-900 text-sm">
-                          <strong>View Only:</strong> This meeting is not scheduled for today. You can view the visitor list but cannot mark attendance.
+                      <Alert className="border-amber-300 dark:border-amber-500/50 bg-amber-50 dark:bg-amber-950/40 dark:backdrop-blur-sm">
+                        <AlertDescription className="text-amber-900 dark:text-amber-200 text-sm font-medium">
+                          <strong className="dark:text-amber-100">View Only:</strong> This meeting is not scheduled for today. You can view the visitor list but cannot mark attendance.
                         </AlertDescription>
                       </Alert>
                     )}
 
-                    {externalVisitors.map((visitor) => (
+                    {externalVisitors.map((visitor) => {
+                      const isAlreadyMarked = visitor.participation_status === 'confirmed' || 
+                                             visitor.participation_status === 'checked_in' ||
+                                             visitor.checked_in_at ||
+                                             visitor.check_in_time
+                      
+                      return (
                       <Card
                         key={visitor.id}
                         className={`border-2 transition-all duration-200 ${
-                          isTodayBooking 
-                            ? 'cursor-pointer hover:shadow-xl hover:border-indigo-500 hover:scale-[1.02] bg-gradient-to-r from-white to-indigo-50/30' 
-                            : 'cursor-default opacity-75 bg-gray-50'
+                          isTodayBooking && !isAlreadyMarked
+                            ? 'cursor-pointer hover:shadow-xl hover:border-indigo-500 dark:hover:border-indigo-400 dark:hover:shadow-indigo-500/20 hover:scale-[1.02] bg-gradient-to-r from-white to-indigo-50/30 dark:from-gray-800/90 dark:to-indigo-950/30 dark:border-gray-700 dark:backdrop-blur-sm' 
+                            : isTodayBooking && isAlreadyMarked
+                            ? 'cursor-default opacity-90 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 dark:border-green-500/40 border-green-300'
+                            : 'cursor-default opacity-75 bg-gray-50 dark:bg-gray-800/50 dark:border-gray-700'
                         }`}
-                        onClick={isTodayBooking ? () => handleSelectVisitor(visitor) : undefined}
+                        onClick={isTodayBooking && !isAlreadyMarked ? () => handleSelectVisitor(visitor) : undefined}
                       >
                         <CardContent className="p-4">
                           <div className="flex items-center justify-between">
                             <div className="flex-1">
                               <div className="flex items-center gap-2 mb-2">
-                                <div className="h-10 w-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm">
+                                <div className="h-10 w-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 dark:from-indigo-500 dark:to-purple-500 flex items-center justify-center text-white font-bold text-sm shadow-md">
                                   {visitor.full_name.charAt(0).toUpperCase()}
                                 </div>
-                                <h3 className="text-lg font-bold">{visitor.full_name}</h3>
+                                <h3 className="text-lg font-bold dark:text-gray-100">{visitor.full_name}</h3>
                               </div>
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
                                 {visitor.email && (
-                                  <div className="flex items-center gap-2 p-2 bg-blue-50 rounded-md">
-                                    <Mail className="h-3 w-3 text-blue-600" />
-                                    <span className="truncate text-blue-900">{visitor.email}</span>
+                                  <div className="flex items-center gap-2 p-2 bg-blue-50 dark:bg-blue-950/40 dark:border-blue-500/40 rounded-md border dark:border-blue-500/40 shadow-sm">
+                                    <Mail className="h-3 w-3 text-blue-600 dark:text-blue-400" />
+                                    <span className="truncate text-blue-900 dark:text-blue-200">{visitor.email}</span>
                                   </div>
                                 )}
                                 {visitor.phone && (
-                                  <div className="flex items-center gap-2 p-2 bg-green-50 rounded-md">
-                                    <Phone className="h-3 w-3 text-green-600" />
-                                    <span className="text-green-900">{visitor.phone}</span>
+                                  <div className="flex items-center gap-2 p-2 bg-green-50 dark:bg-green-950/40 dark:border-green-500/40 rounded-md border dark:border-green-500/40 shadow-sm">
+                                    <Phone className="h-3 w-3 text-green-600 dark:text-green-400" />
+                                    <span className="text-green-900 dark:text-green-200">{visitor.phone}</span>
                                   </div>
                                 )}
                                 {visitor.company_name && (
-                                  <div className="flex items-center gap-2 p-2 bg-purple-50 rounded-md">
-                                    <Building2 className="h-3 w-3 text-purple-600" />
-                                    <span className="truncate text-purple-900">{visitor.company_name}</span>
+                                  <div className="flex items-center gap-2 p-2 bg-purple-50 dark:bg-purple-950/40 dark:border-purple-500/40 rounded-md border dark:border-purple-500/40 shadow-sm">
+                                    <Building2 className="h-3 w-3 text-purple-600 dark:text-purple-400" />
+                                    <span className="truncate text-purple-900 dark:text-purple-200">{visitor.company_name}</span>
                                   </div>
                                 )}
                                 {visitor.reference_type && (
-                                  <div className="flex items-center gap-2 p-2 bg-orange-50 rounded-md">
-                                    <Hash className="h-3 w-3 text-orange-600" />
-                                    <span className="truncate text-orange-900">
+                                  <div className="flex items-center gap-2 p-2 bg-orange-50 dark:bg-orange-950/40 dark:border-orange-500/40 rounded-md border dark:border-orange-500/40 shadow-sm">
+                                    <Hash className="h-3 w-3 text-orange-600 dark:text-orange-400" />
+                                    <span className="truncate text-orange-900 dark:text-orange-200">
                                       <span className="font-medium">{visitor.reference_type}:</span> {visitor.reference_value}
                                     </span>
                                   </div>
                                 )}
                               </div>
                             </div>
-                            {isTodayBooking ? (
-                              <div className="ml-4 p-2 bg-indigo-100 rounded-full">
-                                <ArrowRight className="h-5 w-5 text-indigo-600" />
+                            {isTodayBooking && !isAlreadyMarked ? (
+                              <div className="ml-4 p-2 bg-indigo-100 dark:bg-indigo-500/20 dark:border dark:border-indigo-500/40 rounded-full shadow-sm">
+                                <ArrowRight className="h-5 w-5 text-indigo-600 dark:text-indigo-300" />
+                              </div>
+                            ) : isTodayBooking && isAlreadyMarked ? (
+                              <div className="ml-4 flex flex-col items-center gap-1">
+                                <div className="p-2 bg-green-100 dark:bg-green-900/50 dark:border dark:border-green-500/40 rounded-full shadow-sm">
+                                  <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
+                                </div>
+                                <span className="text-xs font-semibold text-green-700 dark:text-green-300">Confirmed</span>
                               </div>
                             ) : (
-                              <div className="ml-4 text-gray-400 text-xs font-medium bg-gray-100 px-3 py-2 rounded-full">
+                              <div className="ml-4 text-gray-400 dark:text-gray-400 text-xs font-medium bg-gray-100 dark:bg-gray-700/50 dark:border dark:border-gray-600 px-3 py-2 rounded-full">
                                 View Only
                               </div>
                             )}
                           </div>
                         </CardContent>
                       </Card>
-                    ))}
+                      )
+                    })}
                   </div>
                 )}
               </CardContent>
@@ -1045,19 +1083,20 @@ export default function SmartAssistantPage() {
               </div>
 
               <div className="flex items-center gap-2">
-                <div className="flex-1 border-t"></div>
-                <span className="text-sm text-muted-foreground">OR</span>
-                <div className="flex-1 border-t"></div>
+                <div className="flex-1 border-t dark:border-gray-700"></div>
+                <span className="text-sm text-muted-foreground dark:text-gray-400">OR</span>
+                <div className="flex-1 border-t dark:border-gray-700"></div>
               </div>
 
               {/* Create New Member */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <Label className="text-base font-semibold">Create New Member</Label>
+                  <Label className="text-base font-semibold dark:text-gray-100">Create New Member</Label>
                   <Button
                     onClick={() => setShowCreateMemberDialog(true)}
                     size="sm"
                     variant="outline"
+                    className="dark:border-gray-700 dark:bg-gray-800/50 dark:text-gray-100 dark:hover:bg-gray-800 dark:hover:border-gray-600"
                   >
                     <Plus className="h-4 w-4 mr-2" />
                     Create New
@@ -1066,7 +1105,7 @@ export default function SmartAssistantPage() {
               </div>
 
               <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setShowAddMemberDialog(false)}>
+                <Button variant="outline" onClick={() => setShowAddMemberDialog(false)} className="dark:border-gray-700 dark:bg-gray-800/50 dark:text-gray-100 dark:hover:bg-gray-800 dark:hover:border-gray-600">
                   Close
                 </Button>
               </div>
@@ -1076,10 +1115,10 @@ export default function SmartAssistantPage() {
 
         {/* Create New Member Dialog */}
         <Dialog open={showCreateMemberDialog} onOpenChange={setShowCreateMemberDialog}>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <User className="h-5 w-5 text-green-600" />
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto dark:bg-gray-800/95 dark:border-gray-700 dark:backdrop-blur-sm">
+            <DialogHeader className="dark:border-gray-700">
+              <DialogTitle className="flex items-center gap-2 dark:text-gray-100 font-semibold">
+                <User className="h-5 w-5 text-green-600 dark:text-green-400" />
                 Create New Member & Add to Meeting
               </DialogTitle>
             </DialogHeader>
@@ -1193,24 +1232,24 @@ export default function SmartAssistantPage() {
   // Confirm View
   if (currentView === 'confirm' && selectedVisitor && meeting) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-primary/5 to-secondary/5 p-4">
+      <div className="min-h-screen bg-gradient-to-br from-primary/5 to-secondary/5 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 p-4">
         <FloatingButtons />
         <div className="max-w-lg mx-auto">
-          <Button variant="outline" onClick={() => setCurrentView('details')} className="mb-4 text-sm px-4 py-2">
+          <Button variant="outline" onClick={() => setCurrentView('details')} className="mb-4 text-sm px-4 py-2 dark:border-gray-700 dark:bg-gray-800/50 dark:text-gray-100 dark:hover:bg-gray-800 dark:hover:border-gray-600">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Visitor List
           </Button>
 
-          <Card className="border-2 shadow-2xl">
-            <CardHeader className="bg-gradient-to-r from-green-50 to-emerald-50 text-center border-b-2 pb-3">
-              <CardTitle className="text-xl text-green-900">Confirm Attendance</CardTitle>
-              <CardDescription className="text-sm">Please confirm the details below</CardDescription>
+          <Card className="border-2 shadow-2xl dark:bg-gray-800/80 dark:border-gray-700 dark:backdrop-blur-sm">
+            <CardHeader className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/50 dark:to-emerald-950/50 text-center border-b-2 dark:border-b-green-500/30 pb-3">
+              <CardTitle className="text-xl text-green-900 dark:text-green-300 font-bold">Confirm Attendance</CardTitle>
+              <CardDescription className="text-sm dark:text-green-400/80">Please confirm the details below</CardDescription>
             </CardHeader>
-            <CardContent className="pt-4 space-y-4">
+            <CardContent className="pt-4 space-y-4 dark:bg-gray-800/50">
               {/* Meeting Info */}
-              <div className="p-4 bg-blue-50 border-2 border-blue-300 rounded-lg">
-                <h3 className="font-bold text-base mb-3 text-blue-900">Meeting Information</h3>
-                <div className="space-y-1 text-sm">
+              <div className="p-4 bg-blue-50 dark:bg-blue-950/40 border-2 border-blue-300 dark:border-blue-500/40 rounded-lg shadow-sm">
+                <h3 className="font-bold text-base mb-3 text-blue-900 dark:text-blue-200">Meeting Information</h3>
+                <div className="space-y-1 text-sm dark:text-blue-300">
                   <p><strong>Title:</strong> {meeting.title}</p>
                   <p><strong>Date:</strong> {formatDate(meeting.booking_date)}</p>
                   <p><strong>Time:</strong> {formatTime(meeting.start_time)} - {formatTime(meeting.end_time)}</p>
@@ -1220,9 +1259,9 @@ export default function SmartAssistantPage() {
               </div>
 
               {/* Visitor Info */}
-              <div className="p-4 bg-green-50 border-2 border-green-300 rounded-lg">
-                <h3 className="font-bold text-base mb-3 text-green-900">Your Information</h3>
-                <div className="space-y-1 text-sm">
+              <div className="p-4 bg-green-50 dark:bg-green-950/40 border-2 border-green-300 dark:border-green-500/40 rounded-lg shadow-sm">
+                <h3 className="font-bold text-base mb-3 text-green-900 dark:text-green-200">Your Information</h3>
+                <div className="space-y-1 text-sm dark:text-green-300">
                   <p><strong>Name:</strong> {selectedVisitor.full_name}</p>
                   <p><strong>Email:</strong> {selectedVisitor.email}</p>
                   <p><strong>Phone:</strong> {selectedVisitor.phone}</p>
@@ -1233,9 +1272,9 @@ export default function SmartAssistantPage() {
                 </div>
               </div>
 
-              <Alert className="border-green-500 bg-green-50">
-                <CheckCircle className="h-4 w-4 text-green-600" />
-                <AlertDescription className="text-green-900 text-sm">
+              <Alert className="border-green-500 dark:border-green-500/50 bg-green-50 dark:bg-green-950/40 dark:backdrop-blur-sm">
+                <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
+                <AlertDescription className="text-green-900 dark:text-green-200 text-sm font-medium">
                   By confirming, you acknowledge your attendance at this meeting
                 </AlertDescription>
               </Alert>
@@ -1244,14 +1283,14 @@ export default function SmartAssistantPage() {
                 <Button
                   variant="outline"
                   onClick={() => setCurrentView('details')}
-                  className="flex-1 text-sm py-3"
+                  className="flex-1 text-sm py-3 dark:border-gray-700 dark:bg-gray-800/50 dark:text-gray-100 dark:hover:bg-gray-800 dark:hover:border-gray-600"
                 >
                   Cancel
                 </Button>
                 <Button
                   onClick={handleConfirmAttendance}
                   disabled={isLoading}
-                  className="flex-1 text-sm py-3 bg-gradient-to-r from-green-600 to-emerald-600"
+                  className="flex-1 text-sm py-3 bg-gradient-to-r from-green-600 to-emerald-600 dark:from-green-500 dark:to-emerald-500 dark:hover:from-green-400 dark:hover:to-emerald-400 dark:text-gray-950 dark:font-semibold shadow-md"
                 >
                   {isLoading ? (
                     <>
@@ -1276,41 +1315,41 @@ export default function SmartAssistantPage() {
   // Success View
   if (currentView === 'success') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-primary/5 to-secondary/5 p-4">
+      <div className="min-h-screen bg-gradient-to-br from-primary/5 to-secondary/5 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 p-4">
         <FloatingButtons />
         <div className="max-w-lg mx-auto">
-          <Card className="border-2 border-green-500 shadow-2xl">
-            <CardContent className="pt-8 pb-8 text-center space-y-4">
-              <div className="mx-auto w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mb-3 animate-bounce-gentle">
+          <Card className="border-2 border-green-500 dark:border-green-500/60 shadow-2xl dark:bg-gray-800/80 dark:backdrop-blur-sm">
+            <CardContent className="pt-8 pb-8 text-center space-y-4 dark:bg-gray-800/50">
+              <div className="mx-auto w-16 h-16 bg-green-500 dark:bg-green-500 rounded-full flex items-center justify-center mb-3 animate-bounce-gentle shadow-lg">
                 <CheckCircle className="h-10 w-10 text-white" />
               </div>
-              <h1 className="text-2xl font-bold text-green-900">Attendance Confirmed!</h1>
-              <p className="text-base text-muted-foreground">
+              <h1 className="text-2xl font-bold text-green-900 dark:text-green-300">Attendance Confirmed!</h1>
+              <p className="text-base text-muted-foreground dark:text-gray-300">
                 Thank you, {selectedVisitor?.full_name}
               </p>
 
-              <div className="bg-green-50 border-2 border-green-300 rounded-lg p-4">
-                <p className="text-green-900 font-semibold mb-2 text-sm">
+              <div className="bg-green-50 dark:bg-green-950/40 border-2 border-green-300 dark:border-green-500/40 rounded-lg p-4 shadow-sm">
+                <p className="text-green-900 dark:text-green-200 font-semibold mb-2 text-sm">
                   ✅ Check-in successful
                 </p>
-                <p className="text-xs text-green-700">
+                <p className="text-xs text-green-700 dark:text-green-300">
                   Meeting: {meeting?.title}
                 </p>
-                <p className="text-xs text-green-600 mt-1">
+                <p className="text-xs text-green-600 dark:text-green-400 mt-1">
                   {new Date().toLocaleString()}
                 </p>
               </div>
 
               <Button
                 onClick={handleReset}
-                className="w-full text-sm py-3 bg-gradient-to-r from-blue-600 to-purple-600"
+                className="w-full text-sm py-3 bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-500 dark:to-purple-500 dark:hover:from-blue-400 dark:hover:to-purple-400 dark:text-gray-950 dark:font-semibold shadow-md"
               >
                 <ArrowRight className="h-4 w-4 mr-2" />
                 Mark Attendance for Another Visitor
               </Button>
 
               <Link href="/" className="block">
-                <Button variant="outline" className="w-full text-sm py-2">
+                <Button variant="outline" className="w-full text-sm py-2 dark:border-gray-700 dark:bg-gray-800/50 dark:text-gray-100 dark:hover:bg-gray-800 dark:hover:border-gray-600">
                   <ArrowLeft className="h-4 w-4 mr-2" />
                   Back to Login
                 </Button>

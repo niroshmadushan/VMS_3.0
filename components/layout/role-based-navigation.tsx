@@ -18,24 +18,33 @@ import {
   BarChart3,
   FileText,
   Utensils,
+  Tag,
 } from "lucide-react"
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar"
 
 const navigationConfig = {
   admin: [
+    // Core Dashboard
     { name: "Dashboard", href: "/admin", icon: LayoutDashboard },
+    // Bookings Section
     { name: "Bookings", href: "/admin/bookings", icon: Calendar },
-    { name: "User Management", href: "/admin/users", icon: Users },
-    { name: "Place Management", href: "/admin/places", icon: MapPin },
-    { name: "Refreshments", href: "/admin/refreshments", icon: Utensils },
-    { name: "Visitor Passes", href: "/admin/passes", icon: CreditCard },
-    { name: "External Members", href: "/admin/external-members", icon: UserCheck },
-    // { name: "Feedback", href: "/admin/feedback", icon: MessageSquare }, // Temporarily hidden - will be developed in a few days
-    { name: "Pass History", href: "/admin/pass-history", icon: History },
-    { name: "Pass Types", href: "/admin/pass-types", icon: FileText },
-    { name: "Availability", href: "/admin/availability", icon: Clock },
+    { name: "Missing Booking Details", href: "/admin/bookings/missing-details", icon: FileText },
     { name: "Timeline", href: "/admin/timeline", icon: BarChart3 },
+    // User Management Section
+    { name: "User Management", href: "/admin/users", icon: Users },
+    { name: "External Members", href: "/admin/external-members", icon: UserCheck },
+    // Place Management Section
+    { name: "Place Management", href: "/admin/places", icon: MapPin },
+    { name: "Availability", href: "/admin/availability", icon: Clock },
+    // Refreshments
+    { name: "Refreshments", href: "/admin/refreshments", icon: Utensils },
+    // Pass Management Section (Grouped together)
+    { name: "Pass Types", href: "/admin/pass-types", icon: Tag },
+    { name: "Visitor Passes", href: "/admin/passes", icon: CreditCard },
+    { name: "Pass History", href: "/admin/pass-history", icon: History },
+    // Settings (Always last)
     { name: "Settings", href: "/admin/settings", icon: Settings },
+    // { name: "Feedback", href: "/admin/feedback", icon: MessageSquare }, // Temporarily hidden - will be developed in a few days
   ],
   staff: [
     { name: "Dashboard", href: "/staff", icon: LayoutDashboard },

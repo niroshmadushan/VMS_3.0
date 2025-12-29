@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Calendar, Clock, MapPin, Users, Edit, Trash2, Utensils, AlertTriangle } from "lucide-react"
+import { Calendar, Clock, MapPin, Users, Trash2, Utensils, AlertTriangle } from "lucide-react"
 import { placeManagementAPI } from "@/lib/place-management-api"
 import toast from "react-hot-toast"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -165,6 +165,10 @@ export function TimelineView() {
   }
 
   const isBookingOngoing = (booking: Booking) => {
+    // Cancelled bookings can never be ongoing/live
+    if (booking.status === "cancelled") {
+      return false
+    }
     const now = currentTime
     const currentTimeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`
     return booking.startTime <= currentTimeStr && booking.endTime > currentTimeStr
@@ -191,14 +195,6 @@ export function TimelineView() {
     }
   }
 
-  const handleEdit = (booking: Booking) => {
-    if (booking.status === "completed" || booking.status === "cancelled") {
-      toast.error(`Cannot edit ${booking.status} bookings`, { position: 'top-center', duration: 3000, icon: '🚫' })
-      return
-    }
-    window.location.href = `/admin/bookings/update?id=${booking.id}`
-  }
-
   const handleCancel = (booking: Booking) => {
     if (booking.status === "completed" || booking.status === "cancelled") {
       toast.error(`Cannot cancel ${booking.status} bookings`, { position: 'top-center', duration: 3000, icon: '🚫' })
@@ -222,11 +218,11 @@ export function TimelineView() {
 
   if (isLoading) {
     return (
-      <Card>
-        <CardContent className="py-12">
+      <Card className="dark:bg-card dark:border-border">
+        <CardContent className="py-12 dark:bg-card">
           <div className="text-center">
-            <Clock className="h-12 w-12 animate-spin mx-auto mb-4 text-muted-foreground" />
-            <p>Loading today's bookings...</p>
+            <Clock className="h-12 w-12 animate-spin mx-auto mb-4 text-muted-foreground dark:text-muted-foreground" />
+            <p className="dark:text-foreground">Loading today's bookings...</p>
           </div>
         </CardContent>
       </Card>
@@ -235,12 +231,22 @@ export function TimelineView() {
 
   return (
     <>
-      {/* Current Time - Top Right Corner */}
-      <div className="fixed top-20 right-6 z-40">
-        <div className="p-3 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg shadow-xl border-2 border-white">
+      <div className="space-y-3 px-2 sm:px-4 max-w-[98vw] mx-auto dark:bg-background">
+        {/* Compact Header with Current Time */}
+        <div className="flex items-center justify-between pb-2 border-b border-border/50 dark:border-border">
+        <div>
+          <CardTitle className="flex items-center gap-2 text-[13px] font-semibold dark:text-foreground">
+            <Clock className="h-4 w-4" />
+            Today's Timeline View
+          </CardTitle>
+          <p className="text-[11px] text-muted-foreground dark:text-muted-foreground mt-0.5">
+            {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+          </p>
+        </div>
+        <div className="p-2 bg-gradient-to-br from-blue-500 to-purple-600 dark:from-blue-600 dark:to-purple-700 rounded-lg shadow-md">
           <div className="text-center">
-            <p className="text-xs text-white/80 mb-1">Current Time</p>
-            <p className="text-2xl font-bold text-white font-mono tabular-nums">
+            <p className="text-[10px] text-white/80 mb-0.5">Current Time</p>
+            <p className="text-lg font-bold text-white font-mono tabular-nums">
               {currentTime.toLocaleTimeString('en-US', { 
                 hour: '2-digit', 
                 minute: '2-digit',
@@ -248,7 +254,7 @@ export function TimelineView() {
                 hour12: false 
               })}
             </p>
-            <p className="text-xs text-white/70 mt-1">
+            <p className="text-[10px] text-white/70 mt-0.5">
               {currentTime.toLocaleDateString('en-US', { 
                 month: 'short',
                 day: 'numeric'
@@ -258,134 +264,187 @@ export function TimelineView() {
         </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <Clock className="h-5 w-5" />
-                Today's Timeline View
-              </CardTitle>
-              <p className="text-sm text-muted-foreground">
-                {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-              </p>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
+      <Card className="dark:bg-card dark:border-border shadow-md">
+        <CardContent className="p-3 dark:bg-card">
           {bookings.length === 0 ? (
-            <div className="text-center py-12">
-              <Calendar className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-              <p className="text-lg text-muted-foreground">No bookings scheduled for today</p>
-              <p className="text-sm text-muted-foreground mt-2">Create a new booking to get started</p>
+            <div className="text-center py-8">
+              <Calendar className="h-12 w-12 mx-auto text-muted-foreground dark:text-muted-foreground mb-3" />
+              <p className="text-sm text-muted-foreground dark:text-muted-foreground">No bookings scheduled for today</p>
+              <p className="text-xs text-muted-foreground dark:text-muted-foreground mt-1">Create a new booking to get started</p>
             </div>
           ) : (
             <div className="relative">
-              {/* Timeline */}
-              <div className="max-h-[600px] overflow-y-auto space-y-6 pr-2">
+              {/* Timeline - Compact */}
+              <div className="max-h-[calc(7*80px)] overflow-y-auto table-scroll-container-vertical space-y-3 pr-2">
                 {bookings.map((booking, index) => {
-                  const isOngoing = isBookingOngoing(booking)
+                  const isCancelled = booking.status === 'cancelled'
+                  const isOngoing = isBookingOngoing(booking) // This will return false for cancelled bookings
                   const isCompleted = booking.status === 'completed'
+                  const isUpcoming = booking.status === 'upcoming'
+                  
+                  // Color scheme based on status with dark theme support
+                  const getStatusColors = () => {
+                    if (isCancelled) {
+                      return {
+                        connector: 'bg-red-300/30 dark:bg-red-900/30',
+                        timeText: 'text-red-600 dark:text-red-400',
+                        timeTextSecondary: 'text-red-500 dark:text-red-500',
+                        dot: 'bg-gradient-to-br from-red-400 to-red-600 dark:from-red-600 dark:to-red-800 shadow-lg',
+                        cardBorder: 'border-red-500 dark:border-red-700',
+                        cardBg: 'bg-red-50 dark:bg-red-950/20',
+                        cardShadow: 'shadow-lg',
+                        title: 'text-red-900 dark:text-red-200',
+                        description: 'text-red-700 dark:text-red-300',
+                        icon: 'text-red-500 dark:text-red-400',
+                        label: 'text-red-600 dark:text-red-400',
+                        value: 'text-red-900 dark:text-red-200',
+                        badgeBorder: 'border-red-300 dark:border-red-700',
+                        badgeText: 'text-red-700 dark:text-red-300'
+                      }
+                    } else if (isOngoing) {
+                      return {
+                        connector: 'bg-green-300/30 dark:bg-green-900/30',
+                        timeText: 'text-green-600 dark:text-green-400 font-bold',
+                        timeTextSecondary: 'text-green-600 dark:text-green-400',
+                        dot: 'bg-gradient-to-br from-green-400 to-green-600 dark:from-green-500 dark:to-green-700 shadow-xl shadow-green-500/50 dark:shadow-green-600/50',
+                        cardBorder: 'border-green-500 dark:border-green-600',
+                        cardBg: 'bg-green-50 dark:bg-green-950/20',
+                        cardShadow: 'shadow-xl shadow-green-500/20 dark:shadow-green-600/20',
+                        title: 'text-green-900 dark:text-green-200',
+                        description: 'text-green-700 dark:text-green-300',
+                        icon: 'text-green-500 dark:text-green-400',
+                        label: 'text-green-600 dark:text-green-400',
+                        value: 'text-green-900 dark:text-green-200',
+                        badgeBorder: '',
+                        badgeText: ''
+                      }
+                    } else if (isCompleted) {
+                      return {
+                        connector: 'bg-blue-300/30 dark:bg-blue-900/30',
+                        timeText: 'text-blue-600 dark:text-blue-400',
+                        timeTextSecondary: 'text-blue-500 dark:text-blue-500',
+                        dot: 'bg-gradient-to-br from-blue-400 to-blue-600 dark:from-blue-500 dark:to-blue-700 shadow-lg',
+                        cardBorder: 'border-blue-500 dark:border-blue-600',
+                        cardBg: 'bg-blue-50 dark:bg-blue-950/20',
+                        cardShadow: 'shadow-lg',
+                        title: 'text-blue-900 dark:text-blue-200',
+                        description: 'text-blue-700 dark:text-blue-300',
+                        icon: 'text-blue-500 dark:text-blue-400',
+                        label: 'text-blue-600 dark:text-blue-400',
+                        value: 'text-blue-900 dark:text-blue-200',
+                        badgeBorder: '',
+                        badgeText: ''
+                      }
+                    } else { // Upcoming
+                      return {
+                        connector: 'bg-orange-300/30 dark:bg-orange-900/30',
+                        timeText: 'text-orange-600 dark:text-orange-400',
+                        timeTextSecondary: 'text-orange-500 dark:text-orange-500',
+                        dot: 'bg-gradient-to-br from-orange-400 to-orange-600 dark:from-orange-500 dark:to-orange-700 shadow-lg',
+                        cardBorder: 'border-orange-500 dark:border-orange-600',
+                        cardBg: 'bg-orange-50 dark:bg-orange-950/20',
+                        cardShadow: 'shadow-lg',
+                        title: 'text-orange-900 dark:text-orange-200',
+                        description: 'text-orange-700 dark:text-orange-300',
+                        icon: 'text-orange-500 dark:text-orange-400',
+                        label: 'text-orange-600 dark:text-orange-400',
+                        value: 'text-orange-900 dark:text-orange-200',
+                        badgeBorder: '',
+                        badgeText: ''
+                      }
+                    }
+                  }
+                  
+                  const colors = getStatusColors()
                   
                   return (
                     <div key={booking.id} className="relative">
                       {/* Connector Line */}
                       {index < bookings.length - 1 && (
-                        <div className="absolute left-6 top-24 bottom-0 w-0.5 bg-gradient-to-b from-primary/30 to-transparent h-6" />
+                        <div className={`absolute left-4 top-16 bottom-0 w-0.5 h-4 ${colors.connector}`} />
                       )}
                       
-                      {/* Booking Card */}
-                      <div className={`relative flex gap-6 group`}>
-                        {/* Time Indicator */}
-                        <div className="flex-shrink-0 w-24 pt-2">
-                          <div className={`text-right ${isOngoing ? 'text-green-600 font-bold text-lg' : 'text-muted-foreground'}`}>
+                      {/* Booking Card - Compact */}
+                      <div className={`relative flex gap-3 group`}>
+                        {/* Time Indicator - Compact */}
+                        <div className="flex-shrink-0 w-16 pt-1">
+                          <div className={`text-right text-[13px] font-semibold ${colors.timeText}`}>
                             {formatTime(booking.startTime)}
                           </div>
-                          <div className="text-right text-xs text-muted-foreground mt-1">
-                            to {formatTime(booking.endTime)}
+                          <div className={`text-right text-[11px] mt-0.5 ${colors.timeTextSecondary}`}>
+                            {formatTime(booking.endTime)}
                           </div>
                         </div>
                         
-                        {/* Timeline Dot */}
+                        {/* Timeline Dot - Compact */}
                         <div className="relative flex-shrink-0">
-                          {/* Animated Ripple Effect for Ongoing */}
-                          {isOngoing && (
+                          {/* Animated Ripple Effect for Ongoing - NOT for cancelled */}
+                          {isOngoing && !isCancelled && (
                             <>
-                              <div className="absolute inset-0 w-12 h-12 rounded-full bg-green-300 opacity-75 animate-ping" style={{animationDuration: '2s'}}></div>
-                              <div className="absolute inset-0 w-12 h-12 rounded-full bg-green-400 opacity-50 animate-ping" style={{animationDuration: '3s', animationDelay: '0.5s'}}></div>
+                              <div className="absolute inset-0 w-8 h-8 rounded-full bg-green-300 opacity-75 animate-ping" style={{animationDuration: '2s'}}></div>
+                              <div className="absolute inset-0 w-8 h-8 rounded-full bg-green-400 opacity-50 animate-ping" style={{animationDuration: '3s', animationDelay: '0.5s'}}></div>
                             </>
                           )}
                           
-                          <div className={`
-                            w-12 h-12 rounded-full flex items-center justify-center relative z-10
-                            ${isOngoing ? 'bg-gradient-to-br from-green-400 to-green-600 shadow-xl shadow-green-500/50' : 
-                              isCompleted ? 'bg-gradient-to-br from-blue-400 to-blue-600 shadow-lg' : 
-                              'bg-gradient-to-br from-orange-400 to-orange-600 shadow-lg'}
-                            transition-all duration-300
-                          `}>
-                            {isOngoing ? (
-                              <Calendar className="h-6 w-6 text-white animate-pulse" />
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center relative z-10 ${colors.dot} transition-all duration-300`}>
+                            {isCancelled ? (
+                              <AlertTriangle className="h-3.5 w-3.5 text-white" />
+                            ) : isOngoing ? (
+                              <Calendar className="h-4 w-4 text-white animate-pulse" />
                             ) : isCompleted ? (
-                              <div className="text-white text-2xl font-bold">✓</div>
+                              <div className="text-white text-sm font-bold">✓</div>
                             ) : (
-                              <Calendar className="h-5 w-5 text-white" />
+                              <Calendar className="h-3.5 w-3.5 text-white" />
                             )}
                           </div>
                         </div>
                         
-                        {/* Booking Card */}
-                        <div className={`
-                          flex-1 rounded-lg border-2 p-6 transition-all duration-300
-                          ${isOngoing ? 'border-green-500 bg-green-50 shadow-xl shadow-green-500/20' : 
-                            isCompleted ? 'border-blue-300 bg-blue-50/50' : 
-                            'border-orange-300 bg-orange-50/50'}
-                          hover:shadow-lg
-                        `}>
-                          {/* Header */}
-                          <div className="flex items-start justify-between mb-4">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-3 mb-2">
+                        {/* Booking Card - Compact */}
+                        <div className={`flex-1 rounded-lg border p-3 transition-all duration-300 ${colors.cardBorder} ${colors.cardBg} ${colors.cardShadow} hover:shadow-md`}>
+                          {/* Header - Compact */}
+                          <div className="flex items-start justify-between mb-2">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
                                 {booking.bookingRefId && (
-                                  <Badge variant="outline" className="font-mono font-bold">
+                                  <Badge variant="outline" className={`font-mono font-semibold text-[10px] px-1.5 py-0 ${colors.badgeBorder} ${colors.badgeText}`}>
                                     {booking.bookingRefId}
                                   </Badge>
                                 )}
-                                <h3 className={`text-xl font-bold ${isOngoing ? 'text-green-900' : isCompleted ? 'text-blue-900' : 'text-orange-900'}`}>
+                                <h3 className={`text-[13px] font-bold truncate ${colors.title}`}>
                                   {booking.title}
                                 </h3>
-                                {isOngoing && (
-                                  <Badge className="relative bg-green-500 text-white shadow-lg">
-                                    <span className="relative z-10 flex items-center gap-1">
-                                      <span className="animate-pulse">⚡</span>
-                                      LIVE NOW
-                                    </span>
-                                  </Badge>
-                                )}
                               </div>
                               {booking.description && (
-                                <p className="text-sm text-muted-foreground">{booking.description}</p>
+                                <p className={`text-[11px] truncate ${colors.description}`}>{booking.description}</p>
                               )}
                             </div>
-                            <Badge {...getStatusBadgeProps(booking.status)} className="text-sm px-3 py-1">
-                              {booking.status}
+                            <Badge {...getStatusBadgeProps(booking.status)} className="text-[10px] px-2 py-0.5 ml-2 flex-shrink-0">
+                              {booking.status === "ongoing" && isOngoing ? (
+                                <span className="flex items-center gap-1">
+                                  <span className="animate-pulse">⚡</span>
+                                  LIVE
+                                </span>
+                              ) : (
+                                booking.status
+                              )}
                             </Badge>
                           </div>
                           
-                          {/* Details Grid */}
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
-                            <div className="flex items-center gap-2">
-                              <MapPin className="h-4 w-4 text-muted-foreground" />
+                          {/* Details Grid - Compact */}
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2">
+                            <div className="flex items-center gap-1.5">
+                              <MapPin className={`h-3 w-3 ${colors.icon}`} />
                               <div>
-                                <p className="text-xs text-muted-foreground">Place</p>
-                                <p className="font-medium text-sm">{booking.place}</p>
+                                <p className={`text-[10px] ${colors.label}`}>Place</p>
+                                <p className={`font-semibold text-[11px] truncate ${colors.value}`}>{booking.place}</p>
                               </div>
                             </div>
                             
-                            <div className="flex items-center gap-2">
-                              <Clock className="h-4 w-4 text-muted-foreground" />
+                            <div className="flex items-center gap-1.5">
+                              <Clock className={`h-3 w-3 ${colors.icon}`} />
                               <div>
-                                <p className="text-xs text-muted-foreground">Duration</p>
-                                <p className="font-medium text-sm">
+                                <p className={`text-[10px] ${colors.label}`}>Duration</p>
+                                <p className={`font-semibold text-[11px] ${colors.value}`}>
                                   {(() => {
                                     const start = booking.startTime.split(':').map(Number)
                                     const end = booking.endTime.split(':').map(Number)
@@ -398,40 +457,41 @@ export function TimelineView() {
                               </div>
                             </div>
                             
-                            <div className="flex items-center gap-2">
-                              <Users className="h-4 w-4 text-muted-foreground" />
+                            <div className="flex items-center gap-1.5">
+                              <Users className={`h-3 w-3 ${colors.icon}`} />
                               <div>
-                                <p className="text-xs text-muted-foreground">Participants</p>
-                                <p className="font-medium text-sm">
+                                <p className={`text-[10px] ${colors.label}`}>Participants</p>
+                                <p className={`font-semibold text-[11px] ${colors.value}`}>
                                   {booking.totalParticipantsCount ?? 0}
                                 </p>
                               </div>
                             </div>
+                            
+                            {booking.refreshments?.required && (
+                              <div className="flex items-center gap-1.5">
+                                <Utensils className={`h-3 w-3 ${colors.icon}`} />
+                                <div>
+                                  <p className={`text-[10px] ${colors.label}`}>Refreshments</p>
+                                  <p className={`font-semibold text-[11px] ${colors.value}`}>Yes</p>
+                                </div>
+                              </div>
+                            )}
                           </div>
                           
-                          {/* Actions */}
-                          <div className="flex gap-2 mt-4 pt-4 border-t">
-                            <Button 
-                              variant="outline" 
-                              size="sm" 
-                              onClick={() => handleEdit(booking)}
-                              disabled={booking.status === "completed" || booking.status === "cancelled"}
-                            >
-                              <Edit className="h-4 w-4 mr-1" />
-                              Edit
-                            </Button>
-                            {(booking.status === "upcoming" || booking.status === "ongoing") && (
+                          {/* Actions - Compact */}
+                          {!isCancelled && (booking.status === "upcoming" || booking.status === "ongoing") && (
+                            <div className="flex gap-2 mt-2 pt-2 border-t dark:border-border/50">
                               <Button
                                 variant="outline"
                                 size="sm"
                                 onClick={() => handleCancel(booking)}
-                                className="text-destructive hover:text-destructive"
+                                className="text-destructive hover:text-destructive h-7 px-2 text-[11px] dark:border-border dark:hover:bg-muted"
                               >
-                                <Trash2 className="h-4 w-4 mr-1" />
+                                <Trash2 className="h-3 w-3 mr-1" />
                                 Cancel
                               </Button>
-                            )}
-                          </div>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -442,21 +502,22 @@ export function TimelineView() {
           )}
         </CardContent>
       </Card>
+      </div>
 
       {/* Confirmation Dialog */}
       <Dialog open={isConfirmDialogOpen} onOpenChange={setIsConfirmDialogOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-orange-500" />
+        <DialogContent className="sm:max-w-md dark:bg-card dark:border-border">
+          <DialogHeader className="dark:border-border/50">
+            <DialogTitle className="flex items-center gap-2 dark:text-foreground">
+              <AlertTriangle className="h-5 w-5 text-orange-500 dark:text-orange-400" />
               {confirmTitle}
             </DialogTitle>
           </DialogHeader>
           <div className="py-4">
-            <p className="text-sm text-muted-foreground">{confirmMessage}</p>
+            <p className="text-sm text-muted-foreground dark:text-muted-foreground">{confirmMessage}</p>
           </div>
           <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setIsConfirmDialogOpen(false)}>
+            <Button variant="outline" onClick={() => setIsConfirmDialogOpen(false)} className="dark:border-border dark:hover:bg-muted">
               No, Keep It
             </Button>
             <Button
