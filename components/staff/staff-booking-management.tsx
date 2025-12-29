@@ -607,7 +607,12 @@ export function StaffBookingManagement() {
         limit: 100
       })
       
-      const bookingsData: any[] = Array.isArray(bookingsResponse) ? bookingsResponse : []
+      let bookingsData: any[] = Array.isArray(bookingsResponse) ? bookingsResponse : []
+      
+      // Filter out missing bookings (is_missing_booking = 1 or true)
+      bookingsData = bookingsData.filter((b: any) => 
+        (b.is_missing_booking === 0 || b.is_missing_booking === false || b.is_missing_booking === null || b.is_missing_booking === undefined)
+      )
       
       // Fetch ALL cancellations once at the start (more reliable than filtering per booking)
       console.log('\n  🔍 ========== FETCHING ALL CANCELLATIONS ==========')
@@ -2899,7 +2904,7 @@ export function StaffBookingManagement() {
   }, [])
 
   return (
-    <div className="space-y-4 px-2 sm:px-4">
+    <div className="space-y-3 px-2 sm:px-4 max-w-[98vw] mx-auto dark:bg-background">
       {/* Compact Header with Filters and Actions in One Line */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4">
         {/* Search */}
@@ -2941,6 +2946,26 @@ export function StaffBookingManagement() {
             ))}
           </SelectContent>
         </Select>
+
+        {/* Date Range Filter */}
+        <div className="flex items-center gap-2">
+          <Input
+            type="date"
+            placeholder="From Date"
+            value={filterDateFrom}
+            onChange={(e) => setFilterDateFrom(e.target.value)}
+            className="w-full sm:w-[140px]"
+          />
+          <span className="text-muted-foreground hidden sm:inline">to</span>
+          <Input
+            type="date"
+            placeholder="To Date"
+            value={filterDateTo}
+            onChange={(e) => setFilterDateTo(e.target.value)}
+            className="w-full sm:w-[140px]"
+            min={filterDateFrom || undefined}
+          />
+        </div>
 
         {/* New Booking Button */}
         <Button 
@@ -3520,11 +3545,11 @@ export function StaffBookingManagement() {
       <div className="flex items-center justify-between px-2">
         <div className="text-sm text-muted-foreground">
           Showing <strong className="text-foreground">{filteredBookings.length}</strong> of <strong className="text-foreground">{bookings.length}</strong> bookings
-          {(searchTerm || statusFilter !== "all" || placeFilter !== "all") && (
+          {(searchTerm || statusFilter !== "all" || placeFilter !== "all" || filterDateFrom || filterDateTo) && (
             <Badge variant="secondary" className="ml-2">Filters active</Badge>
           )}
         </div>
-        {(searchTerm || statusFilter !== "all" || placeFilter !== "all") && (
+        {(searchTerm || statusFilter !== "all" || placeFilter !== "all" || filterDateFrom || filterDateTo) && (
           <Button
             variant="ghost"
             size="sm"
@@ -3532,6 +3557,8 @@ export function StaffBookingManagement() {
               setSearchTerm("")
               setStatusFilter("all")
               setPlaceFilter("all")
+              setFilterDateFrom("")
+              setFilterDateTo("")
             }}
             className="h-8"
           >
@@ -3548,14 +3575,14 @@ export function StaffBookingManagement() {
         </TabsList>
 
         <TabsContent value="list">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Calendar className="h-5 w-5" />
+          <Card className="dark:bg-card dark:border-border">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-[13px]">
+                <Calendar className="h-4 w-4" />
                 All Bookings ({filteredBookings.length})
               </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-3">
               {isLoadingBookings ? (
                 <div className="flex items-center justify-center py-12">
                   <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -3577,96 +3604,99 @@ export function StaffBookingManagement() {
                   </p>
                 </div>
               ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                      <TableHead>Ref ID</TableHead>
-                    <TableHead>Title</TableHead>
-                    <TableHead>Date & Time</TableHead>
-                    <TableHead>Place</TableHead>
-                    <TableHead>Responsible</TableHead>
-                    <TableHead>Participants</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+              <div className="border rounded-lg overflow-hidden dark:border-border">
+                <div className="overflow-x-auto">
+                  <div className="max-h-[calc(7*60px)] overflow-y-auto table-scroll-container-vertical">
+                    <Table>
+                      <TableHeader className="sticky top-0 z-10 bg-background dark:bg-card">
+                        <TableRow>
+                          <TableHead className="w-[100px] text-[12px]">Ref ID</TableHead>
+                          <TableHead className="min-w-[200px] text-[12px]">Title</TableHead>
+                          <TableHead className="w-[150px] text-[12px]">Date & Time</TableHead>
+                          <TableHead className="w-[120px] text-[12px]">Place</TableHead>
+                          <TableHead className="min-w-[150px] text-[12px]">Responsible</TableHead>
+                          <TableHead className="w-[120px] text-[12px]">Participants</TableHead>
+                          <TableHead className="w-[100px] text-[12px]">Status</TableHead>
+                          <TableHead className="w-[150px] text-[12px]">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
                     {filteredBookings.map((booking) => (
-                    <TableRow key={booking.id}>
-                      <TableCell>
+                    <TableRow key={booking.id} onClick={(e) => e.stopPropagation()}>
+                      <TableCell className="text-[12px]">
                         {booking.bookingRefId ? (
-                          <Badge variant="secondary" className="font-mono font-bold text-sm">
+                          <Badge variant="secondary" className="font-mono font-bold text-[11px]">
                             {booking.bookingRefId}
                           </Badge>
                         ) : (
-                          <span className="text-xs text-muted-foreground">—</span>
+                          <span className="text-[11px] text-muted-foreground">—</span>
                         )}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="text-[12px]">
                         <div>
-                          <div className="flex items-center gap-2">
-                            <p className="font-medium">{booking.title}</p>
+                          <div className="flex items-center gap-1.5">
+                            <p className="font-medium text-[12px] truncate">{booking.title}</p>
                             {booking.refreshments?.required && (
-                              <Badge variant="outline" className="text-orange-600 border-orange-600">
-                                🍽️ Refreshments
+                              <Badge variant="outline" className="text-orange-600 border-orange-600 text-[10px] px-1 py-0">
+                                🍽️
                               </Badge>
                             )}
                           </div>
                           {booking.description && (
-                            <p className="text-sm text-muted-foreground">{booking.description}</p>
+                            <p className="text-[11px] text-muted-foreground truncate">{booking.description}</p>
                           )}
                         </div>
                       </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Calendar className="h-4 w-4 text-muted-foreground" />
+                      <TableCell className="text-[12px]">
+                        <div className="flex items-center gap-1.5">
+                          <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
                           <div>
-                            <p className="text-sm font-medium">{formatDate(booking.date)}</p>
-                            <p className="text-xs text-muted-foreground">
+                            <p className="text-[11px] font-medium">{formatDate(booking.date)}</p>
+                            <p className="text-[10px] text-muted-foreground">
                               {formatTime(booking.startTime)} - {formatTime(booking.endTime)}
                             </p>
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <MapPin className="h-4 w-4 text-muted-foreground" />
-                          {booking.place}
+                      <TableCell className="text-[12px]">
+                        <div className="flex items-center gap-1.5">
+                          <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
+                          <span className="truncate">{booking.place}</span>
                         </div>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="text-[12px]">
                         {booking.responsiblePerson ? (
-                          <div className="flex items-center gap-2">
-                            <Avatar className="h-6 w-6">
-                              <AvatarFallback className="text-xs">
+                          <div className="flex items-center gap-1.5">
+                            <Avatar className="h-5 w-5">
+                              <AvatarFallback className="text-[10px]">
                                 {booking.responsiblePerson.name
                                   .split(" ")
                                   .map((n) => n[0])
                                   .join("")}
                               </AvatarFallback>
                             </Avatar>
-                            <div>
-                              <p className="text-sm font-medium">{booking.responsiblePerson.name}</p>
-                              <p className="text-xs text-muted-foreground">{booking.responsiblePerson.department}</p>
+                            <div className="min-w-0">
+                              <p className="text-[11px] font-medium truncate">{booking.responsiblePerson.name}</p>
+                              <p className="text-[10px] text-muted-foreground truncate">{booking.responsiblePerson.department}</p>
                             </div>
                           </div>
                         ) : (
-                          <span className="text-muted-foreground">Not assigned</span>
+                          <span className="text-[11px] text-muted-foreground">Not assigned</span>
                         )}
                       </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Users className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-sm">
-                            {booking.totalParticipantsCount ?? (booking.selectedEmployees.length + booking.externalParticipants.length)} participants
+                      <TableCell className="text-[12px]">
+                        <div className="flex items-center gap-1.5">
+                          <Users className="h-3.5 w-3.5 text-muted-foreground" />
+                          <span className="text-[11px]">
+                            {booking.totalParticipantsCount ?? (booking.selectedEmployees.length + booking.externalParticipants.length)}
                           </span>
                         </div>
                       </TableCell>
-                      <TableCell>
-                        <Badge {...getStatusBadgeProps(booking.status)}>{booking.status}</Badge>
+                      <TableCell className="text-[12px]">
+                        <Badge {...getStatusBadgeProps(booking.status)} className="text-[11px]">{booking.status}</Badge>
                       </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2 flex-wrap">
+                      <TableCell className="text-[12px]">
+                        <div className="flex items-center gap-1.5 flex-wrap">
                           {/* Check if responsible person email matches current user email */}
                           {(() => {
                             // Get responsible person email
@@ -3677,11 +3707,14 @@ export function StaffBookingManagement() {
                             // Check if emails match (case-insensitive)
                             const isResponsiblePerson = responsiblePersonEmail.toLowerCase().trim() === currentUserEmail.toLowerCase().trim()
                             
-                            // If user is the responsible person, show Mail, Cancel, and Edit buttons
+                            // Check if booking is cancelled or completed
+                            const bookingStatus = String(booking.status || '').toLowerCase().trim()
+                            const isCancelled = bookingStatus === 'cancelled'
+                            const isCompleted = booking.status === "completed"
+                            const isCancelledOrCompleted = isCancelled || isCompleted
+                            
+                            // If user is the responsible person, show buttons
                             if (isResponsiblePerson) {
-                              // Check if booking is cancelled or completed
-                              const isCancelledOrCompleted = booking.status === "cancelled" || booking.status === "completed"
-                              
                               return (
                                 <>
                                   {/* Mail Button - Only show if NOT cancelled or completed */}
@@ -3689,101 +3722,116 @@ export function StaffBookingManagement() {
                                     <Button 
                                       variant="outline" 
                                       size="sm" 
-                                      onClick={() => handleSendEmailClick(booking)}
-                                      className="text-blue-600 border-blue-600 hover:bg-blue-50"
+                                      onClick={(e) => {
+                                        e.preventDefault()
+                                        e.stopPropagation()
+                                        handleSendEmailClick(booking)
+                                      }}
+                                      className="text-blue-600 border-blue-600 hover:bg-blue-50 h-7 px-2"
                                       title="Send email to participants"
                                     >
-                                      <Mail className="h-4 w-4" />
+                                      <Mail className="h-3.5 w-3.5" />
                                     </Button>
                                   )}
                                   
-                                  {/* Edit Button */}
-                              <Button 
-                                variant="outline" 
-                                size="sm" 
-                                onClick={() => handleEdit(booking)}
-                                disabled={booking.status === "completed" || booking.status === "cancelled"}
-                                title={
-                                  booking.status === "completed" ? "Cannot edit completed bookings" :
-                                  booking.status === "cancelled" ? "Cannot edit cancelled bookings" :
-                                  "Edit booking"
-                                }
-                              >
-                                <Edit className="h-4 w-4" />
-                              </Button>
+                                  {/* Edit Button - Hide completely if cancelled or completed */}
+                                  {!isCancelled && !isCompleted && (
+                                    <Button 
+                                      variant="outline" 
+                                      size="sm" 
+                                      onClick={(e) => {
+                                        e.preventDefault()
+                                        e.stopPropagation()
+                                        handleEdit(booking)
+                                      }}
+                                      className="h-7 px-2"
+                                      title="Edit booking"
+                                    >
+                                      <Edit className="h-3.5 w-3.5" />
+                                    </Button>
+                                  )}
                               
-                                  {/* Cancel Button */}
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleCancel(booking.id)}
-                                disabled={booking.status === "completed" || booking.status === "cancelled"}
-                                className="text-red-600 hover:text-red-700 hover:border-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                                title={
-                                  booking.status === "completed" || booking.status === "cancelled" 
-                                    ? "Cannot cancel this booking" 
-                                    : "Cancel booking"
-                                }
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </>
+                                  {/* Delete/Cancel Button - Only show if NOT cancelled and NOT completed */}
+                                  {!isCancelled && !isCompleted && (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={(e) => {
+                                        e.preventDefault()
+                                        e.stopPropagation()
+                                        handleCancel(booking.id)
+                                      }}
+                                      className="text-red-600 hover:text-red-700 hover:border-red-600 dark:text-red-400 dark:hover:text-red-300 dark:border-red-400 dark:hover:border-red-300 dark:hover:bg-red-950/30 h-7 px-2"
+                                      title="Cancel booking"
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </Button>
+                                  )}
+                                  
+                                  {/* Info Button - Show ONLY for cancelled bookings to view cancellation reason */}
+                                  {isCancelled && (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={(e) => {
+                                        e.preventDefault()
+                                        e.stopPropagation()
+                                        handleShowCancellationReason(booking)
+                                      }}
+                                      className="text-blue-600 hover:text-blue-700 hover:border-blue-600 dark:text-blue-400 dark:hover:text-blue-300 dark:border-blue-400 dark:hover:border-blue-300 dark:hover:bg-blue-950/30 h-7 px-2"
+                                      title="View cancellation details"
+                                    >
+                                      <Info className="h-3.5 w-3.5" />
+                                    </Button>
+                                  )}
+                                </>
                               )
                             }
                             
-                            // For other bookings, show only cancellation reason view button (if cancelled)
-                            return null
-                          })()}
-
-                          {/* Always show cancellation reason button for ALL cancelled bookings */}
-                          {(() => {
-                            // Check if booking is cancelled (handle all case variations)
-                            const bookingStatus = String(booking.status || '').toLowerCase().trim()
-                            const isCancelled = bookingStatus === 'cancelled'
-                            
-                            if (!isCancelled) return null
-                            
-                            // Get cancellation reason with fallbacks
-                            const reason = booking.cancellation?.cancellation_reason || 
-                                         booking.cancellation?.['cancellation_reason'] ||
-                                         booking.cancellation?.cancellationReason ||
-                                         booking.cancellation?.reason ||
-                                         ''
-                            
-                            const hasReason = reason && String(reason).trim().length > 0
-                            
-                            return (
+                            // For other bookings (not responsible person), show only cancellation reason view button (if cancelled)
+                            if (isCancelled) {
+                              return (
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  onClick={() => handleShowCancellationReason(booking)}
-                                  className="text-blue-600 hover:text-blue-700 hover:border-blue-600"
-                                  title={hasReason ? `View cancellation reason: ${String(reason).substring(0, 50)}...` : "View cancellation details"}
+                                  onClick={(e) => {
+                                    e.preventDefault()
+                                    e.stopPropagation()
+                                    handleShowCancellationReason(booking)
+                                  }}
+                                  className="text-blue-600 hover:text-blue-700 hover:border-blue-600 dark:text-blue-400 dark:hover:text-blue-300 dark:border-blue-400 dark:hover:border-blue-300 dark:hover:bg-blue-950/30 h-7 px-2"
+                                  title="View cancellation details"
                                 >
-                                  <Info className="h-4 w-4" />
+                                  <Info className="h-3.5 w-3.5" />
                                 </Button>
-                            )
+                              )
+                            }
+                            
+                            return null
                           })()}
                         </div>
                       </TableCell>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              </div>
               )}
             </CardContent>
           </Card>
         </TabsContent>
 
         <TabsContent value="today">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Clock className="h-5 w-5" />
+          <Card className="dark:bg-card dark:border-border">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-[13px]">
+                <Clock className="h-4 w-4" />
                 Today's Bookings ({todaysBookings.length})
               </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-3">
               {todaysBookings.length === 0 ? (
                 <p className="text-center text-muted-foreground py-8">No bookings scheduled for today</p>
               ) : (
@@ -3856,20 +3904,21 @@ export function StaffBookingManagement() {
 
       {/* Confirmation Dialog */}
       <Dialog open={isConfirmDialogOpen} onOpenChange={setIsConfirmDialogOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md dark:bg-card dark:border-border">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-orange-500" />
+            <DialogTitle className="flex items-center gap-2 dark:text-foreground">
+              <AlertTriangle className="h-5 w-5 text-orange-500 dark:text-orange-400" />
               {confirmTitle}
             </DialogTitle>
           </DialogHeader>
           <div className="py-4">
-            <p className="text-sm text-muted-foreground">{confirmMessage}</p>
+            <p className="text-sm text-muted-foreground dark:text-muted-foreground">{confirmMessage}</p>
           </div>
           <div className="flex justify-end gap-3">
             <Button
               variant="outline"
               onClick={() => setIsConfirmDialogOpen(false)}
+              className="dark:border-border dark:hover:bg-muted"
             >
               No, Keep It
             </Button>
@@ -3878,6 +3927,7 @@ export function StaffBookingManagement() {
               onClick={() => {
                 if (confirmAction) confirmAction()
               }}
+              className="dark:bg-destructive dark:hover:bg-destructive/90"
             >
               Yes, Continue
             </Button>
@@ -3887,26 +3937,26 @@ export function StaffBookingManagement() {
 
       {/* Cancellation Reason Dialog */}
       <Dialog open={isCancellationDialog} onOpenChange={setIsCancellationDialog}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md dark:bg-card dark:border-border">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-red-500" />
+            <DialogTitle className="flex items-center gap-2 dark:text-foreground">
+              <AlertTriangle className="h-5 w-5 text-red-500 dark:text-red-400" />
               Cancel Booking
             </DialogTitle>
           </DialogHeader>
           <div className="py-4 space-y-4">
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-muted-foreground dark:text-muted-foreground">
               Please provide a reason for cancelling this booking. This information will be stored for records.
             </p>
             <div className="space-y-2">
-              <Label htmlFor="cancellationReason">Cancellation Reason *</Label>
+              <Label htmlFor="cancellationReason" className="dark:text-foreground">Cancellation Reason *</Label>
               <Textarea
                 id="cancellationReason"
                 placeholder="Enter the reason for cancellation (e.g., Room unavailable, Event postponed, etc.)"
                 value={cancellationReason}
                 onChange={(e) => setCancellationReason(e.target.value)}
                 rows={4}
-                className="resize-none"
+                className="resize-none dark:bg-background dark:border-border dark:text-foreground"
                 required
               />
             </div>
@@ -3919,6 +3969,7 @@ export function StaffBookingManagement() {
                 setCancellationReason("")
                 setBookingToCancel(null)
               }}
+              className="dark:border-border dark:hover:bg-muted"
             >
               Cancel
             </Button>
@@ -3926,6 +3977,7 @@ export function StaffBookingManagement() {
               variant="destructive"
               onClick={handleConfirmCancellation}
               disabled={!cancellationReason.trim()}
+              className="dark:bg-destructive dark:hover:bg-destructive/90"
             >
               Confirm Cancellation
             </Button>
@@ -3935,10 +3987,10 @@ export function StaffBookingManagement() {
 
       {/* View Cancellation Reason Dialog */}
       <Dialog open={isCancellationReasonDialogOpen} onOpenChange={setIsCancellationReasonDialogOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md dark:bg-card dark:border-border">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Info className="h-5 w-5 text-blue-500" />
+            <DialogTitle className="flex items-center gap-2 dark:text-foreground">
+              <Info className="h-5 w-5 text-blue-500 dark:text-blue-400" />
               Cancellation Details
             </DialogTitle>
           </DialogHeader>
@@ -3946,17 +3998,17 @@ export function StaffBookingManagement() {
             {selectedCancellation && (
               <>
                 <div className="space-y-2">
-                  <Label className="text-sm font-semibold">Cancellation Reason</Label>
-                  <div className="p-3 bg-gray-50 rounded-lg border">
-                    <p className="text-sm text-foreground whitespace-pre-wrap">
-                      {selectedCancellation.cancellation_reason}
+                  <Label className="text-sm font-semibold dark:text-foreground">Cancellation Reason</Label>
+                  <div className="p-3 bg-gray-50 dark:bg-muted rounded-lg border dark:border-border">
+                    <p className="text-sm text-foreground dark:text-foreground whitespace-pre-wrap">
+                      {selectedCancellation.cancellation_reason || 'No reason provided'}
                     </p>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4 pt-2 border-t">
+                <div className="grid grid-cols-2 gap-4 pt-2 border-t dark:border-border">
                   <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Cancelled At</Label>
-                    <p className="text-sm font-medium">
+                    <Label className="text-xs text-muted-foreground dark:text-muted-foreground">Cancelled At</Label>
+                    <p className="text-sm font-medium dark:text-foreground">
                       {selectedCancellation.cancelled_at 
                         ? new Date(selectedCancellation.cancelled_at).toLocaleString('en-US', {
                             year: 'numeric',
@@ -3969,13 +4021,18 @@ export function StaffBookingManagement() {
                     </p>
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Cancellation Type</Label>
-                    <p className="text-sm font-medium capitalize">
+                    <Label className="text-xs text-muted-foreground dark:text-muted-foreground">Cancellation Type</Label>
+                    <p className="text-sm font-medium capitalize dark:text-foreground">
                       {selectedCancellation.cancellation_type?.replace('_', ' ') || 'N/A'}
                     </p>
                   </div>
                 </div>
               </>
+            )}
+            {!selectedCancellation && (
+              <div className="text-center py-4">
+                <p className="text-sm text-muted-foreground dark:text-muted-foreground">No cancellation details available</p>
+              </div>
             )}
           </div>
           <div className="flex justify-end">

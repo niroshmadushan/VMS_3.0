@@ -2,10 +2,12 @@
 
 import type { ReactNode } from "react"
 import { usePathname } from "next/navigation"
-import { LogOut, User } from "lucide-react"
+import { LogOut, User, AlertTriangle } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import { logoutManager } from "@/lib/logout-manager"
 import { useEffect, useState } from "react"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
+import { Button } from "@/components/ui/button"
 import {
   Sidebar,
   SidebarContent,
@@ -38,6 +40,7 @@ export function AppLayout({ children, title, subtitle }: AppLayoutProps) {
   const { user, isAuthenticated, isLoading, signOut } = useAuth()
   const [isClient, setIsClient] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [showLogoutDialog, setShowLogoutDialog] = useState(false)
   const pathname = usePathname()
 
   useEffect(() => {
@@ -74,6 +77,15 @@ export function AppLayout({ children, title, subtitle }: AppLayoutProps) {
       logoutManager.clearLocalStorage()
       logoutManager.redirectToLogin()
     }
+  }
+
+  const handleLogoutClick = () => {
+    setShowLogoutDialog(true)
+  }
+
+  const confirmLogout = async () => {
+    setShowLogoutDialog(false)
+    await handleLogout()
   }
 
   // Get user role safely
@@ -118,7 +130,7 @@ export function AppLayout({ children, title, subtitle }: AppLayoutProps) {
               )}
               <SidebarMenuItem>
                 <SidebarMenuButton
-                  onClick={handleLogout}
+                  onClick={handleLogoutClick}
                   className="w-full text-destructive hover:bg-destructive/10 hover:text-destructive"
                 >
                   <LogOut className="h-4 w-4" />
@@ -127,6 +139,38 @@ export function AppLayout({ children, title, subtitle }: AppLayoutProps) {
               </SidebarMenuItem>
             </SidebarMenu>
           </SidebarFooter>
+
+          {/* Logout Confirmation Dialog */}
+          <Dialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
+            <DialogContent className="dark:bg-card dark:border-border">
+              <DialogHeader className="dark:border-border/50">
+                <DialogTitle className="flex items-center gap-2 dark:text-foreground">
+                  <AlertTriangle className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+                  Confirm Logout
+                </DialogTitle>
+                <DialogDescription className="dark:text-muted-foreground">
+                  Are you sure you want to logout? You will need to login again to access your account.
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter className="dark:border-border/50">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowLogoutDialog(false)}
+                  className="dark:border-border dark:text-foreground dark:hover:bg-muted"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={confirmLogout}
+                  className="dark:bg-red-600 dark:hover:bg-red-700"
+                >
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Logout
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
           <SidebarRail />
         </Sidebar>
 

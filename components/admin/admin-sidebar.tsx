@@ -5,6 +5,7 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import {
   LayoutDashboard,
   MapPin,
@@ -22,38 +23,69 @@ import {
   Moon,
   User,
   Utensils,
+  AlertTriangle,
+  FileText,
+  Calendar,
+  BarChart3,
+  Tag,
 } from "lucide-react"
 
 const navigation = [
+  // Core Dashboard
   {
     name: "Dashboard",
     href: "/admin",
     icon: LayoutDashboard,
   },
+  // Bookings Section
   {
-    name: "Places",
-    href: "/admin/places",
-    icon: MapPin,
+    name: "Bookings",
+    href: "/admin/bookings",
+    icon: Calendar,
   },
   {
-    name: "Refreshments",
-    href: "/admin/refreshments",
-    icon: Utensils,
+    name: "Missing Booking Details",
+    href: "/admin/bookings/missing-details",
+    icon: FileText,
   },
   {
-    name: "Users",
+    name: "Timeline",
+    href: "/admin/timeline",
+    icon: BarChart3,
+  },
+  // User Management Section
+  {
+    name: "User Management",
     href: "/admin/users",
     icon: Users,
+  },
+  {
+    name: "External Members",
+    href: "/admin/external-members",
+    icon: UserCheck,
+  },
+  // Place Management Section
+  {
+    name: "Place Management",
+    href: "/admin/places",
+    icon: MapPin,
   },
   {
     name: "Availability",
     href: "/admin/availability",
     icon: Clock,
   },
+  // Refreshments
+  {
+    name: "Refreshments",
+    href: "/admin/refreshments",
+    icon: Utensils,
+  },
+  // Pass Management Section (Grouped together)
   {
     name: "Pass Types",
     href: "/admin/pass-types",
-    icon: Settings,
+    icon: Tag,
   },
   {
     name: "Visitor Passes",
@@ -65,10 +97,11 @@ const navigation = [
     href: "/admin/pass-history",
     icon: History,
   },
+  // Settings (Always last)
   {
-    name: "External Members",
-    href: "/admin/external-members",
-    icon: UserCheck,
+    name: "Settings",
+    href: "/admin/settings",
+    icon: Settings,
   },
   // {
   //   name: "Feedback",
@@ -81,6 +114,7 @@ export function AdminSidebar() {
   const [collapsed, setCollapsed] = useState(false)
   const [user, setUser] = useState<any>(null)
   const [theme, setTheme] = useState<'light' | 'dark'>('light')
+  const [showLogoutDialog, setShowLogoutDialog] = useState(false)
   const pathname = usePathname()
   const router = useRouter()
 
@@ -104,6 +138,15 @@ export function AdminSidebar() {
     localStorage.removeItem('user')
     localStorage.removeItem('token')
     router.push('/')
+  }
+
+  const handleLogoutClick = () => {
+    setShowLogoutDialog(true)
+  }
+
+  const confirmLogout = () => {
+    setShowLogoutDialog(false)
+    handleLogout()
   }
 
   const toggleTheme = () => {
@@ -175,7 +218,7 @@ export function AdminSidebar() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={handleLogout}
+              onClick={handleLogoutClick}
               className="text-sidebar-foreground hover:bg-sidebar-accent justify-center"
               title="Logout"
             >
@@ -213,7 +256,7 @@ export function AdminSidebar() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={handleLogout}
+                onClick={handleLogoutClick}
                 className="flex-1 text-sidebar-foreground hover:bg-sidebar-accent"
               >
                 <LogOut className="h-4 w-4 mr-2" />
@@ -223,6 +266,38 @@ export function AdminSidebar() {
           </div>
         )}
       </div>
+
+      {/* Logout Confirmation Dialog */}
+      <Dialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
+        <DialogContent className="dark:bg-card dark:border-border">
+          <DialogHeader className="dark:border-border/50">
+            <DialogTitle className="flex items-center gap-2 dark:text-foreground">
+              <AlertTriangle className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+              Confirm Logout
+            </DialogTitle>
+            <DialogDescription className="dark:text-muted-foreground">
+              Are you sure you want to logout? You will need to login again to access your account.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="dark:border-border/50">
+            <Button
+              variant="outline"
+              onClick={() => setShowLogoutDialog(false)}
+              className="dark:border-border dark:text-foreground dark:hover:bg-muted"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmLogout}
+              className="dark:bg-red-600 dark:hover:bg-red-700"
+            >
+              <LogOut className="h-4 w-4 mr-2" />
+              Logout
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ArrowLeft, Calendar, MapPin, Users, X, Search, Clock, Utensils, Save, Edit, ExternalLink } from "lucide-react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { placeManagementAPI } from "@/lib/place-management-api"
 import toast from "react-hot-toast"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -180,6 +180,11 @@ export default function NewBookingPage() {
   
   // Email Notification State
   const [selectedEmailParticipants, setSelectedEmailParticipants] = useState<string[]>([])
+  
+  // Confirmation Dialog State
+  const [isCancelConfirmDialogOpen, setIsCancelConfirmDialogOpen] = useState(false)
+  const [isCreateConfirmDialogOpen, setIsCreateConfirmDialogOpen] = useState(false)
+  const [shouldSubmitForm, setShouldSubmitForm] = useState(false)
   
   const [newExternalParticipant, setNewExternalParticipant] = useState({
     fullName: "",
@@ -455,8 +460,19 @@ export default function NewBookingPage() {
         else return `${mins}min`
       }
 
+      // Check if selected date is today
+      const today = new Date().toISOString().split('T')[0]
+      const isToday = formData.date === today
+      
+      // Get current time in minutes (add 1 minute buffer to ensure future times)
+      const now = new Date()
+      const currentMinutes = now.getHours() * 60 + now.getMinutes() + 1 // Add 1 minute buffer
+
       const openMinutes = timeToMinutes(openTime)
       const closeMinutes = timeToMinutes(closeTime)
+      
+      // If today, start from current time (minimum open time)
+      const effectiveStartMinutes = isToday ? Math.max(openMinutes, currentMinutes) : openMinutes
 
       // Get existing bookings for this date and place
       // Filter bookings: same date, same place, and exclude cancelled bookings
@@ -476,7 +492,7 @@ export default function NewBookingPage() {
 
       // Find gaps
       const gaps: {start: string, end: string, duration: string}[] = []
-      let currentTime = openMinutes
+      let currentTime = effectiveStartMinutes
 
       for (const booking of relevantBookings) {
         if (currentTime < booking.start) {
@@ -676,13 +692,15 @@ export default function NewBookingPage() {
       })
     })
     
-    // Add external participants
+    // Add external participants (only if they have an email)
     formData.externalParticipants.forEach(participant => {
-      participants.push({
-        name: participant.fullName,
-        email: participant.email,
-        type: 'external'
-      })
+      if (participant.email && participant.email.trim() !== '') {
+        participants.push({
+          name: participant.fullName,
+          email: participant.email.trim(),
+          type: 'external'
+        })
+      }
     })
     
     return participants
@@ -700,7 +718,10 @@ export default function NewBookingPage() {
   // Handle select all participants
   const handleSelectAllParticipants = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.checked) {
-      const allEmails = getAllParticipants().map(p => p.email)
+      // Only include participants with valid emails
+      const allEmails = getAllParticipants()
+        .filter(p => p.email && p.email.trim() !== '')
+        .map(p => p.email.trim())
       setSelectedEmailParticipants(allEmails)
     } else {
       setSelectedEmailParticipants([])
@@ -735,6 +756,18 @@ export default function NewBookingPage() {
         return time.substring(0, 5) // Remove seconds if present
       }
 
+      // Filter out any empty or invalid emails
+      const validEmails = selectedEmailParticipants.filter(email => email && email.trim() !== '').map(email => email.trim())
+      
+      if (validEmails.length === 0) {
+        console.log('📧 No valid email addresses to send notifications to')
+        toast.warning('No valid email addresses selected', {
+          position: 'top-center',
+          duration: 3000
+        })
+        return
+      }
+
       // Prepare email data for the new simplified API
       const emailData = {
         meetingName: bookingData.title,
@@ -743,12 +776,14 @@ export default function NewBookingPage() {
         endTime: formatTime(bookingData.end_time),
         place: bookingData.place_name || '',
         description: bookingData.description || '',
-        participantEmails: selectedEmailParticipants,
+        participantEmails: validEmails,
         emailType: 'booking_details' as const,
-        bookingRefId: bookingRefId // Include booking reference ID
+        bookingRefId: bookingRefId || '' // Include booking reference ID (ensure it's always a string)
       }
 
       console.log('📧 Email data prepared:', emailData)
+      console.log('📧 Booking Reference ID:', bookingRefId)
+      console.log('📧 Valid participant emails:', validEmails)
 
       // Call the simplified email API endpoint
       const response = await fetch('/api/booking-email/send-from-frontend', {
@@ -803,6 +838,15 @@ export default function NewBookingPage() {
   // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    // If confirmation dialog should be shown, show it instead of submitting
+    if (!shouldSubmitForm) {
+      setIsCreateConfirmDialogOpen(true)
+      return
+    }
+    
+    // Reset the flag for next time
+    setShouldSubmitForm(false)
 
     // 🛡️ COMPREHENSIVE VALIDATION
     console.log('🔍 Starting validation...')
@@ -957,6 +1001,7 @@ export default function NewBookingPage() {
       }
 
       // Insert external participants with member linking
+      // Ensure all operations complete before proceeding
       let hasExternalParticipants = false
       for (const participant of formData.externalParticipants) {
         let memberId = participant.id
@@ -968,42 +1013,75 @@ export default function NewBookingPage() {
           })
           const data = Array.isArray(response) ? response : response.data || []
           
-          const existingMember = data.find((m: any) => 
-            m.email === participant.email || m.phone === participant.phone
-          )
+          // Check by email (if provided) or phone - case-insensitive
+          const existingMember = data.find((m: any) => {
+            if (participant.email) {
+              return (m.email && m.email.toLowerCase() === participant.email.toLowerCase()) || 
+                     m.phone === participant.phone
+            }
+            return m.phone === participant.phone
+          })
 
           if (existingMember) {
             // Use existing member ID and increment visit count
             memberId = existingMember.id
+            console.log('✅ Using existing member:', existingMember.full_name, 'ID:', memberId)
             await placeManagementAPI.updateRecord('external_members', { id: memberId }, {
               visit_count: (existingMember.visit_count || 0) + 1,
-              last_visit_date: new Date().toISOString()
+              last_visit_date: getSriLankaTimestamp()
             })
-          } else if (!participant.id.startsWith('existing_')) {
-            // Create new member record
+            console.log('✅ Updated visit count for existing member')
+          } else {
+            // Create new member record in external_members table FIRST
+            // This ensures the member exists before linking to booking
             memberId = generateUUID()
-            await placeManagementAPI.insertRecord('external_members', sanitizeObject({
+            console.log('➕ Creating new member in external_members table:', participant.fullName, 'ID:', memberId)
+            
+            const memberData = sanitizeObject({
               id: memberId,
               full_name: sanitizeInput(participant.fullName),
-              email: participant.email,
-              phone: participant.phone,
+              email: (participant.email || '').toLowerCase().trim(),
+              phone: participant.phone.trim(),
               reference_type: participant.referenceType,
               reference_value: sanitizeInput(participant.referenceValue),
               visit_count: 1,
-              last_visit_date: getSriLankaTime(),
+              last_visit_date: getSriLankaTimestamp(),
               is_active: true,
               is_deleted: false,
               is_blacklisted: false,
-              created_at: getSriLankaTime()
-            }))
+              created_at: getSriLankaTimestamp()
+            })
+            
+            // Wait for member creation to complete
+            await placeManagementAPI.insertRecord('external_members', memberData)
+            console.log('✅ Successfully created new member in external_members table')
+            
+            // Verify member was created (optional check)
+            const verifyResponse = await placeManagementAPI.getTableData('external_members', {
+              id: memberId
+            })
+            const verifyData = Array.isArray(verifyResponse) ? verifyResponse : []
+            if (verifyData.length === 0) {
+              throw new Error(`Failed to verify member creation for ${participant.fullName}`)
+            }
+            console.log('✅ Verified member exists in external_members table')
           }
         } catch (error) {
-          console.error('Member check/create failed:', error)
+          console.error('❌ Member check/create failed:', error)
+          toast.error(`Failed to process external member ${participant.fullName}: ${error}`, {
+            position: 'top-center',
+            duration: 4000
+          })
+          throw error // Stop booking creation if member creation fails
         }
 
-        // Insert external participant with member_id link
-        await placeManagementAPI.insertRecord('external_participants', sanitizeObject({
-          id: generateUUID(),
+        // Wait for member to be created, then insert external participant record
+        // This ensures both records are created: external_members AND external_participants
+        const participantId = generateUUID()
+        console.log('➕ Creating external_participant record for member:', memberId, 'Participant ID:', participantId)
+        
+        const participantData = sanitizeObject({
+          id: participantId,
           booking_id: bookingId,
           member_id: memberId,
           full_name: sanitizeInput(participant.fullName),
@@ -1012,7 +1090,11 @@ export default function NewBookingPage() {
           reference_type: participant.referenceType,
           reference_value: sanitizeInput(participant.referenceValue),
           participation_status: 'invited'
-        }))
+        })
+        
+        // Wait for participant creation to complete in external_participants table
+        await placeManagementAPI.insertRecord('external_participants', participantData)
+        console.log('✅ Successfully created external_participant record in external_participants table')
 
         hasExternalParticipants = true
       }
@@ -1038,13 +1120,24 @@ export default function NewBookingPage() {
         }))
       }
 
+      // All database operations completed - booking, participants, and external members are all saved
+      console.log('✅ All database operations completed successfully')
+      console.log('✅ Booking ID:', bookingId)
+      console.log('✅ External members created:', formData.externalParticipants.length)
+
       toast.success('Booking created successfully!', {
         position: 'top-center',
         duration: 3000,
         icon: '✅'
       })
 
-      // Send email notifications to selected participants
+      // Auto-select all participants with valid emails for notifications
+      const allParticipantsWithEmails = getAllParticipants()
+        .filter(p => p.email && p.email.trim() !== '')
+        .map(p => p.email.trim())
+      setSelectedEmailParticipants(allParticipantsWithEmails)
+
+      // Send email notifications to all participants (including external members)
       await sendEmailNotifications(sanitizedBookingData, bookingRefId)
 
       // Redirect to bookings list
@@ -1362,21 +1455,22 @@ export default function NewBookingPage() {
   }
 
   return (
-    <div className="container mx-auto py-6 px-4 max-w-[1600px]">
+    <div className="container mx-auto py-6 px-4 max-w-[1600px] dark:bg-background">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-6 pb-4 border-b border-border/50 dark:border-border">
         <div className="flex items-center gap-4">
           <Button
             variant="outline"
             size="sm"
             onClick={() => router.push('/admin/bookings')}
+            className="dark:border-border dark:hover:bg-muted"
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Bookings
           </Button>
           <div>
-            <h1 className="text-3xl font-bold">Create New Booking</h1>
-            <p className="text-muted-foreground">Fill in the details to create a new booking</p>
+            <h1 className="text-3xl font-bold dark:text-foreground">Create New Booking</h1>
+            <p className="text-muted-foreground dark:text-muted-foreground">Fill in the details to create a new booking</p>
           </div>
         </div>
       </div>
@@ -1385,39 +1479,41 @@ export default function NewBookingPage() {
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left Column - Basic Info */}
-          <Card className="lg:col-span-2">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+          <Card className="lg:col-span-2 dark:bg-card dark:border-border shadow-md">
+            <CardHeader className="dark:border-border/50">
+              <CardTitle className="flex items-center gap-2 dark:text-foreground">
                 <Calendar className="h-5 w-5" />
                 Booking Details
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-4 dark:bg-card">
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2 space-y-2">
-                  <Label htmlFor="title">Booking Title *</Label>
+                  <Label htmlFor="title" className="dark:text-foreground">Booking Title *</Label>
                   <Input
                     id="title"
                     value={formData.title}
                     onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                     placeholder="e.g., Weekly Team Meeting"
                     required
+                    className="dark:bg-card dark:border-border dark:text-foreground"
                   />
                 </div>
 
                 <div className="col-span-2 space-y-2">
-                  <Label htmlFor="description">Description</Label>
+                  <Label htmlFor="description" className="dark:text-foreground">Description</Label>
                   <Textarea
                     id="description"
                     value={formData.description}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                     placeholder="Enter booking description..."
                     rows={3}
+                    className="dark:bg-card dark:border-border dark:text-foreground"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="date">Date *</Label>
+                  <Label htmlFor="date" className="dark:text-foreground">Date *</Label>
                   <Input
                     id="date"
                     type="date"
@@ -1425,20 +1521,21 @@ export default function NewBookingPage() {
                     min={new Date().toISOString().split('T')[0]}
                     onChange={(e) => setFormData({ ...formData, date: e.target.value, place: '', startTime: '', endTime: '' })}
                     required
+                    className="dark:bg-card dark:border-border dark:text-foreground"
                   />
-                  <p className="text-xs text-muted-foreground">
-                    You can only book for today or future dates
+                  <p className="text-xs text-muted-foreground dark:text-muted-foreground">
+                    You can only book for today or future dates. For today, only future times are available.
                   </p>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="place">Place *</Label>
+                  <Label htmlFor="place" className="dark:text-foreground">Place *</Label>
                   <Select
                     value={formData.place}
                     onValueChange={(value) => setFormData({ ...formData, place: value, startTime: '', endTime: '' })}
                     disabled={!formData.date || isLoadingPlaces}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="dark:bg-card dark:border-border dark:text-foreground">
                       <SelectValue placeholder={
                         !formData.date ? "Select date first" :
                         isLoadingPlaces ? "Loading places..." :
@@ -1446,12 +1543,12 @@ export default function NewBookingPage() {
                         "Select a place"
                       } />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="dark:bg-card dark:border-border">
                       {availablePlaces.map((place) => (
-                        <SelectItem key={place.id} value={place.id}>
+                        <SelectItem key={place.id} value={place.id} className="dark:text-foreground dark:hover:bg-muted">
                           <div className="flex flex-col">
-                            <span className="font-medium">{place.name}</span>
-                            <span className="text-xs text-muted-foreground">
+                            <span className="font-medium dark:text-foreground">{place.name}</span>
+                            <span className="text-xs text-muted-foreground dark:text-muted-foreground">
                               {place.operatingHours} • Capacity: {place.capacity}
                             </span>
                           </div>
@@ -1460,14 +1557,14 @@ export default function NewBookingPage() {
                     </SelectContent>
                   </Select>
                   {availablePlaces.length > 0 && formData.date && (
-                    <p className="text-xs text-green-600">
+                    <p className="text-xs text-green-600 dark:text-green-400">
                       ✅ {availablePlaces.length} place(s) available for {getDayOfWeek(formData.date)}
                     </p>
                   )}
                 </div>
 
                 <div className="col-span-2 space-y-2">
-                  <Label htmlFor="timeSlot">Available Time Slots *</Label>
+                  <Label htmlFor="timeSlot" className="dark:text-foreground">Available Time Slots *</Label>
                   <Select
                     value={selectedTimeGap}
                     onValueChange={(value) => {
@@ -1481,7 +1578,7 @@ export default function NewBookingPage() {
                     }}
                     disabled={!formData.date || !formData.place}
                   >
-                    <SelectTrigger className="h-auto py-3">
+                    <SelectTrigger className="h-auto py-3 dark:bg-card dark:border-border dark:text-foreground">
                       <SelectValue placeholder={
                         !formData.date ? "Select date first" :
                         !formData.place ? "Select place first" :
@@ -1489,9 +1586,9 @@ export default function NewBookingPage() {
                         "Select an available time slot"
                       } />
                     </SelectTrigger>
-                    <SelectContent className="max-h-[400px] w-full min-w-[600px]">
+                    <SelectContent className="max-h-[400px] w-full min-w-[600px] dark:bg-card dark:border-border">
                       {availableTimeGaps.length === 0 ? (
-                        <div className="p-4 text-center text-sm text-muted-foreground">
+                        <div className="p-4 text-center text-sm text-muted-foreground dark:text-muted-foreground">
                           {!formData.date || !formData.place ? 
                             "Select date and place first" :
                             "No available time slots for this date and place"
@@ -1502,11 +1599,11 @@ export default function NewBookingPage() {
                           <SelectItem 
                             key={`${gap.start}-${gap.end}`} 
                             value={`${gap.start} - ${gap.end}`}
-                            className="py-4 cursor-pointer"
+                            className="py-4 cursor-pointer dark:text-foreground dark:hover:bg-muted"
                           >
                             <div className="flex items-center justify-between w-full gap-12 pr-8">
-                              <span className="font-bold text-lg">{gap.start} - {gap.end}</span>
-                              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-300">
+                              <span className="font-bold text-lg dark:text-foreground">{gap.start} - {gap.end}</span>
+                              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-300 dark:bg-green-950/30 dark:text-green-400 dark:border-green-700">
                                 Duration: {gap.duration}
                               </Badge>
                             </div>
@@ -1516,20 +1613,20 @@ export default function NewBookingPage() {
                     </SelectContent>
                   </Select>
                   {availableTimeGaps.length > 0 && (
-                    <p className="text-xs text-green-600">
+                    <p className="text-xs text-green-600 dark:text-green-400">
                       ✅ {availableTimeGaps.length} time slot(s) available (min. {minBookingDuration >= 60 ? `${minBookingDuration / 60}h` : `${minBookingDuration}min`})
                     </p>
                   )}
                   {selectedTimeGap && (
-                    <div className="p-4 bg-gradient-to-r from-green-50 to-blue-50 border-2 border-green-400 rounded-lg shadow-sm">
+                    <div className="p-4 bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-950/30 dark:to-blue-950/30 border-2 border-green-400 dark:border-green-700 rounded-lg shadow-sm">
                       <div className="flex items-center gap-2 mb-2">
-                        <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
-                        <p className="text-sm font-semibold text-green-900">Selected Available Slot Range</p>
+                        <div className="w-3 h-3 bg-green-500 dark:bg-green-400 rounded-full animate-pulse"></div>
+                        <p className="text-sm font-semibold text-green-900 dark:text-green-300">Selected Available Slot Range</p>
                       </div>
-                      <p className="text-xl font-bold text-green-800 mb-1">
+                      <p className="text-xl font-bold text-green-800 dark:text-green-300 mb-1">
                         {selectedTimeGap}
                       </p>
-                      <p className="text-xs text-green-700">
+                      <p className="text-xs text-green-700 dark:text-green-400">
                         Now choose your exact booking time within this range
                       </p>
                     </div>
@@ -1540,7 +1637,7 @@ export default function NewBookingPage() {
                 {selectedTimeGap && (
                   <div className="col-span-2 grid grid-cols-2 gap-4 pt-4 border-t">
                     <div className="space-y-2">
-                      <Label htmlFor="customStartTime" className="flex items-center gap-2">
+                      <Label htmlFor="customStartTime" className="flex items-center gap-2 dark:text-foreground">
                         <Clock className="h-4 w-4" />
                         Booking Start Time *
                       </Label>
@@ -1554,18 +1651,18 @@ export default function NewBookingPage() {
                           })
                         }}
                       >
-                        <SelectTrigger className="h-12">
+                        <SelectTrigger className="h-12 dark:bg-card dark:border-border dark:text-foreground">
                           <SelectValue placeholder="Select start time" />
                         </SelectTrigger>
-                        <SelectContent className="max-h-[300px]">
+                        <SelectContent className="max-h-[300px] dark:bg-card dark:border-border">
                           {availableStartTimes.map((time) => (
-                            <SelectItem key={time} value={time} className="py-3">
+                            <SelectItem key={time} value={time} className="py-3 dark:text-foreground dark:hover:bg-muted">
                               <span className="font-semibold">{time}</span>
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-xs text-muted-foreground dark:text-muted-foreground">
                         Choose any start time within the selected slot (30-min intervals)
                       </p>
                     </div>
@@ -1625,15 +1722,15 @@ export default function NewBookingPage() {
                     </div>
 
                     {formData.startTime && formData.endTime && (
-                      <div className="col-span-2 p-4 bg-blue-50 border-2 border-blue-300 rounded-lg">
+                      <div className="col-span-2 p-4 bg-blue-50 dark:bg-blue-950/30 border-2 border-blue-300 dark:border-blue-700 rounded-lg">
                         <div className="flex items-center gap-2 mb-2">
-                          <Clock className="h-4 w-4 text-blue-700" />
-                          <p className="text-sm font-semibold text-blue-900">Final Booking Time</p>
+                          <Clock className="h-4 w-4 text-blue-700 dark:text-blue-400" />
+                          <p className="text-sm font-semibold text-blue-900 dark:text-blue-300">Final Booking Time</p>
                         </div>
-                        <p className="text-2xl font-bold text-blue-800">
+                        <p className="text-2xl font-bold text-blue-800 dark:text-blue-300">
                           {formData.startTime} - {formData.endTime}
                         </p>
-                        <p className="text-sm text-blue-700 mt-1">
+                        <p className="text-sm text-blue-700 dark:text-blue-400 mt-1">
                           Duration: {(() => {
                             const startMin = parseInt(formData.startTime.split(':')[0]) * 60 + parseInt(formData.startTime.split(':')[1])
                             const endMin = parseInt(formData.endTime.split(':')[0]) * 60 + parseInt(formData.endTime.split(':')[1])
@@ -1654,10 +1751,10 @@ export default function NewBookingPage() {
 
           {/* Right Column - Quick Info */}
           <Card>
-            <CardHeader>
-              <CardTitle className="text-sm">Booking Summary</CardTitle>
+            <CardHeader className="dark:border-border/50">
+              <CardTitle className="text-sm dark:text-foreground">Booking Summary</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3 text-sm">
+            <CardContent className="space-y-3 text-sm dark:bg-card">
               <div>
                 <p className="text-muted-foreground">Date</p>
                 <p className="font-semibold">{formData.date || '—'}</p>
@@ -1698,18 +1795,18 @@ export default function NewBookingPage() {
         </div>
 
         {/* Responsible Person Section */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+        <Card className="dark:bg-card dark:border-border shadow-md">
+          <CardHeader className="dark:border-border/50">
+            <CardTitle className="flex items-center gap-2 dark:text-foreground">
               <Users className="h-5 w-5" />
               Responsible Person *
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-4 dark:bg-card">
             <div className="space-y-2">
-              <Label>Search for Responsible Person</Label>
+              <Label className="dark:text-foreground">Search for Responsible Person</Label>
               <div className="relative">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground dark:text-muted-foreground" />
                 <Input
                   placeholder="Search admin or employee by name..."
                   value={responsibleSearch}
@@ -1718,13 +1815,13 @@ export default function NewBookingPage() {
                     setShowResponsibleDropdown(e.target.value.length > 0)
                   }}
                   onFocus={() => responsibleSearch.length > 0 && setShowResponsibleDropdown(true)}
-                  className="pl-10"
+                  className="pl-10 dark:bg-card dark:border-border dark:text-foreground"
                 />
               </div>
             </div>
 
             {showResponsibleDropdown && responsibleSearch && (
-              <div className="max-h-60 overflow-y-auto border rounded-md">
+              <div className="max-h-60 overflow-y-auto border rounded-md dark:border-border dark:bg-card">
                 {users
                   .filter(user =>
                     // Show both admin and staff as responsible person
@@ -1737,7 +1834,7 @@ export default function NewBookingPage() {
                   .map(user => (
                     <div
                       key={user.id}
-                      className="p-3 cursor-pointer hover:bg-muted transition-colors"
+                      className="p-3 cursor-pointer hover:bg-muted dark:hover:bg-muted/50 transition-colors dark:text-foreground"
                       onClick={() => {
                         const person: Employee = {
                           id: user.id,
@@ -1752,26 +1849,26 @@ export default function NewBookingPage() {
                         setShowResponsibleDropdown(false)
                       }}
                     >
-                      <p className="font-medium text-sm">{user.full_name}</p>
-                      <p className="text-xs text-muted-foreground">{user.email} • {user.role}</p>
+                      <p className="font-medium text-sm dark:text-foreground">{user.full_name}</p>
+                      <p className="text-xs text-muted-foreground dark:text-muted-foreground">{user.email} • {user.role}</p>
                     </div>
                   ))}
               </div>
             )}
 
             {formData.responsiblePerson && (
-              <div className="p-4 bg-primary/5 border-2 border-primary/20 rounded-lg">
+              <div className="p-4 bg-primary/5 dark:bg-primary/10 border-2 border-primary/20 dark:border-primary/30 rounded-lg">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <Avatar className="h-10 w-10 border-2 border-primary">
-                      <AvatarFallback className="bg-primary text-primary-foreground font-semibold">
+                    <Avatar className="h-10 w-10 border-2 border-primary dark:border-primary">
+                      <AvatarFallback className="bg-primary text-primary-foreground dark:bg-primary dark:text-primary-foreground font-semibold">
                         {formData.responsiblePerson.name.split(' ').map(n => n[0]).join('').substring(0, 2)}
                       </AvatarFallback>
                     </Avatar>
                     <div>
-                      <p className="font-semibold">{formData.responsiblePerson.name}</p>
-                      <p className="text-xs text-muted-foreground">{formData.responsiblePerson.email}</p>
-                      <Badge variant="outline" className="mt-1 text-xs">{formData.responsiblePerson.role}</Badge>
+                      <p className="font-semibold dark:text-foreground">{formData.responsiblePerson.name}</p>
+                      <p className="text-xs text-muted-foreground dark:text-muted-foreground">{formData.responsiblePerson.email}</p>
+                      <Badge variant="outline" className="mt-1 text-xs dark:border-border">{formData.responsiblePerson.role}</Badge>
                     </div>
                   </div>
                   <Button
@@ -1779,6 +1876,7 @@ export default function NewBookingPage() {
                     variant="ghost"
                     size="sm"
                     onClick={() => setFormData({ ...formData, responsiblePerson: null })}
+                    className="dark:hover:bg-muted"
                   >
                     <X className="h-4 w-4" />
                   </Button>
@@ -1787,7 +1885,7 @@ export default function NewBookingPage() {
             )}
             
             {!formData.responsiblePerson && (
-              <p className="text-sm text-muted-foreground text-center py-4 border-2 border-dashed rounded-lg">
+              <p className="text-sm text-muted-foreground dark:text-muted-foreground text-center py-4 border-2 border-dashed rounded-lg dark:border-border">
                 No responsible person assigned
               </p>
             )}
@@ -1797,29 +1895,29 @@ export default function NewBookingPage() {
         {/* Participants Section */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Internal Participants */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+          <Card className="dark:bg-card dark:border-border shadow-md">
+            <CardHeader className="dark:border-border/50">
+              <CardTitle className="flex items-center gap-2 dark:text-foreground">
                 <Users className="h-5 w-5" />
                 Employee Participants (Optional)
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-4 dark:bg-card">
               <div className="space-y-2">
-                <Label>Search Employees</Label>
+                <Label className="dark:text-foreground">Search Employees</Label>
                 <div className="relative">
-                  <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground dark:text-muted-foreground" />
                   <Input
                     placeholder="Search by name or email..."
                     value={employeeSearch}
                     onChange={(e) => setEmployeeSearch(e.target.value)}
-                    className="pl-10"
+                    className="pl-10 dark:bg-card dark:border-border dark:text-foreground"
                   />
                 </div>
               </div>
 
               {employeeSearch && (
-                <div className="max-h-60 overflow-y-auto border rounded-md">
+                <div className="max-h-60 overflow-y-auto border rounded-md dark:border-border dark:bg-card">
                   {users
                   .filter(user =>
                     // Show both admin and staff as participants
@@ -1833,30 +1931,30 @@ export default function NewBookingPage() {
                     .map(user => (
                       <div
                         key={user.id}
-                        className="p-3 cursor-pointer hover:bg-muted transition-colors"
+                        className="p-3 cursor-pointer hover:bg-muted dark:hover:bg-muted/50 transition-colors dark:text-foreground"
                         onClick={() => selectEmployee(user)}
                       >
-                        <p className="font-medium text-sm">{user.full_name}</p>
-                        <p className="text-xs text-muted-foreground">{user.email} • {user.role}</p>
+                        <p className="font-medium text-sm dark:text-foreground">{user.full_name}</p>
+                        <p className="text-xs text-muted-foreground dark:text-muted-foreground">{user.email} • {user.role}</p>
                       </div>
                     ))}
                 </div>
               )}
 
               <div className="space-y-2">
-                <Label>Selected Employees ({formData.selectedEmployees.length})</Label>
+                <Label className="dark:text-foreground">Selected Employees ({formData.selectedEmployees.length})</Label>
                 <div className="space-y-2 max-h-60 overflow-y-auto">
                   {formData.selectedEmployees.map((employee) => (
-                    <div key={employee.id} className="flex items-center justify-between p-3 bg-muted rounded-md">
+                    <div key={employee.id} className="flex items-center justify-between p-3 bg-muted dark:bg-muted/50 rounded-md">
                       <div className="flex items-center gap-3">
                         <Avatar className="h-8 w-8">
-                          <AvatarFallback className="text-xs">
+                          <AvatarFallback className="text-xs dark:bg-primary/20 dark:text-primary">
                             {employee.name.split(' ').map(n => n[0]).join('').substring(0, 2)}
                           </AvatarFallback>
                         </Avatar>
                         <div>
-                          <p className="font-medium text-sm">{employee.name}</p>
-                          <p className="text-xs text-muted-foreground">{employee.email}</p>
+                          <p className="font-medium text-sm dark:text-foreground">{employee.name}</p>
+                          <p className="text-xs text-muted-foreground dark:text-muted-foreground">{employee.email}</p>
                         </div>
                       </div>
                       <Button
@@ -1864,13 +1962,14 @@ export default function NewBookingPage() {
                         variant="ghost"
                         size="sm"
                         onClick={() => removeEmployee(employee.id)}
+                        className="dark:hover:bg-muted"
                       >
                         <X className="h-4 w-4" />
                       </Button>
                     </div>
                   ))}
                   {formData.selectedEmployees.length === 0 && (
-                    <p className="text-sm text-muted-foreground text-center py-4">
+                    <p className="text-sm text-muted-foreground dark:text-muted-foreground text-center py-4">
                       No employees selected
                     </p>
                   )}
@@ -1880,16 +1979,16 @@ export default function NewBookingPage() {
           </Card>
 
           {/* External Participants */}
-          <Card>
-            <CardHeader>
-              <CardTitle>External Participants</CardTitle>
+          <Card className="dark:bg-card dark:border-border shadow-md">
+            <CardHeader className="dark:border-border/50">
+              <CardTitle className="dark:text-foreground">External Participants</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-4 dark:bg-card">
               {/* Search Existing Members */}
-              <div className="space-y-2 p-4 bg-blue-50 border-2 border-blue-200 rounded-lg">
-                <Label className="text-blue-900 font-semibold">🔍 Search Existing Members</Label>
+              <div className="space-y-2 p-4 bg-blue-50 dark:bg-blue-950/20 border-2 border-blue-200 dark:border-blue-800 rounded-lg">
+                <Label className="text-blue-900 dark:text-blue-300 font-semibold">🔍 Search Existing Members</Label>
                 <div className="relative">
-                  <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground dark:text-muted-foreground" />
                   <Input
                     placeholder="Search by name, email, phone, or company..."
                     value={memberSearch}
@@ -1899,26 +1998,26 @@ export default function NewBookingPage() {
                       setShowMemberDropdown(true)
                     }}
                     onFocus={() => memberSearch.length >= 2 && setShowMemberDropdown(true)}
-                    className="pl-10"
+                    className="pl-10 dark:bg-card dark:border-border dark:text-foreground"
                   />
                 </div>
                 {showMemberDropdown && searchedMembers.length > 0 && (
-                  <div className="max-h-60 overflow-y-auto border rounded-md bg-white shadow-lg">
+                  <div className="max-h-60 overflow-y-auto border rounded-md bg-white dark:bg-card dark:border-border shadow-lg">
                     {searchedMembers.map(member => (
                       <div
                         key={member.id}
-                        className="p-3 cursor-pointer hover:bg-blue-50 transition-colors border-b last:border-b-0"
+                        className="p-3 cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-950/30 transition-colors border-b dark:border-border last:border-b-0"
                         onClick={() => selectExistingMember(member)}
                       >
                         <div className="flex items-center justify-between">
                           <div>
-                            <p className="font-medium text-sm">{member.full_name}</p>
-                            <p className="text-xs text-muted-foreground">{member.email} • {member.phone}</p>
+                            <p className="font-medium text-sm dark:text-foreground">{member.full_name}</p>
+                            <p className="text-xs text-muted-foreground dark:text-muted-foreground">{member.email} • {member.phone}</p>
                             {member.company_name && (
-                              <p className="text-xs text-blue-600">{member.company_name} • {member.designation}</p>
+                              <p className="text-xs text-blue-600 dark:text-blue-400">{member.company_name} • {member.designation}</p>
                             )}
                           </div>
-                          <Badge variant="outline" className="bg-green-50">
+                          <Badge variant="outline" className="bg-green-50 dark:bg-green-950/30 dark:border-green-800 dark:text-green-300">
                             {member.visit_count} visits
                           </Badge>
                         </div>
@@ -1926,7 +2025,7 @@ export default function NewBookingPage() {
                     ))}
                   </div>
                 )}
-                <p className="text-xs text-blue-700">
+                <p className="text-xs text-blue-700 dark:text-blue-400">
                   💡 Search for existing members to auto-fill details and track visits
                 </p>
               </div>
@@ -1934,83 +2033,87 @@ export default function NewBookingPage() {
               {/* OR Divider */}
               <div className="relative">
                 <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t" />
+                  <span className="w-full border-t dark:border-border" />
                 </div>
                 <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-white px-2 text-muted-foreground">Or Add New Member</span>
+                  <span className="bg-white dark:bg-card px-2 text-muted-foreground dark:text-muted-foreground">Or Add New Member</span>
                 </div>
               </div>
 
               {/* Add New Member Form */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="col-span-2 space-y-2">
-                  <Label>Full Name *</Label>
+                  <Label className="dark:text-foreground">Full Name *</Label>
                   <Input
                     value={newExternalParticipant.fullName}
                     onChange={(e) => setNewExternalParticipant({...newExternalParticipant, fullName: e.target.value})}
                     placeholder="Enter full name"
+                    className="dark:bg-card dark:border-border dark:text-foreground"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Email</Label>
+                  <Label className="dark:text-foreground">Email</Label>
                   <Input
                     type="email"
                     value={newExternalParticipant.email}
                     onChange={(e) => setNewExternalParticipant({...newExternalParticipant, email: e.target.value})}
                     placeholder="email@example.com"
+                    className="dark:bg-card dark:border-border dark:text-foreground"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Phone *</Label>
+                  <Label className="dark:text-foreground">Phone *</Label>
                   <Input
                     value={newExternalParticipant.phone}
                     onChange={(e) => setNewExternalParticipant({...newExternalParticipant, phone: e.target.value})}
                     placeholder="+1234567890"
+                    className="dark:bg-card dark:border-border dark:text-foreground"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Reference Type *</Label>
+                  <Label className="dark:text-foreground">Reference Type *</Label>
                   <Select
                     value={newExternalParticipant.referenceType}
                     onValueChange={(value: any) => setNewExternalParticipant({...newExternalParticipant, referenceType: value})}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="dark:bg-card dark:border-border dark:text-foreground">
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="NIC">NIC</SelectItem>
-                      <SelectItem value="Passport">Passport</SelectItem>
-                      <SelectItem value="Employee ID">Employee ID</SelectItem>
+                    <SelectContent className="dark:bg-card dark:border-border">
+                      <SelectItem value="NIC" className="dark:text-foreground dark:hover:bg-muted">NIC</SelectItem>
+                      <SelectItem value="Passport" className="dark:text-foreground dark:hover:bg-muted">Passport</SelectItem>
+                      <SelectItem value="Employee ID" className="dark:text-foreground dark:hover:bg-muted">Employee ID</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Reference Value *</Label>
+                  <Label className="dark:text-foreground">Reference Value *</Label>
                   <Input
                     value={newExternalParticipant.referenceValue}
                     onChange={(e) => setNewExternalParticipant({...newExternalParticipant, referenceValue: e.target.value})}
                     placeholder="Enter ID number"
+                    className="dark:bg-card dark:border-border dark:text-foreground"
                   />
                 </div>
                 <div className="col-span-2">
-                  <Button type="button" onClick={addExternalParticipant} className="w-full">
+                  <Button type="button" onClick={addExternalParticipant} className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 dark:from-blue-500 dark:to-purple-500 dark:hover:from-blue-600 dark:hover:to-purple-600 shadow-lg">
                     Add External Participant
                   </Button>
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label>Added External Participants ({formData.externalParticipants.length})</Label>
+                <Label className="dark:text-foreground">Added External Participants ({formData.externalParticipants.length})</Label>
                 <div className="space-y-2 max-h-60 overflow-y-auto">
                   {formData.externalParticipants.map((participant) => (
-                    <div key={participant.id} className="flex items-center justify-between p-3 bg-muted rounded-md">
+                    <div key={participant.id} className="flex items-center justify-between p-3 bg-muted dark:bg-muted/50 rounded-md">
                       <div className="flex-1">
-                        <p className="font-medium text-sm">{participant.fullName}</p>
-                        <p className="text-xs text-muted-foreground">
+                        <p className="font-medium text-sm dark:text-foreground">{participant.fullName}</p>
+                        <p className="text-xs text-muted-foreground dark:text-muted-foreground">
                           {participant.referenceType}: {participant.referenceValue} • {participant.phone}
                         </p>
                         {participant.email && (
-                          <p className="text-xs text-muted-foreground">{participant.email}</p>
+                          <p className="text-xs text-muted-foreground dark:text-muted-foreground">{participant.email}</p>
                         )}
                       </div>
                       <div className="flex items-center gap-1">
@@ -2020,9 +2123,9 @@ export default function NewBookingPage() {
                           size="sm"
                           onClick={() => handleEditExternalMember(participant)}
                           title="Edit member details"
-                          className="h-8 w-8 p-0"
+                          className="h-8 w-8 p-0 dark:hover:bg-muted"
                         >
-                          <Edit className="h-4 w-4 text-blue-600" />
+                          <Edit className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                         </Button>
                         <Button
                           type="button"
@@ -2030,15 +2133,15 @@ export default function NewBookingPage() {
                           size="sm"
                           onClick={() => removeExternalParticipant(participant.id)}
                           title="Remove participant"
-                          className="h-8 w-8 p-0"
+                          className="h-8 w-8 p-0 dark:hover:bg-muted"
                         >
-                          <X className="h-4 w-4 text-red-500" />
+                          <X className="h-4 w-4 text-red-500 dark:text-red-400" />
                         </Button>
                       </div>
                     </div>
                   ))}
                   {formData.externalParticipants.length === 0 && (
-                    <p className="text-sm text-muted-foreground text-center py-4">
+                    <p className="text-sm text-muted-foreground dark:text-muted-foreground text-center py-4">
                       No external participants added
                     </p>
                   )}
@@ -2049,14 +2152,14 @@ export default function NewBookingPage() {
         </div>
 
         {/* Refreshments Section */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+        <Card className="dark:bg-card dark:border-border shadow-md">
+          <CardHeader className="dark:border-border/50">
+            <CardTitle className="flex items-center gap-2 dark:text-foreground">
               <Utensils className="h-5 w-5" />
               Refreshments
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-4 dark:bg-card">
             <div className="flex items-center space-x-2">
               <input
                 type="checkbox"
@@ -2071,9 +2174,9 @@ export default function NewBookingPage() {
                     },
                   })
                 }
-                className="h-4 w-4"
+                className="h-4 w-4 dark:accent-primary"
               />
-              <Label htmlFor="refreshmentsRequired" className="cursor-pointer">
+              <Label htmlFor="refreshmentsRequired" className="cursor-pointer dark:text-foreground">
                 Refreshments Required
               </Label>
             </div>
@@ -2081,7 +2184,7 @@ export default function NewBookingPage() {
             {formData.refreshments.required && (
               <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-2">
-                  <Label>Type</Label>
+                  <Label className="dark:text-foreground">Type</Label>
                   <Select
                     value={formData.refreshments.type}
                     onValueChange={(value) =>
@@ -2091,22 +2194,22 @@ export default function NewBookingPage() {
                       })
                     }
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="dark:bg-card dark:border-border dark:text-foreground">
                       <SelectValue placeholder="Select type" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="dark:bg-card dark:border-border">
                       {refreshmentTypes.length > 0 ? (
                         refreshmentTypes.map((type) => (
-                          <SelectItem key={type.id} value={type.code}>
+                          <SelectItem key={type.id} value={type.code} className="dark:text-foreground dark:hover:bg-muted">
                             {type.name}
                           </SelectItem>
                         ))
                       ) : (
                         <>
-                          <SelectItem value="beverages">Beverages</SelectItem>
-                          <SelectItem value="light_snacks">Light Snacks</SelectItem>
-                          <SelectItem value="full_meal">Full Meal</SelectItem>
-                          <SelectItem value="custom">Custom</SelectItem>
+                          <SelectItem value="beverages" className="dark:text-foreground dark:hover:bg-muted">Beverages</SelectItem>
+                          <SelectItem value="light_snacks" className="dark:text-foreground dark:hover:bg-muted">Light Snacks</SelectItem>
+                          <SelectItem value="full_meal" className="dark:text-foreground dark:hover:bg-muted">Full Meal</SelectItem>
+                          <SelectItem value="custom" className="dark:text-foreground dark:hover:bg-muted">Custom</SelectItem>
                         </>
                       )}
                     </SelectContent>
@@ -2114,7 +2217,7 @@ export default function NewBookingPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Serving Time</Label>
+                  <Label className="dark:text-foreground">Serving Time</Label>
                   <Select
                     value={formData.refreshments.servingTime}
                     onValueChange={(value) =>
@@ -2125,21 +2228,21 @@ export default function NewBookingPage() {
                     }
                     disabled={servingTimeOptions.length === 0}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="dark:bg-card dark:border-border dark:text-foreground">
                       <SelectValue placeholder={
                         servingTimeOptions.length === 0 
                           ? "Select booking time first" 
                           : "Select serving time"
                       } />
                     </SelectTrigger>
-                    <SelectContent className="max-h-[300px]">
+                    <SelectContent className="max-h-[300px] dark:bg-card dark:border-border">
                       {servingTimeOptions.length === 0 ? (
-                        <div className="p-4 text-center text-sm text-muted-foreground">
+                        <div className="p-4 text-center text-sm text-muted-foreground dark:text-muted-foreground">
                           Select booking start and end time first
                         </div>
                       ) : (
                         servingTimeOptions.map((time) => (
-                          <SelectItem key={time} value={time}>
+                          <SelectItem key={time} value={time} className="dark:text-foreground dark:hover:bg-muted">
                             {time}
                           </SelectItem>
                         ))
@@ -2147,14 +2250,14 @@ export default function NewBookingPage() {
                     </SelectContent>
                   </Select>
                   {servingTimeOptions.length > 0 && (
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-xs text-muted-foreground dark:text-muted-foreground">
                       {servingTimeOptions.length} time options (15-min intervals, last: {servingTimeOptions[servingTimeOptions.length - 1]})
                     </p>
                   )}
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Estimated Count</Label>
+                  <Label className="dark:text-foreground">Estimated Count</Label>
                   <Input
                     type="number"
                     min="1"
@@ -2165,14 +2268,15 @@ export default function NewBookingPage() {
                         refreshments: { ...formData.refreshments, estimatedCount: parseInt(e.target.value) || 0 },
                       })
                     }
+                    className="dark:bg-card dark:border-border dark:text-foreground"
                   />
                 </div>
 
                 <div className="col-span-3 space-y-2">
-                  <Label>Items</Label>
+                  <Label className="dark:text-foreground">Items</Label>
                   <div className="flex flex-wrap gap-2 mb-2">
                     {formData.refreshments.items.map((item) => (
-                      <Badge key={item} variant="secondary" className="flex items-center gap-1">
+                      <Badge key={item} variant="secondary" className="flex items-center gap-1 dark:bg-muted dark:text-foreground">
                         {item}
                         <X className="h-3 w-3 cursor-pointer" onClick={() => removeRefreshmentItem(item)} />
                       </Badge>
@@ -2182,7 +2286,7 @@ export default function NewBookingPage() {
                     onValueChange={(value) => addRefreshmentItem(value)}
                     disabled={!formData.refreshments.type || availableItemsForType.length === 0}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="dark:bg-card dark:border-border dark:text-foreground">
                       <SelectValue placeholder={
                         !formData.refreshments.type 
                           ? "Select type first" 
@@ -2191,35 +2295,35 @@ export default function NewBookingPage() {
                           : "Add item"
                       } />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="dark:bg-card dark:border-border">
                       {availableItemsForType.length > 0 ? (
                         availableItemsForType.map((item) => (
-                          <SelectItem key={item.id} value={item.name}>
+                          <SelectItem key={item.id} value={item.name} className="dark:text-foreground dark:hover:bg-muted">
                             {item.name}
                           </SelectItem>
                         ))
                       ) : (
                         <>
-                          <SelectItem value="Coffee">Coffee</SelectItem>
-                          <SelectItem value="Tea">Tea</SelectItem>
-                          <SelectItem value="Water">Water</SelectItem>
-                          <SelectItem value="Juice">Juice</SelectItem>
-                          <SelectItem value="Cookies">Cookies</SelectItem>
-                          <SelectItem value="Sandwiches">Sandwiches</SelectItem>
-                          <SelectItem value="Lunch">Lunch</SelectItem>
+                          <SelectItem value="Coffee" className="dark:text-foreground dark:hover:bg-muted">Coffee</SelectItem>
+                          <SelectItem value="Tea" className="dark:text-foreground dark:hover:bg-muted">Tea</SelectItem>
+                          <SelectItem value="Water" className="dark:text-foreground dark:hover:bg-muted">Water</SelectItem>
+                          <SelectItem value="Juice" className="dark:text-foreground dark:hover:bg-muted">Juice</SelectItem>
+                          <SelectItem value="Cookies" className="dark:text-foreground dark:hover:bg-muted">Cookies</SelectItem>
+                          <SelectItem value="Sandwiches" className="dark:text-foreground dark:hover:bg-muted">Sandwiches</SelectItem>
+                          <SelectItem value="Lunch" className="dark:text-foreground dark:hover:bg-muted">Lunch</SelectItem>
                         </>
                       )}
                     </SelectContent>
                   </Select>
                   {formData.refreshments.type && availableItemsForType.length === 0 && (
-                    <p className="text-xs text-muted-foreground">
-                      No items available for this type. <a href="/admin/refreshments" className="text-blue-600 hover:underline">Manage items</a>
+                    <p className="text-xs text-muted-foreground dark:text-muted-foreground">
+                      No items available for this type. <a href="/admin/refreshments" className="text-blue-600 hover:underline dark:text-blue-400">Manage items</a>
                     </p>
                   )}
                 </div>
 
                 <div className="col-span-3 space-y-2">
-                  <Label>Special Requests</Label>
+                  <Label className="dark:text-foreground">Special Requests</Label>
                   <Textarea
                     value={formData.refreshments.specialRequests}
                     onChange={(e) =>
@@ -2230,6 +2334,7 @@ export default function NewBookingPage() {
                     }
                     placeholder="Any special requirements..."
                     rows={2}
+                    className="dark:bg-card dark:border-border dark:text-foreground"
                   />
                 </div>
               </div>
@@ -2238,32 +2343,32 @@ export default function NewBookingPage() {
         </Card>
 
         {/* Participant Email Notification Section */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+        <Card className="dark:bg-card dark:border-border shadow-md">
+          <CardHeader className="dark:border-border/50">
+            <CardTitle className="flex items-center gap-2 dark:text-foreground">
               <Users className="h-5 w-5" />
               Email Notifications
             </CardTitle>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-muted-foreground dark:text-muted-foreground">
               Select participants to receive email notifications about this meeting
             </p>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-4 dark:bg-card">
             {/* Check All/Uncheck All */}
-            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+            <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-muted rounded-lg">
               <div className="flex items-center space-x-2">
                 <input
                   type="checkbox"
                   id="selectAllParticipants"
                   checked={getAllParticipants().length > 0 && getAllParticipants().every(p => selectedEmailParticipants.includes(p.email))}
                   onChange={handleSelectAllParticipants}
-                  className="h-4 w-4"
+                  className="h-4 w-4 dark:accent-primary"
                 />
-                <Label htmlFor="selectAllParticipants" className="cursor-pointer font-medium">
+                <Label htmlFor="selectAllParticipants" className="cursor-pointer font-medium dark:text-foreground">
                   Select All Participants
                 </Label>
               </div>
-              <Badge variant="outline">
+              <Badge variant="outline" className="dark:border-border dark:text-foreground">
                 {selectedEmailParticipants.length} of {getAllParticipants().length} selected
               </Badge>
             </div>
@@ -2271,30 +2376,30 @@ export default function NewBookingPage() {
             {/* Participants List */}
             <div className="space-y-3 max-h-60 overflow-y-auto">
               {getAllParticipants().map((participant, index) => (
-                <div key={`${participant.type}-${index}`} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50">
+                <div key={`${participant.type}-${index}`} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 dark:border-border dark:hover:bg-muted/50 dark:text-foreground">
                   <div className="flex items-center space-x-3">
                     <input
                       type="checkbox"
                       id={`participant-${index}`}
                       checked={selectedEmailParticipants.includes(participant.email)}
                       onChange={(e) => handleParticipantEmailSelection(participant.email, e.target.checked)}
-                      className="h-4 w-4"
+                      className="h-4 w-4 dark:accent-primary"
                     />
                     <div className="flex items-center space-x-2">
                       <Avatar className="h-8 w-8">
-                        <AvatarFallback className="text-xs">
+                        <AvatarFallback className="text-xs dark:bg-primary/20 dark:text-primary">
                           {participant.name.split(' ').map(n => n[0]).join('').toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
                       <div>
-                        <p className="font-medium text-sm">{participant.name}</p>
-                        <p className="text-xs text-muted-foreground">{participant.email}</p>
+                        <p className="font-medium text-sm dark:text-foreground">{participant.name}</p>
+                        <p className="text-xs text-muted-foreground dark:text-muted-foreground">{participant.email}</p>
                       </div>
                     </div>
                   </div>
                   <Badge 
                     variant={participant.type === 'responsible' ? 'default' : participant.type === 'internal' ? 'secondary' : 'outline'}
-                    className="text-xs"
+                    className="text-xs dark:border-border"
                   >
                     {participant.type === 'responsible' ? 'Responsible' : 
                      participant.type === 'internal' ? 'Internal' : 'External'}
@@ -2304,7 +2409,7 @@ export default function NewBookingPage() {
             </div>
 
             {getAllParticipants().length === 0 && (
-              <div className="text-center py-8 text-muted-foreground">
+              <div className="text-center py-8 text-muted-foreground dark:text-muted-foreground">
                 <Users className="h-12 w-12 mx-auto mb-2 opacity-50" />
                 <p>No participants added yet</p>
                 <p className="text-xs">Add participants above to enable email notifications</p>
@@ -2318,12 +2423,17 @@ export default function NewBookingPage() {
           <Button
             type="button"
             variant="outline"
-            onClick={() => router.push('/admin/bookings')}
+            onClick={() => setIsCancelConfirmDialogOpen(true)}
             disabled={isSubmitting}
+            className="dark:border-border dark:hover:bg-muted dark:text-foreground"
           >
             Cancel
           </Button>
-          <Button type="submit" disabled={isSubmitting} className="min-w-[200px]">
+          <Button 
+            type="submit"
+            disabled={isSubmitting} 
+            className="min-w-[200px] bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 dark:from-blue-500 dark:to-purple-500 dark:hover:from-blue-600 dark:hover:to-purple-600 shadow-lg"
+          >
             {isSubmitting ? (
               <>
                 <span className="animate-spin mr-2">⏳</span>
@@ -2338,6 +2448,90 @@ export default function NewBookingPage() {
           </Button>
         </div>
       </form>
+
+      {/* Cancel Confirmation Dialog */}
+      <Dialog open={isCancelConfirmDialogOpen} onOpenChange={setIsCancelConfirmDialogOpen}>
+        <DialogContent className="dark:bg-card dark:border-border">
+          <DialogHeader>
+            <DialogTitle className="dark:text-foreground">Cancel Booking Creation</DialogTitle>
+            <DialogDescription className="dark:text-muted-foreground">
+              Are you sure you want to cancel? All unsaved changes will be lost.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setIsCancelConfirmDialogOpen(false)}
+              className="dark:border-border dark:hover:bg-muted dark:text-foreground"
+            >
+              No, Keep Editing
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                setIsCancelConfirmDialogOpen(false)
+                router.push('/admin/bookings')
+              }}
+              className="dark:bg-red-600 dark:hover:bg-red-700"
+            >
+              Yes, Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Booking Confirmation Dialog */}
+      <Dialog open={isCreateConfirmDialogOpen} onOpenChange={setIsCreateConfirmDialogOpen}>
+        <DialogContent className="dark:bg-card dark:border-border">
+          <DialogHeader>
+            <DialogTitle className="dark:text-foreground">Create Booking</DialogTitle>
+            <DialogDescription className="dark:text-muted-foreground">
+              Are you sure you want to create this booking? This will send email notifications to selected participants.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setIsCreateConfirmDialogOpen(false)}
+              disabled={isSubmitting}
+              className="dark:border-border dark:hover:bg-muted dark:text-foreground"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                setIsCreateConfirmDialogOpen(false)
+                setShouldSubmitForm(true)
+                // Trigger form submission after dialog closes
+                setTimeout(() => {
+                  const form = document.querySelector('form') as HTMLFormElement
+                  if (form) {
+                    // Create a synthetic submit event
+                    const syntheticEvent = {
+                      preventDefault: () => {},
+                      stopPropagation: () => {},
+                      target: form,
+                      currentTarget: form
+                    } as any
+                    handleSubmit(syntheticEvent)
+                  }
+                }, 150)
+              }}
+              disabled={isSubmitting}
+              className="min-w-[100px] bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 dark:from-blue-500 dark:to-purple-500 dark:hover:from-blue-600 dark:hover:to-purple-600"
+            >
+              {isSubmitting ? (
+                <>
+                  <span className="animate-spin mr-2">⏳</span>
+                  Creating...
+                </>
+              ) : (
+                'Yes, Create'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Edit External Member Dialog */}
       <Dialog open={isEditMemberDialogOpen} onOpenChange={setIsEditMemberDialogOpen}>

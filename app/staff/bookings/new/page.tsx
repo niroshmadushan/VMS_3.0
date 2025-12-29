@@ -9,7 +9,8 @@ import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Calendar, MapPin, Users, X, Search, Clock, Utensils, Save, Lock } from "lucide-react"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
+import { Calendar, MapPin, Users, X, Search, Clock, Utensils, Save, Lock, Edit } from "lucide-react"
 import { placeManagementAPI } from "@/lib/place-management-api"
 import toast from "react-hot-toast"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -163,8 +164,31 @@ export default function StaffNewBookingPage() {
   const [searchedMembers, setSearchedMembers] = useState<any[]>([])
   const [showMemberDropdown, setShowMemberDropdown] = useState(false)
   
+  // External Member Edit state
+  const [isEditMemberDialogOpen, setIsEditMemberDialogOpen] = useState(false)
+  const [editingExternalMember, setEditingExternalMember] = useState<ExternalParticipant | null>(null)
+  const [isUpdatingMember, setIsUpdatingMember] = useState(false)
+  const [editingMemberFormData, setEditingMemberFormData] = useState({
+    full_name: "",
+    email: "",
+    phone: "",
+    company_name: "",
+    designation: "",
+    reference_type: "NIC" as "NIC" | "Passport" | "Driving License" | "Employee ID" | "Other",
+    reference_value: "",
+    address: "",
+    city: "",
+    country: "Sri Lanka",
+    notes: ""
+  })
+  
   // Email Notification State
   const [selectedEmailParticipants, setSelectedEmailParticipants] = useState<string[]>([])
+  
+  // Confirmation Dialog State
+  const [isCancelConfirmDialogOpen, setIsCancelConfirmDialogOpen] = useState(false)
+  const [isCreateConfirmDialogOpen, setIsCreateConfirmDialogOpen] = useState(false)
+  const [shouldSubmitForm, setShouldSubmitForm] = useState(false)
   
   const [newExternalParticipant, setNewExternalParticipant] = useState({
     fullName: "",
@@ -189,27 +213,19 @@ export default function StaffNewBookingPage() {
       try {
         // Load types
         const typesResponse = await placeManagementAPI.getTableData('refreshment_types', {
-          limit: 100
+          is_deleted: 'false',
+          is_active: 'true'
         })
         const typesData = Array.isArray(typesResponse) ? typesResponse : typesResponse?.data || []
-        // Filter client-side for active and non-deleted
-        const activeTypes = typesData.filter((t: any) => 
-          (t.is_deleted === false || t.is_deleted === 0 || t.is_deleted === 'false') &&
-          (t.is_active === true || t.is_active === 1 || t.is_active === 'true')
-        )
-        setRefreshmentTypes(activeTypes)
+        setRefreshmentTypes(typesData)
         
         // Load items
         const itemsResponse = await placeManagementAPI.getTableData('refreshment_items', {
-          limit: 500
+          is_deleted: 'false',
+          is_active: 'true'
         })
         const itemsData = Array.isArray(itemsResponse) ? itemsResponse : itemsResponse?.data || []
-        // Filter client-side for active and non-deleted
-        const activeItems = itemsData.filter((i: any) => 
-          (i.is_deleted === false || i.is_deleted === 0 || i.is_deleted === 'false') &&
-          (i.is_active === true || i.is_active === 1 || i.is_active === 'true')
-        )
-        setRefreshmentItems(activeItems)
+        setRefreshmentItems(itemsData)
       } catch (error) {
         console.error('Error loading refreshments:', error)
         // Fallback to default types if table doesn't exist
@@ -224,17 +240,49 @@ export default function StaffNewBookingPage() {
     loadRefreshments()
   }, [])
 
-  // Filter items based on selected type
+  // Filter items based on selected type and fetch from API when type changes
   useEffect(() => {
-    if (formData.refreshments.type && refreshmentItems.length > 0) {
+    if (formData.refreshments.type && refreshmentTypes.length > 0) {
       // Find type by code
       const selectedType = refreshmentTypes.find(t => t.code === formData.refreshments.type)
+      
       if (selectedType) {
+        // Filter from already loaded items
         const filtered = refreshmentItems
           .filter(item => item.type_id === selectedType.id)
           .map(item => ({ id: item.id, name: item.name }))
-        setAvailableItemsForType(filtered)
+        
+        console.log(`🔄 Selected refreshment type: ${selectedType.name} (${selectedType.code})`)
+        console.log(`📋 Available items for type "${selectedType.name}":`, filtered)
+        console.log(`📊 Total items found: ${filtered.length}`)
+        
+        // If no items found in loaded data, try to fetch from API
+        if (filtered.length === 0 && selectedType.id) {
+          console.log(`⚠️ No items found in loaded data, fetching from API for type ID: ${selectedType.id}`)
+          
+          // Fetch items for this specific type from API
+          placeManagementAPI.getTableData('refreshment_items', {
+            is_deleted: 'false',
+            is_active: 'true'
+          }).then((response) => {
+            const allItems = Array.isArray(response) ? response : response?.data || []
+            const itemsForType = allItems
+              .filter((item: any) => String(item.type_id) === String(selectedType.id))
+              .map((item: any) => ({ id: item.id, name: item.name }))
+            
+            console.log(`✅ Fetched items from API for type "${selectedType.name}":`, itemsForType)
+            console.log(`📊 API returned ${itemsForType.length} items`)
+            
+            setAvailableItemsForType(itemsForType)
+          }).catch((error) => {
+            console.error('❌ Error fetching items from API:', error)
+            setAvailableItemsForType([])
+          })
+        } else {
+          setAvailableItemsForType(filtered)
+        }
       } else {
+        console.log(`❌ Type not found for code: ${formData.refreshments.type}`)
         setAvailableItemsForType([])
       }
     } else {
@@ -732,7 +780,18 @@ export default function StaffNewBookingPage() {
     }
 
     try {
-      console.log('📧 Sending email notifications to:', selectedEmailParticipants)
+      // Filter valid emails (non-empty, trimmed)
+      const validEmails = selectedEmailParticipants
+        .filter(email => email && email.trim() !== '')
+        .map(email => email.trim())
+      
+      if (validEmails.length === 0) {
+        console.log('📧 No valid email addresses found')
+        return
+      }
+
+      console.log('📧 Sending email notifications to:', validEmails)
+      console.log('📧 Booking Reference ID:', bookingRefId)
       
       // Get authentication token
       const token = localStorage.getItem('authToken') || localStorage.getItem('jwt_token') || localStorage.getItem('token')
@@ -754,6 +813,7 @@ export default function StaffNewBookingPage() {
       }
 
       // Prepare email data for the new simplified API
+      // IMPORTANT: bookingRefId is included so backend can store it in booking_ref_id column for each email record
       const emailData = {
         meetingName: bookingData.title,
         date: bookingData.booking_date,
@@ -761,12 +821,14 @@ export default function StaffNewBookingPage() {
         endTime: formatTime(bookingData.end_time),
         place: bookingData.place_name || '',
         description: bookingData.description || '',
-        participantEmails: selectedEmailParticipants,
+        participantEmails: validEmails, // Use filtered valid emails
         emailType: 'booking_details' as const,
-        bookingRefId: bookingRefId // Include booking reference ID
+        bookingRefId: bookingRefId // Include booking reference ID - this will be stored in booking_ref_id column in database
       }
 
       console.log('📧 Email data prepared:', emailData)
+      console.log('📧 Booking Reference ID included:', bookingRefId)
+      console.log('📧 Total valid emails:', validEmails.length)
 
       // Call the simplified email API endpoint
       const response = await fetch('/api/booking-email/send-from-frontend', {
@@ -788,15 +850,17 @@ export default function StaffNewBookingPage() {
       }
 
       if (result.success) {
-        // Show success message with details
-        if (result.data?.emailsFailed && result.data.emailsFailed > 0) {
-          toast.success(`Emails sent to ${result.data.emailsSent} participants (${result.data.emailsFailed} failed)`, {
+        const successful = result.data?.successful || result.data?.emailsSent || selectedEmailParticipants.length
+        const failed = result.data?.failed || 0
+        
+        if (failed > 0) {
+          toast.success(`Emails sent to ${successful} participants (${failed} failed)`, {
             position: 'top-center',
             duration: 4000,
             icon: '📧'
           })
         } else {
-          toast.success(`Email notifications sent to ${result.data?.emailsSent || selectedEmailParticipants.length} participants`, {
+          toast.success(`Email notifications sent to ${successful} participants`, {
             position: 'top-center',
             duration: 3000,
             icon: '📧'
@@ -819,6 +883,15 @@ export default function StaffNewBookingPage() {
   // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    // If confirmation dialog should be shown, show it instead of submitting
+    if (!shouldSubmitForm) {
+      setIsCreateConfirmDialogOpen(true)
+      return
+    }
+    
+    // Reset the flag for next time
+    setShouldSubmitForm(false)
 
     // 🛡️ COMPREHENSIVE VALIDATION
     console.log('🔍 Starting validation...')
@@ -973,6 +1046,7 @@ export default function StaffNewBookingPage() {
       }
 
       // Insert external participants with member linking
+      // Ensure all operations complete before proceeding
       let hasExternalParticipants = false
       for (const participant of formData.externalParticipants) {
         let memberId = participant.id
@@ -980,29 +1054,45 @@ export default function StaffNewBookingPage() {
         // Check if member exists in database
         try {
           const response = await placeManagementAPI.getTableData('external_members', {
-            is_deleted: 'false'
+            limit: 500
           })
           const data = Array.isArray(response) ? response : response.data || []
           
-          const existingMember = data.find((m: any) => 
-            m.email === participant.email || m.phone === participant.phone
-          )
+          // Filter out deleted members (client-side filter)
+          const activeMembers = data.filter((m: any) => !m.is_deleted && (m.is_deleted === false || m.is_deleted === 0))
+          
+          // Check by email (if provided) or phone - case-insensitive
+          // Match by email OR phone (either one matching is enough)
+          const existingMember = activeMembers.find((m: any) => {
+            if (participant.email && participant.email.trim().length > 0) {
+              // If participant has email, check email match OR phone match
+              return (m.email && m.email.toLowerCase() === participant.email.toLowerCase()) || 
+                     (m.phone && m.phone === participant.phone)
+            }
+            // If no email, just check phone match
+            return m.phone && m.phone === participant.phone
+          })
 
           if (existingMember) {
             // Use existing member ID and increment visit count
             memberId = existingMember.id
+            console.log('✅ Using existing member:', existingMember.full_name, 'ID:', memberId)
             await placeManagementAPI.updateRecord('external_members', { id: memberId }, {
               visit_count: (existingMember.visit_count || 0) + 1,
               last_visit_date: getSriLankaTimestamp()
             })
-          } else if (!participant.id.startsWith('existing_')) {
-            // Create new member record
+            console.log('✅ Updated visit count for existing member')
+          } else {
+            // Create new member record in external_members table FIRST
+            // This ensures the member exists before linking to booking
             memberId = generateUUID()
-            await placeManagementAPI.insertRecord('external_members', sanitizeObject({
+            console.log('➕ Creating new member in external_members table:', participant.fullName, 'ID:', memberId)
+            
+            const memberData = sanitizeObject({
               id: memberId,
               full_name: sanitizeInput(participant.fullName),
-              email: participant.email,
-              phone: participant.phone,
+              email: (participant.email || '').toLowerCase().trim(),
+              phone: participant.phone.trim(),
               reference_type: participant.referenceType,
               reference_value: sanitizeInput(participant.referenceValue),
               visit_count: 1,
@@ -1011,15 +1101,39 @@ export default function StaffNewBookingPage() {
               is_deleted: false,
               is_blacklisted: false,
               created_at: getSriLankaTimestamp()
-            }))
+            })
+            
+            // Wait for member creation to complete
+            await placeManagementAPI.insertRecord('external_members', memberData)
+            console.log('✅ Successfully created new member in external_members table')
+            
+            // Verify member was created (optional check)
+            const verifyResponse = await placeManagementAPI.getTableData('external_members', {
+              limit: 500
+            })
+            const verifyData = Array.isArray(verifyResponse) ? verifyResponse : []
+            const foundMember = verifyData.find((m: any) => m.id === memberId)
+            if (!foundMember) {
+              throw new Error(`Failed to verify member creation for ${participant.fullName}`)
+            }
+            console.log('✅ Verified member exists in external_members table')
           }
         } catch (error) {
-          console.error('Member check/create failed:', error)
+          console.error('❌ Member check/create failed:', error)
+          toast.error(`Failed to process external member ${participant.fullName}: ${error}`, {
+            position: 'top-center',
+            duration: 4000
+          })
+          throw error // Stop booking creation if member creation fails
         }
 
-        // Insert external participant with member_id link
-        await placeManagementAPI.insertRecord('external_participants', sanitizeObject({
-          id: generateUUID(),
+        // Wait for member to be created, then insert external participant record
+        // This ensures both records are created: external_members AND external_participants
+        const participantId = generateUUID()
+        console.log('➕ Creating external_participant record for member:', memberId, 'Participant ID:', participantId)
+        
+        const participantData = sanitizeObject({
+          id: participantId,
           booking_id: bookingId,
           member_id: memberId,
           full_name: sanitizeInput(participant.fullName),
@@ -1028,7 +1142,11 @@ export default function StaffNewBookingPage() {
           reference_type: participant.referenceType,
           reference_value: sanitizeInput(participant.referenceValue),
           participation_status: 'invited'
-        }))
+        })
+        
+        // Wait for participant creation to complete in external_participants table
+        await placeManagementAPI.insertRecord('external_participants', participantData)
+        console.log('✅ Successfully created external_participant record in external_participants table')
 
         hasExternalParticipants = true
       }
@@ -1039,6 +1157,11 @@ export default function StaffNewBookingPage() {
           has_external_participants: true
         })
       }
+
+      // All database operations completed - booking, participants, and external members are all saved
+      console.log('✅ All database operations completed successfully')
+      console.log('✅ Booking ID:', bookingId)
+      console.log('✅ External members created:', formData.externalParticipants.length)
 
       // Insert refreshments with sanitization
       if (formData.refreshments.required) {
@@ -1060,7 +1183,19 @@ export default function StaffNewBookingPage() {
         icon: '✅'
       })
 
-      // Send email notifications to selected participants
+      // Auto-select all participants with valid emails for notifications
+      const allParticipantsWithEmails = getAllParticipants()
+        .filter(p => p.email && p.email.trim() !== '')
+        .map(p => p.email.trim())
+      setSelectedEmailParticipants(allParticipantsWithEmails)
+
+      console.log('📧 All participants with emails:', allParticipantsWithEmails)
+      console.log('📧 External participants count:', formData.externalParticipants.length)
+      console.log('📧 External participants with emails:', formData.externalParticipants.filter(p => p.email && p.email.trim() !== '').length)
+      console.log('📧 Booking Reference ID for emails:', bookingRefId)
+
+      // Send email notifications to all participants (including external members)
+      // bookingRefId will be included in email data and stored in booking_ref_id column in database
       await sendEmailNotifications(sanitizedBookingData, bookingRefId)
 
       // Redirect to bookings list
@@ -1111,15 +1246,20 @@ export default function StaffNewBookingPage() {
 
     try {
       const response = await placeManagementAPI.getTableData('external_members', {
-        is_deleted: 'false',
-        is_blacklisted: 'false',
-        is_active: 'true'
+        limit: 500
       })
       
       const data = Array.isArray(response) ? response : response.data || []
       
+      // Filter out deleted and blacklisted members (client-side filter)
+      const activeMembers = data.filter((m: any) => 
+        (m.is_deleted === false || m.is_deleted === 0) && 
+        (m.is_blacklisted === false || m.is_blacklisted === 0) && 
+        (m.is_active === true || m.is_active === 1)
+      )
+      
       // Filter by email, phone, or name
-      const filtered = data.filter((member: any) =>
+      const filtered = activeMembers.filter((member: any) =>
         member.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         member.phone?.includes(searchTerm) ||
         member.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -1134,8 +1274,18 @@ export default function StaffNewBookingPage() {
 
   // Select existing member
   const selectExistingMember = (member: any) => {
-    // Check if already added
-    if (formData.externalParticipants.some(p => p.email === member.email)) {
+    // Check if already added (by email or phone)
+    const isDuplicate = formData.externalParticipants.some(p => {
+      if (member.email && p.email) {
+        return p.email.toLowerCase() === member.email.toLowerCase()
+      }
+      if (member.phone && p.phone) {
+        return p.phone === member.phone
+      }
+      return false
+    })
+    
+    if (isDuplicate) {
       toast.error('This member is already added')
       return
     }
@@ -1143,7 +1293,7 @@ export default function StaffNewBookingPage() {
     const participant: ExternalParticipant = {
       id: member.id,
       fullName: member.full_name,
-      email: member.email,
+      email: member.email || "",
       phone: member.phone,
       referenceType: member.reference_type as "NIC" | "Passport" | "Employee ID",
       referenceValue: member.reference_value,
@@ -1162,60 +1312,130 @@ export default function StaffNewBookingPage() {
 
   // External participant management
   const addExternalParticipant = async () => {
-    if (!newExternalParticipant.fullName || !newExternalParticipant.phone || !newExternalParticipant.referenceValue) {
-      toast.error("Please fill in all required fields", {
+    // Validate required fields
+    if (!newExternalParticipant.fullName?.trim() || !newExternalParticipant.phone?.trim() || !newExternalParticipant.referenceValue?.trim()) {
+      toast.error("Please fill in all required fields (Full Name, Phone, Reference Value)", {
         position: 'top-center',
         duration: 3000
       })
       return
     }
 
-    // Check for duplicates in current form
-    if (formData.externalParticipants.some(p => 
-      p.email === newExternalParticipant.email || 
-      p.phone === newExternalParticipant.phone
-    )) {
-      toast.error('Duplicate email or phone in participants')
+    // Trim all input values
+    const trimmedParticipant = {
+      fullName: newExternalParticipant.fullName.trim(),
+      email: (newExternalParticipant.email || "").trim(),
+      phone: newExternalParticipant.phone.trim(),
+      referenceType: newExternalParticipant.referenceType,
+      referenceValue: newExternalParticipant.referenceValue.trim(),
+    }
+
+    // Check for duplicates in current form (only check if both have values)
+    const isDuplicateInForm = formData.externalParticipants.some(p => {
+      // Check email match (only if both have emails and they're not empty)
+      if (trimmedParticipant.email && p.email && trimmedParticipant.email.length > 0 && p.email.length > 0) {
+        if (p.email.toLowerCase() === trimmedParticipant.email.toLowerCase()) {
+          return true
+        }
+      }
+      // Check phone match (always check phone as it's required)
+      if (p.phone && trimmedParticipant.phone && p.phone === trimmedParticipant.phone) {
+        return true
+      }
+      return false
+    })
+    
+    if (isDuplicateInForm) {
+      toast.error('This participant is already added (duplicate email or phone)', {
+        position: 'top-center',
+        duration: 3000
+      })
       return
     }
 
     // Check if exists in database
     try {
       const response = await placeManagementAPI.getTableData('external_members', {
-        is_deleted: 'false'
+        limit: 500
       })
       const data = Array.isArray(response) ? response : response.data || []
       
-      const existing = data.find((m: any) => 
-        m.email === newExternalParticipant.email || 
-        m.phone === newExternalParticipant.phone
-      )
+      // Filter out deleted members (client-side filter)
+      const activeMembers = data.filter((m: any) => !m.is_deleted && (m.is_deleted === false || m.is_deleted === 0))
+      
+      // Check by email (if both have emails) or phone
+      // Only match if BOTH email AND phone match (more strict matching)
+      const existing = activeMembers.find((m: any) => {
+        let emailMatch = false
+        let phoneMatch = false
+        
+        // Check email match (only if both have emails and they're not empty)
+        if (trimmedParticipant.email && m.email && trimmedParticipant.email.length > 0 && m.email.length > 0) {
+          if (m.email.toLowerCase() === trimmedParticipant.email.toLowerCase()) {
+            emailMatch = true
+          }
+        }
+        
+        // Check phone match (always check phone)
+        if (m.phone && trimmedParticipant.phone && m.phone === trimmedParticipant.phone) {
+          phoneMatch = true
+        }
+        
+        // Only consider it a match if:
+        // 1. Phone matches AND (email matches OR both don't have email)
+        if (phoneMatch) {
+          if (trimmedParticipant.email && m.email) {
+            // Both have emails, so both must match
+            return emailMatch
+          } else {
+            // At least one doesn't have email, phone match is enough
+            return true
+          }
+        }
+        
+        return false
+      })
 
       if (existing) {
         if (existing.is_blacklisted) {
-          toast.error(`${existing.full_name} is blacklisted: ${existing.blacklist_reason}`)
+          toast.error(`${existing.full_name} is blacklisted: ${existing.blacklist_reason || 'No reason provided'}`, {
+            position: 'top-center',
+            duration: 4000
+          })
           return
         }
-        // Use existing member
-        toast.success(`Using existing member: ${existing.full_name}`)
+        // Use existing member from database (this ensures data consistency)
+        console.log('✅ Found existing member in database:', existing)
+        console.log('📝 User entered:', trimmedParticipant)
+        console.log('🔄 Using database member data for consistency')
         selectExistingMember(existing)
         return
       }
+      
+      console.log('✅ No existing member found, adding as new participant with user-entered data')
     } catch (error) {
-      console.error('Duplicate check failed:', error)
+      console.error('❌ Duplicate check failed:', error)
+      // Continue to add as new if check fails
     }
 
-    // Add as new
+    // Add as new participant (not found in database)
     const participant: ExternalParticipant = {
       id: Math.random().toString(36).substr(2, 9),
-      ...newExternalParticipant,
+      fullName: trimmedParticipant.fullName,
+      email: trimmedParticipant.email,
+      phone: trimmedParticipant.phone,
+      referenceType: trimmedParticipant.referenceType,
+      referenceValue: trimmedParticipant.referenceValue,
     }
+
+    console.log('➕ Adding new external participant (not in database):', participant)
 
     setFormData({
       ...formData,
       externalParticipants: [...formData.externalParticipants, participant],
     })
 
+    // Clear form
     setNewExternalParticipant({
       fullName: "",
       email: "",
@@ -1224,7 +1444,10 @@ export default function StaffNewBookingPage() {
       referenceValue: "",
     })
 
-    toast.success('Added new external participant')
+    toast.success(`Added new external participant: ${participant.fullName}`, {
+      position: 'top-center',
+      duration: 3000
+    })
   }
 
   const removeExternalParticipant = (id: string) => {
@@ -1232,6 +1455,127 @@ export default function StaffNewBookingPage() {
       ...formData,
       externalParticipants: formData.externalParticipants.filter(p => p.id !== id)
     })
+  }
+
+  // Edit external member
+  const handleEditExternalMember = async (participant: ExternalParticipant) => {
+    // Check if this is a database member (UUID format) or temporary ID
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(participant.id)
+    
+    if (isUUID) {
+      // Load full member data from database
+      try {
+        const response = await placeManagementAPI.getTableData('external_members', {
+          limit: 500
+        })
+        const members = Array.isArray(response) ? response : response.data || []
+        // Filter out deleted members and find by ID
+        const activeMembers = members.filter((m: any) => !m.is_deleted && (m.is_deleted === false || m.is_deleted === 0))
+        const member = activeMembers.find((m: any) => m.id === participant.id)
+        
+        if (member) {
+          setEditingMemberFormData({
+            full_name: member.full_name || participant.fullName,
+            email: member.email || participant.email,
+            phone: member.phone || participant.phone,
+            company_name: member.company_name || "",
+            designation: member.designation || "",
+            reference_type: member.reference_type || participant.referenceType,
+            reference_value: member.reference_value || participant.referenceValue,
+            address: member.address || "",
+            city: member.city || "",
+            country: member.country || "Sri Lanka",
+            notes: member.notes || ""
+          })
+          setEditingExternalMember(participant)
+          setIsEditMemberDialogOpen(true)
+        } else {
+          toast.error('Member not found in database')
+        }
+      } catch (error) {
+        console.error('Error loading member:', error)
+        toast.error('Failed to load member details')
+      }
+    } else {
+      // Temporary participant - edit inline
+      setEditingMemberFormData({
+        full_name: participant.fullName,
+        email: participant.email,
+        phone: participant.phone,
+        company_name: "",
+        designation: "",
+        reference_type: participant.referenceType,
+        reference_value: participant.referenceValue,
+        address: "",
+        city: "",
+        country: "Sri Lanka",
+        notes: ""
+      })
+      setEditingExternalMember(participant)
+      setIsEditMemberDialogOpen(true)
+    }
+  }
+
+  const handleUpdateExternalMember = async () => {
+    if (!editingExternalMember) return
+    
+    // Validate
+    if (!editingMemberFormData.full_name?.trim() || !editingMemberFormData.phone?.trim() || !editingMemberFormData.reference_value?.trim()) {
+      toast.error('Please fill in all required fields', { position: 'top-center' })
+      return
+    }
+    
+    setIsUpdatingMember(true)
+    
+    try {
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(editingExternalMember.id)
+      
+      if (isUUID) {
+        // Update in database
+        await placeManagementAPI.updateRecord('external_members', { id: editingExternalMember.id }, {
+          full_name: editingMemberFormData.full_name.trim(),
+          email: editingMemberFormData.email?.trim() || null,
+          phone: editingMemberFormData.phone.trim(),
+          company_name: editingMemberFormData.company_name?.trim() || null,
+          designation: editingMemberFormData.designation?.trim() || null,
+          reference_type: editingMemberFormData.reference_type,
+          reference_value: editingMemberFormData.reference_value.trim(),
+          address: editingMemberFormData.address?.trim() || null,
+          city: editingMemberFormData.city?.trim() || null,
+          country: editingMemberFormData.country?.trim() || 'Sri Lanka',
+          notes: editingMemberFormData.notes?.trim() || null
+        })
+        
+        toast.success('External member updated successfully!', { position: 'top-center' })
+      }
+      
+      // Update participant in form
+      const updatedParticipants = formData.externalParticipants.map(p => 
+        p.id === editingExternalMember.id 
+          ? {
+              ...p,
+              fullName: editingMemberFormData.full_name.trim(),
+              email: editingMemberFormData.email?.trim() || "",
+              phone: editingMemberFormData.phone.trim(),
+              referenceType: editingMemberFormData.reference_type as "NIC" | "Passport" | "Employee ID",
+              referenceValue: editingMemberFormData.reference_value.trim()
+            }
+          : p
+      )
+      
+      setFormData({
+        ...formData,
+        externalParticipants: updatedParticipants
+      })
+      
+      setIsEditMemberDialogOpen(false)
+      setEditingExternalMember(null)
+    } catch (error: any) {
+      console.error('Error updating member:', error)
+      toast.error(error.message || 'Failed to update member', { position: 'top-center' })
+    } finally {
+      setIsUpdatingMember(false)
+    }
   }
 
   // Refreshments management
@@ -1701,16 +2045,16 @@ export default function StaffNewBookingPage() {
           </Card>
 
           {/* External Participants */}
-          <Card>
-            <CardHeader>
-              <CardTitle>External Participants</CardTitle>
+          <Card className="dark:bg-card dark:border-border shadow-md">
+            <CardHeader className="dark:border-border/50">
+              <CardTitle className="dark:text-foreground">External Participants</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-4 dark:bg-card">
               {/* Search Existing Members */}
-              <div className="space-y-2 p-4 bg-blue-50 border-2 border-blue-200 rounded-lg">
-                <Label className="text-blue-900 font-semibold">🔍 Search Existing Members</Label>
+              <div className="space-y-2 p-4 bg-blue-50 dark:bg-blue-950/20 border-2 border-blue-200 dark:border-blue-800 rounded-lg">
+                <Label className="text-blue-900 dark:text-blue-300 font-semibold">🔍 Search Existing Members</Label>
                 <div className="relative">
-                  <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground dark:text-muted-foreground" />
                   <Input
                     placeholder="Search by name, email, phone, or company..."
                     value={memberSearch}
@@ -1720,26 +2064,26 @@ export default function StaffNewBookingPage() {
                       setShowMemberDropdown(true)
                     }}
                     onFocus={() => memberSearch.length >= 2 && setShowMemberDropdown(true)}
-                    className="pl-10"
+                    className="pl-10 dark:bg-card dark:border-border dark:text-foreground"
                   />
                 </div>
                 {showMemberDropdown && searchedMembers.length > 0 && (
-                  <div className="max-h-60 overflow-y-auto border rounded-md bg-white shadow-lg">
+                  <div className="max-h-60 overflow-y-auto border rounded-md bg-white dark:bg-card dark:border-border shadow-lg">
                     {searchedMembers.map(member => (
                       <div
                         key={member.id}
-                        className="p-3 cursor-pointer hover:bg-blue-50 transition-colors border-b last:border-b-0"
+                        className="p-3 cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-950/30 transition-colors border-b dark:border-border last:border-b-0"
                         onClick={() => selectExistingMember(member)}
                       >
                         <div className="flex items-center justify-between">
                           <div>
-                            <p className="font-medium text-sm">{member.full_name}</p>
-                            <p className="text-xs text-muted-foreground">{member.email} • {member.phone}</p>
+                            <p className="font-medium text-sm dark:text-foreground">{member.full_name}</p>
+                            <p className="text-xs text-muted-foreground dark:text-muted-foreground">{member.email} • {member.phone}</p>
                             {member.company_name && (
-                              <p className="text-xs text-blue-600">{member.company_name} • {member.designation}</p>
+                              <p className="text-xs text-blue-600 dark:text-blue-400">{member.company_name} • {member.designation}</p>
                             )}
                           </div>
-                          <Badge variant="outline" className="bg-green-50">
+                          <Badge variant="outline" className="bg-green-50 dark:bg-green-950/30 dark:border-green-800 dark:text-green-300">
                             {member.visit_count} visits
                           </Badge>
                         </div>
@@ -1747,7 +2091,7 @@ export default function StaffNewBookingPage() {
                     ))}
                   </div>
                 )}
-                <p className="text-xs text-blue-700">
+                <p className="text-xs text-blue-700 dark:text-blue-400">
                   💡 Search for existing members to auto-fill details and track visits
                 </p>
               </div>
@@ -1755,94 +2099,115 @@ export default function StaffNewBookingPage() {
               {/* OR Divider */}
               <div className="relative">
                 <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t" />
+                  <span className="w-full border-t dark:border-border" />
                 </div>
                 <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-white px-2 text-muted-foreground">Or Add New Member</span>
+                  <span className="bg-white dark:bg-card px-2 text-muted-foreground dark:text-muted-foreground">Or Add New Member</span>
                 </div>
               </div>
 
               {/* Add New Member Form */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="col-span-2 space-y-2">
-                  <Label>Full Name *</Label>
+                  <Label className="dark:text-foreground">Full Name *</Label>
                   <Input
                     value={newExternalParticipant.fullName}
                     onChange={(e) => setNewExternalParticipant({...newExternalParticipant, fullName: e.target.value})}
                     placeholder="Enter full name"
+                    className="dark:bg-card dark:border-border dark:text-foreground"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Email</Label>
+                  <Label className="dark:text-foreground">Email</Label>
                   <Input
                     type="email"
                     value={newExternalParticipant.email}
                     onChange={(e) => setNewExternalParticipant({...newExternalParticipant, email: e.target.value})}
                     placeholder="email@example.com"
+                    className="dark:bg-card dark:border-border dark:text-foreground"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Phone *</Label>
+                  <Label className="dark:text-foreground">Phone *</Label>
                   <Input
                     value={newExternalParticipant.phone}
                     onChange={(e) => setNewExternalParticipant({...newExternalParticipant, phone: e.target.value})}
                     placeholder="+1234567890"
+                    className="dark:bg-card dark:border-border dark:text-foreground"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Reference Type *</Label>
+                  <Label className="dark:text-foreground">Reference Type *</Label>
                   <Select
                     value={newExternalParticipant.referenceType}
                     onValueChange={(value: any) => setNewExternalParticipant({...newExternalParticipant, referenceType: value})}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="dark:bg-card dark:border-border dark:text-foreground">
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="NIC">NIC</SelectItem>
-                      <SelectItem value="Passport">Passport</SelectItem>
-                      <SelectItem value="Employee ID">Employee ID</SelectItem>
+                    <SelectContent className="dark:bg-card dark:border-border">
+                      <SelectItem value="NIC" className="dark:text-foreground dark:hover:bg-muted">NIC</SelectItem>
+                      <SelectItem value="Passport" className="dark:text-foreground dark:hover:bg-muted">Passport</SelectItem>
+                      <SelectItem value="Employee ID" className="dark:text-foreground dark:hover:bg-muted">Employee ID</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Reference Value *</Label>
+                  <Label className="dark:text-foreground">Reference Value *</Label>
                   <Input
                     value={newExternalParticipant.referenceValue}
                     onChange={(e) => setNewExternalParticipant({...newExternalParticipant, referenceValue: e.target.value})}
                     placeholder="Enter ID number"
+                    className="dark:bg-card dark:border-border dark:text-foreground"
                   />
                 </div>
                 <div className="col-span-2">
-                  <Button type="button" onClick={addExternalParticipant} className="w-full">
+                  <Button type="button" onClick={addExternalParticipant} className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 dark:from-blue-500 dark:to-purple-500 dark:hover:from-blue-600 dark:hover:to-purple-600 shadow-lg">
                     Add External Participant
                   </Button>
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label>Added External Participants ({formData.externalParticipants.length})</Label>
+                <Label className="dark:text-foreground">Added External Participants ({formData.externalParticipants.length})</Label>
                 <div className="space-y-2 max-h-60 overflow-y-auto">
                   {formData.externalParticipants.map((participant) => (
-                    <div key={participant.id} className="flex items-center justify-between p-3 bg-muted rounded-md">
-                      <div>
-                        <p className="font-medium text-sm">{participant.fullName}</p>
-                        <p className="text-xs text-muted-foreground">
+                    <div key={participant.id} className="flex items-center justify-between p-3 bg-muted dark:bg-muted/50 rounded-md">
+                      <div className="flex-1">
+                        <p className="font-medium text-sm dark:text-foreground">{participant.fullName}</p>
+                        <p className="text-xs text-muted-foreground dark:text-muted-foreground">
                           {participant.referenceType}: {participant.referenceValue} • {participant.phone}
                         </p>
+                        {participant.email && (
+                          <p className="text-xs text-muted-foreground dark:text-muted-foreground">{participant.email}</p>
+                        )}
                       </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeExternalParticipant(participant.id)}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEditExternalMember(participant)}
+                          title="Edit member details"
+                          className="h-8 w-8 p-0 dark:hover:bg-muted"
+                        >
+                          <Edit className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeExternalParticipant(participant.id)}
+                          title="Remove participant"
+                          className="h-8 w-8 p-0 dark:hover:bg-muted"
+                        >
+                          <X className="h-4 w-4 text-red-500 dark:text-red-400" />
+                        </Button>
+                      </div>
                     </div>
                   ))}
                   {formData.externalParticipants.length === 0 && (
-                    <p className="text-sm text-muted-foreground text-center py-4">
+                    <p className="text-sm text-muted-foreground dark:text-muted-foreground text-center py-4">
                       No external participants added
                     </p>
                   )}
@@ -1853,14 +2218,14 @@ export default function StaffNewBookingPage() {
         </div>
 
         {/* Refreshments Section */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+        <Card className="dark:bg-card dark:border-border shadow-md">
+          <CardHeader className="dark:border-border/50">
+            <CardTitle className="flex items-center gap-2 dark:text-foreground">
               <Utensils className="h-5 w-5" />
               Refreshments
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-4 dark:bg-card">
             <div className="flex items-center space-x-2">
               <input
                 type="checkbox"
@@ -1875,9 +2240,9 @@ export default function StaffNewBookingPage() {
                     },
                   })
                 }
-                className="h-4 w-4"
+                className="h-4 w-4 dark:accent-primary"
               />
-              <Label htmlFor="refreshmentsRequired" className="cursor-pointer">
+              <Label htmlFor="refreshmentsRequired" className="cursor-pointer dark:text-foreground">
                 Refreshments Required
               </Label>
             </div>
@@ -1885,7 +2250,7 @@ export default function StaffNewBookingPage() {
             {formData.refreshments.required && (
               <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-2">
-                  <Label>Type</Label>
+                  <Label className="dark:text-foreground">Type</Label>
                   <Select
                     value={formData.refreshments.type}
                     onValueChange={(value) =>
@@ -1895,22 +2260,22 @@ export default function StaffNewBookingPage() {
                       })
                     }
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="dark:bg-card dark:border-border dark:text-foreground">
                       <SelectValue placeholder="Select type" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="dark:bg-card dark:border-border">
                       {refreshmentTypes.length > 0 ? (
                         refreshmentTypes.map((type) => (
-                          <SelectItem key={type.id} value={type.code}>
+                          <SelectItem key={type.id} value={type.code} className="dark:text-foreground dark:hover:bg-muted">
                             {type.name}
                           </SelectItem>
                         ))
                       ) : (
                         <>
-                          <SelectItem value="beverages">Beverages</SelectItem>
-                          <SelectItem value="light_snacks">Light Snacks</SelectItem>
-                          <SelectItem value="full_meal">Full Meal</SelectItem>
-                          <SelectItem value="custom">Custom</SelectItem>
+                          <SelectItem value="beverages" className="dark:text-foreground dark:hover:bg-muted">Beverages</SelectItem>
+                          <SelectItem value="light_snacks" className="dark:text-foreground dark:hover:bg-muted">Light Snacks</SelectItem>
+                          <SelectItem value="full_meal" className="dark:text-foreground dark:hover:bg-muted">Full Meal</SelectItem>
+                          <SelectItem value="custom" className="dark:text-foreground dark:hover:bg-muted">Custom</SelectItem>
                         </>
                       )}
                     </SelectContent>
@@ -1918,7 +2283,7 @@ export default function StaffNewBookingPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Serving Time</Label>
+                  <Label className="dark:text-foreground">Serving Time</Label>
                   <Select
                     value={formData.refreshments.servingTime}
                     onValueChange={(value) =>
@@ -1929,21 +2294,21 @@ export default function StaffNewBookingPage() {
                     }
                     disabled={servingTimeOptions.length === 0}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="dark:bg-card dark:border-border dark:text-foreground">
                       <SelectValue placeholder={
                         servingTimeOptions.length === 0 
                           ? "Select booking time first" 
                           : "Select serving time"
                       } />
                     </SelectTrigger>
-                    <SelectContent className="max-h-[300px]">
+                    <SelectContent className="max-h-[300px] dark:bg-card dark:border-border">
                       {servingTimeOptions.length === 0 ? (
-                        <div className="p-4 text-center text-sm text-muted-foreground">
+                        <div className="p-4 text-center text-sm text-muted-foreground dark:text-muted-foreground">
                           Select booking start and end time first
                         </div>
                       ) : (
                         servingTimeOptions.map((time) => (
-                          <SelectItem key={time} value={time}>
+                          <SelectItem key={time} value={time} className="dark:text-foreground dark:hover:bg-muted">
                             {time}
                           </SelectItem>
                         ))
@@ -1951,14 +2316,14 @@ export default function StaffNewBookingPage() {
                     </SelectContent>
                   </Select>
                   {servingTimeOptions.length > 0 && (
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-xs text-muted-foreground dark:text-muted-foreground">
                       {servingTimeOptions.length} time options (15-min intervals, last: {servingTimeOptions[servingTimeOptions.length - 1]})
                     </p>
                   )}
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Estimated Count</Label>
+                  <Label className="dark:text-foreground">Estimated Count</Label>
                   <Input
                     type="number"
                     min="1"
@@ -1969,14 +2334,15 @@ export default function StaffNewBookingPage() {
                         refreshments: { ...formData.refreshments, estimatedCount: parseInt(e.target.value) || 0 },
                       })
                     }
+                    className="dark:bg-card dark:border-border dark:text-foreground"
                   />
                 </div>
 
                 <div className="col-span-3 space-y-2">
-                  <Label>Items</Label>
+                  <Label className="dark:text-foreground">Items</Label>
                   <div className="flex flex-wrap gap-2 mb-2">
                     {formData.refreshments.items.map((item) => (
-                      <Badge key={item} variant="secondary" className="flex items-center gap-1">
+                      <Badge key={item} variant="secondary" className="flex items-center gap-1 dark:bg-muted dark:text-foreground">
                         {item}
                         <X className="h-3 w-3 cursor-pointer" onClick={() => removeRefreshmentItem(item)} />
                       </Badge>
@@ -1986,7 +2352,7 @@ export default function StaffNewBookingPage() {
                     onValueChange={(value) => addRefreshmentItem(value)}
                     disabled={!formData.refreshments.type || availableItemsForType.length === 0}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="dark:bg-card dark:border-border dark:text-foreground">
                       <SelectValue placeholder={
                         !formData.refreshments.type 
                           ? "Select type first" 
@@ -1995,31 +2361,35 @@ export default function StaffNewBookingPage() {
                           : "Add item"
                       } />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="dark:bg-card dark:border-border">
                       {availableItemsForType.length > 0 ? (
                         availableItemsForType.map((item) => (
-                          <SelectItem key={item.id} value={item.name}>
+                          <SelectItem key={item.id} value={item.name} className="dark:text-foreground dark:hover:bg-muted">
                             {item.name}
                           </SelectItem>
                         ))
                       ) : (
-                        <div className="p-4 text-center text-sm text-muted-foreground">
-                          {!formData.refreshments.type 
-                            ? "Please select a refreshment type first" 
-                            : "No items available for this type"}
-                        </div>
+                        <>
+                          <SelectItem value="Coffee" className="dark:text-foreground dark:hover:bg-muted">Coffee</SelectItem>
+                          <SelectItem value="Tea" className="dark:text-foreground dark:hover:bg-muted">Tea</SelectItem>
+                          <SelectItem value="Water" className="dark:text-foreground dark:hover:bg-muted">Water</SelectItem>
+                          <SelectItem value="Juice" className="dark:text-foreground dark:hover:bg-muted">Juice</SelectItem>
+                          <SelectItem value="Cookies" className="dark:text-foreground dark:hover:bg-muted">Cookies</SelectItem>
+                          <SelectItem value="Sandwiches" className="dark:text-foreground dark:hover:bg-muted">Sandwiches</SelectItem>
+                          <SelectItem value="Lunch" className="dark:text-foreground dark:hover:bg-muted">Lunch</SelectItem>
+                        </>
                       )}
                     </SelectContent>
                   </Select>
                   {formData.refreshments.type && availableItemsForType.length === 0 && (
-                    <p className="text-xs text-muted-foreground mt-1">
-                      No items available for this type. <a href="/admin/refreshments" className="text-blue-600 hover:underline">Manage items</a>
+                    <p className="text-xs text-muted-foreground dark:text-muted-foreground">
+                      No items available for this type.
                     </p>
                   )}
                 </div>
 
                 <div className="col-span-3 space-y-2">
-                  <Label>Special Requests</Label>
+                  <Label className="dark:text-foreground">Special Requests</Label>
                   <Textarea
                     value={formData.refreshments.specialRequests}
                     onChange={(e) =>
@@ -2030,6 +2400,7 @@ export default function StaffNewBookingPage() {
                     }
                     placeholder="Any special requirements..."
                     rows={2}
+                    className="dark:bg-card dark:border-border dark:text-foreground"
                   />
                 </div>
               </div>
@@ -2038,32 +2409,32 @@ export default function StaffNewBookingPage() {
         </Card>
 
         {/* Participant Email Notification Section */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+        <Card className="dark:bg-card dark:border-border shadow-md">
+          <CardHeader className="dark:border-border/50">
+            <CardTitle className="flex items-center gap-2 dark:text-foreground">
               <Users className="h-5 w-5" />
               Email Notifications
             </CardTitle>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-muted-foreground dark:text-muted-foreground">
               Select participants to receive email notifications about this meeting
             </p>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-4 dark:bg-card">
             {/* Check All/Uncheck All */}
-            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+            <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-muted rounded-lg">
               <div className="flex items-center space-x-2">
                 <input
                   type="checkbox"
                   id="selectAllParticipants"
                   checked={getAllParticipants().length > 0 && getAllParticipants().every(p => selectedEmailParticipants.includes(p.email))}
                   onChange={handleSelectAllParticipants}
-                  className="h-4 w-4"
+                  className="h-4 w-4 dark:accent-primary"
                 />
-                <Label htmlFor="selectAllParticipants" className="cursor-pointer font-medium">
+                <Label htmlFor="selectAllParticipants" className="cursor-pointer font-medium dark:text-foreground">
                   Select All Participants
                 </Label>
               </div>
-              <Badge variant="outline">
+              <Badge variant="outline" className="dark:border-border dark:text-foreground">
                 {selectedEmailParticipants.length} of {getAllParticipants().length} selected
               </Badge>
             </div>
@@ -2071,30 +2442,30 @@ export default function StaffNewBookingPage() {
             {/* Participants List */}
             <div className="space-y-3 max-h-60 overflow-y-auto">
               {getAllParticipants().map((participant, index) => (
-                <div key={`${participant.type}-${index}`} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50">
+                <div key={`${participant.type}-${index}`} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 dark:border-border dark:hover:bg-muted/50 dark:text-foreground transition-colors">
                   <div className="flex items-center space-x-3">
                     <input
                       type="checkbox"
                       id={`participant-${index}`}
                       checked={selectedEmailParticipants.includes(participant.email)}
                       onChange={(e) => handleParticipantEmailSelection(participant.email, e.target.checked)}
-                      className="h-4 w-4"
+                      className="h-4 w-4 dark:accent-primary"
                     />
                     <div className="flex items-center space-x-2">
-                      <Avatar className="h-8 w-8">
-                        <AvatarFallback className="text-xs">
+                      <Avatar className="h-8 w-8 border dark:border-border">
+                        <AvatarFallback className="text-xs dark:bg-primary/20 dark:text-primary">
                           {participant.name.split(' ').map(n => n[0]).join('').toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
                       <div>
-                        <p className="font-medium text-sm">{participant.name}</p>
-                        <p className="text-xs text-muted-foreground">{participant.email}</p>
+                        <p className="font-medium text-sm dark:text-foreground">{participant.name}</p>
+                        <p className="text-xs text-muted-foreground dark:text-muted-foreground">{participant.email}</p>
                       </div>
                     </div>
                   </div>
                   <Badge 
                     variant={participant.type === 'responsible' ? 'default' : participant.type === 'internal' ? 'secondary' : 'outline'}
-                    className="text-xs"
+                    className="text-xs dark:border-border"
                   >
                     {participant.type === 'responsible' ? 'Responsible' : 
                      participant.type === 'internal' ? 'Internal' : 'External'}
@@ -2104,9 +2475,9 @@ export default function StaffNewBookingPage() {
             </div>
 
             {getAllParticipants().length === 0 && (
-              <div className="text-center py-8 text-muted-foreground">
-                <Users className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                <p>No participants added yet</p>
+              <div className="text-center py-8 text-muted-foreground dark:text-muted-foreground border-2 border-dashed rounded-lg dark:border-border">
+                <Users className="h-12 w-12 mx-auto mb-2 opacity-50 dark:opacity-30" />
+                <p className="dark:text-foreground">No participants added yet</p>
                 <p className="text-xs">Add participants above to enable email notifications</p>
               </div>
             )}
@@ -2118,12 +2489,17 @@ export default function StaffNewBookingPage() {
           <Button
             type="button"
             variant="outline"
-            onClick={() => router.push('/staff/bookings')}
+            onClick={() => setIsCancelConfirmDialogOpen(true)}
             disabled={isSubmitting}
+            className="dark:border-border dark:hover:bg-muted dark:text-foreground"
           >
             Cancel
           </Button>
-          <Button type="submit" disabled={isSubmitting} className="min-w-[200px]">
+          <Button 
+            type="submit"
+            disabled={isSubmitting} 
+            className="min-w-[200px] bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 dark:from-blue-500 dark:to-purple-500 dark:hover:from-blue-600 dark:hover:to-purple-600 shadow-lg"
+          >
             {isSubmitting ? (
               <>
                 <span className="animate-spin mr-2">⏳</span>
@@ -2137,7 +2513,241 @@ export default function StaffNewBookingPage() {
             )}
           </Button>
         </div>
+        
+        {/* Cancel Confirmation Dialog */}
+        <Dialog open={isCancelConfirmDialogOpen} onOpenChange={setIsCancelConfirmDialogOpen}>
+          <DialogContent className="dark:bg-card dark:border-border">
+            <DialogHeader>
+              <DialogTitle className="dark:text-foreground">Cancel Booking Creation</DialogTitle>
+              <DialogDescription className="dark:text-muted-foreground">
+                Are you sure you want to cancel? All unsaved changes will be lost.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setIsCancelConfirmDialogOpen(false)}
+                className="dark:border-border dark:hover:bg-muted dark:text-foreground"
+              >
+                No, Keep Editing
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  setIsCancelConfirmDialogOpen(false)
+                  router.push('/staff/bookings')
+                }}
+                className="dark:bg-red-600 dark:hover:bg-red-700"
+              >
+                Yes, Cancel
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Create Booking Confirmation Dialog */}
+        <Dialog open={isCreateConfirmDialogOpen} onOpenChange={setIsCreateConfirmDialogOpen}>
+          <DialogContent className="dark:bg-card dark:border-border">
+            <DialogHeader>
+              <DialogTitle className="dark:text-foreground">Create Booking</DialogTitle>
+              <DialogDescription className="dark:text-muted-foreground">
+                Are you sure you want to create this booking? This will send email notifications to selected participants.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setIsCreateConfirmDialogOpen(false)}
+                disabled={isSubmitting}
+                className="dark:border-border dark:hover:bg-muted dark:text-foreground"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={async () => {
+                  setIsCreateConfirmDialogOpen(false)
+                  // Set flag to allow submission BEFORE closing dialog
+                  setShouldSubmitForm(true)
+                  // Wait a moment for dialog to close and state to update
+                  await new Promise(resolve => setTimeout(resolve, 100))
+                  // Get the form and trigger natural form submission
+                  const form = document.querySelector('form') as HTMLFormElement
+                  if (form) {
+                    // Use requestSubmit() which will trigger the form's onSubmit handler naturally
+                    // This will call handleSubmit, which will now see shouldSubmitForm=true and proceed
+                    form.requestSubmit()
+                  }
+                }}
+                disabled={isSubmitting}
+                className="min-w-[100px] bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 dark:from-blue-500 dark:to-purple-500 dark:hover:from-blue-600 dark:hover:to-purple-600"
+              >
+                {isSubmitting ? (
+                  <>
+                    <span className="animate-spin mr-2">⏳</span>
+                    Creating...
+                  </>
+                ) : (
+                  'Yes, Create'
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </form>
+
+      {/* Edit External Member Dialog */}
+      <Dialog open={isEditMemberDialogOpen} onOpenChange={setIsEditMemberDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto dark:bg-card dark:border-border">
+          <DialogHeader>
+            <DialogTitle className="dark:text-foreground">Edit External Member</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label className="dark:text-foreground">Full Name *</Label>
+                <Input
+                  value={editingMemberFormData.full_name}
+                  onChange={(e) => setEditingMemberFormData({...editingMemberFormData, full_name: e.target.value})}
+                  required
+                  className="dark:bg-card dark:border-border dark:text-foreground"
+                />
+              </div>
+              <div>
+                <Label className="dark:text-foreground">Email</Label>
+                <Input
+                  type="email"
+                  value={editingMemberFormData.email}
+                  onChange={(e) => setEditingMemberFormData({...editingMemberFormData, email: e.target.value})}
+                  className="dark:bg-card dark:border-border dark:text-foreground"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label className="dark:text-foreground">Phone *</Label>
+                <Input
+                  value={editingMemberFormData.phone}
+                  onChange={(e) => setEditingMemberFormData({...editingMemberFormData, phone: e.target.value})}
+                  placeholder="+94771234567"
+                  required
+                  className="dark:bg-card dark:border-border dark:text-foreground"
+                />
+              </div>
+              <div>
+                <Label className="dark:text-foreground">Company</Label>
+                <Input
+                  value={editingMemberFormData.company_name}
+                  onChange={(e) => setEditingMemberFormData({...editingMemberFormData, company_name: e.target.value})}
+                  className="dark:bg-card dark:border-border dark:text-foreground"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label className="dark:text-foreground">Designation</Label>
+                <Input
+                  value={editingMemberFormData.designation}
+                  onChange={(e) => setEditingMemberFormData({...editingMemberFormData, designation: e.target.value})}
+                  className="dark:bg-card dark:border-border dark:text-foreground"
+                />
+              </div>
+              <div>
+                <Label className="dark:text-foreground">Reference Type *</Label>
+                <Select
+                  value={editingMemberFormData.reference_type}
+                  onValueChange={(v) => setEditingMemberFormData({...editingMemberFormData, reference_type: v as any})}
+                >
+                  <SelectTrigger className="dark:bg-card dark:border-border dark:text-foreground">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="dark:bg-card dark:border-border">
+                    <SelectItem value="NIC" className="dark:text-foreground dark:hover:bg-muted">NIC</SelectItem>
+                    <SelectItem value="Passport" className="dark:text-foreground dark:hover:bg-muted">Passport</SelectItem>
+                    <SelectItem value="Driving License" className="dark:text-foreground dark:hover:bg-muted">Driving License</SelectItem>
+                    <SelectItem value="Employee ID" className="dark:text-foreground dark:hover:bg-muted">Employee ID</SelectItem>
+                    <SelectItem value="Other" className="dark:text-foreground dark:hover:bg-muted">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div>
+              <Label className="dark:text-foreground">Reference Value *</Label>
+              <Input
+                value={editingMemberFormData.reference_value}
+                onChange={(e) => setEditingMemberFormData({...editingMemberFormData, reference_value: e.target.value})}
+                placeholder="NIC: 199012345678"
+                required
+                className="dark:bg-card dark:border-border dark:text-foreground"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label className="dark:text-foreground">City</Label>
+                <Input
+                  value={editingMemberFormData.city}
+                  onChange={(e) => setEditingMemberFormData({...editingMemberFormData, city: e.target.value})}
+                  className="dark:bg-card dark:border-border dark:text-foreground"
+                />
+              </div>
+              <div>
+                <Label className="dark:text-foreground">Country</Label>
+                <Input
+                  value={editingMemberFormData.country}
+                  onChange={(e) => setEditingMemberFormData({...editingMemberFormData, country: e.target.value})}
+                  className="dark:bg-card dark:border-border dark:text-foreground"
+                />
+              </div>
+            </div>
+            <div>
+              <Label className="dark:text-foreground">Address</Label>
+              <Textarea
+                value={editingMemberFormData.address}
+                onChange={(e) => setEditingMemberFormData({...editingMemberFormData, address: e.target.value})}
+                rows={2}
+                className="dark:bg-card dark:border-border dark:text-foreground"
+              />
+            </div>
+            <div>
+              <Label className="dark:text-foreground">Notes</Label>
+              <Textarea
+                value={editingMemberFormData.notes}
+                onChange={(e) => setEditingMemberFormData({...editingMemberFormData, notes: e.target.value})}
+                rows={2}
+                className="dark:bg-card dark:border-border dark:text-foreground"
+              />
+            </div>
+            <div className="flex gap-2 justify-end pt-4 border-t dark:border-border">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setIsEditMemberDialogOpen(false)
+                  setEditingExternalMember(null)
+                }}
+                disabled={isUpdatingMember}
+                className="dark:border-border dark:hover:bg-muted"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                onClick={handleUpdateExternalMember}
+                disabled={isUpdatingMember}
+                className="min-w-[100px]"
+              >
+                {isUpdatingMember ? (
+                  <>
+                    <span className="animate-spin mr-2">⏳</span>
+                    Updating...
+                  </>
+                ) : (
+                  'Update Member'
+                )}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
         </div>
       </DashboardLayout>
     </RouteProtection>

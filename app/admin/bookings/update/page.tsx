@@ -1128,161 +1128,97 @@ export default function UpdateBookingPage() {
         p.is_deleted === true || p.is_deleted === 1
       )
       
-      console.log('👤 Old external participants:', oldExternals.length)
+      console.log('👤 Old external members:', oldExternals.length)
       console.log('👤 New external participants:', formData.externalParticipants.length)
 
-      // Find removed external participants
-      const currentExternalEmails = formData.externalParticipants.map(p => p.email)
+      // Find removed external members (by email)
+      const currentExternalEmails = formData.externalParticipants.map(p => p.email).filter(Boolean)
       const removedExternals = oldExternals.filter((p: any) => 
-        !currentExternalEmails.includes(p.email)
+        p.email && !currentExternalEmails.includes(p.email)
       )
       
-      console.log('❌ External participants to remove:', removedExternals.length)
+      console.log('❌ External members to remove from booking:', removedExternals.length)
       
-      // Soft delete removed external participants
+      // Remove booking_id from external members (unlink from booking)
       for (const p of removedExternals) {
-        await placeManagementAPI.softDeleteRecord('external_participants', p.id)
-      }
-
-      // Find new external participants (not in old active list)
-      const oldExternalEmails = oldExternals.map((p: any) => p.email)
-      const newExternals = formData.externalParticipants.filter(p => 
-        !oldExternalEmails.includes(p.email)
-      )
-      
-      console.log('✅ New external participants to add/restore:', newExternals.length)
-
-      let hasExternalParticipants = formData.externalParticipants.length > 0
-      
-      // For each "new" external participant, check if they were previously deleted
-      for (const participant of newExternals) {
-        // Check if this participant was previously deleted (by email)
-        const deletedRecord = deletedExternals.find((p: any) => p.email === participant.email)
-        
-        if (deletedRecord) {
-          // RESTORE the deleted record
-          console.log('♻️ Restoring previously deleted external participant:', participant.fullName, 'record ID:', deletedRecord.id)
-          await placeManagementAPI.updateRecord('external_participants', { id: deletedRecord.id }, {
-            is_deleted: false,
-            participation_status: 'invited',
-            updated_at: (() => {
-              const now = new Date()
-              const sriLankaTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Colombo' }))
-              return sriLankaTime.toISOString()
-            })()
-          })
-        } else {
-          // Need to insert new record - first handle member linking
-          let memberId = participant.id
-
-          // Check if member exists in database
-          try {
-            const response = await placeManagementAPI.getTableData('external_members', {
-              limit: 200
-            })
-            const data = Array.isArray(response) ? response : response.data || []
-            
-            const existingMember = data.find((m: any) => 
-              m.email === participant.email || m.phone === participant.phone
-            )
-
-            if (existingMember) {
-              // Use existing member ID and increment visit count
-              memberId = existingMember.id
-              await placeManagementAPI.updateRecord('external_members', { id: memberId }, {
-                visit_count: (existingMember.visit_count || 0) + 1,
-                last_visit_date: new Date().toISOString()
-              })
-              console.log('✅ Updated visit count for existing member:', existingMember.full_name)
-            } else if (!participant.id || participant.id.length < 20) {
-              // Create new member record
-              memberId = generateUUID()
-              await placeManagementAPI.insertRecord('external_members', {
-                id: memberId,
-                full_name: participant.fullName,
-                email: participant.email,
-                phone: participant.phone,
-                reference_type: participant.referenceType,
-                reference_value: participant.referenceValue,
-                visit_count: 1,
-                last_visit_date: (() => {
-                  const now = new Date()
-                  const sriLankaTimeString = now.toLocaleString('en-CA', { 
-                    timeZone: 'Asia/Colombo',
-                    year: 'numeric',
-                    month: '2-digit',
-                    day: '2-digit',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    second: '2-digit',
-                    hour12: false
-                  })
-                  const [datePart, timePart] = sriLankaTimeString.split(', ')
-                  const [year, month, day] = datePart.split('-')
-                  const [hours, minutes, seconds] = timePart.split(':')
-                  const sriLankaDate = new Date(
-                    parseInt(year),
-                    parseInt(month) - 1,
-                    parseInt(day),
-                    parseInt(hours),
-                    parseInt(minutes),
-                    parseInt(seconds)
-                  )
-                  const offsetMs = (5 * 60 + 30) * 60 * 1000
-                  const utcDate = new Date(sriLankaDate.getTime() - offsetMs)
-                  return utcDate.toISOString()
-                })(),
-                is_active: true,
-                is_deleted: false,
-                is_blacklisted: false,
-                created_at: (() => {
-                  const now = new Date()
-                  const sriLankaTimeString = now.toLocaleString('en-CA', { 
-                    timeZone: 'Asia/Colombo',
-                    year: 'numeric',
-                    month: '2-digit',
-                    day: '2-digit',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    second: '2-digit',
-                    hour12: false
-                  })
-                  const [datePart, timePart] = sriLankaTimeString.split(', ')
-                  const [year, month, day] = datePart.split('-')
-                  const [hours, minutes, seconds] = timePart.split(':')
-                  const sriLankaDate = new Date(
-                    parseInt(year),
-                    parseInt(month) - 1,
-                    parseInt(day),
-                    parseInt(hours),
-                    parseInt(minutes),
-                    parseInt(seconds)
-                  )
-                  const offsetMs = (5 * 60 + 30) * 60 * 1000
-                  const utcDate = new Date(sriLankaDate.getTime() - offsetMs)
-                  return utcDate.toISOString()
-                })()
-              })
-              console.log('✅ Created new member:', participant.fullName)
-            }
-          } catch (error) {
-            console.error('Member check/create failed:', error)
-          }
-
-          // Insert external participant with member_id link
-          console.log('➕ Inserting new external participant:', participant.fullName)
-          await placeManagementAPI.insertRecord('external_participants', {
-            id: generateUUID(),
-            booking_id: bookingId!,
-            member_id: memberId,
-            full_name: participant.fullName,
-            email: participant.email,
-            phone: participant.phone,
-            reference_type: participant.referenceType,
-            reference_value: participant.referenceValue,
+        if (p.id) {
+          await placeManagementAPI.updateRecord('external_members', { id: p.id }, {
+            booking_id: null,
             participation_status: 'invited'
           })
         }
+      }
+
+      // Find new external participants (not in old list)
+      const oldExternalEmails = oldExternals.map((p: any) => p.email).filter(Boolean)
+      const newExternals = formData.externalParticipants.filter(p => 
+        p.email && !oldExternalEmails.includes(p.email)
+      )
+      
+      console.log('✅ New external members to link to booking:', newExternals.length)
+
+      let hasExternalParticipants = formData.externalParticipants.length > 0
+      
+      // For each new external participant, ensure member exists and link to booking
+      for (const participant of newExternals) {
+        // Ensure member exists in external_members table
+        let memberId = participant.id
+        
+        // Check if member exists in database
+        try {
+          const memberResponse = await placeManagementAPI.getTableData('external_members', {
+            is_deleted: 'false'
+          })
+          const memberData = Array.isArray(memberResponse) ? memberResponse : []
+          
+          const existingMember = memberData.find((m: any) => 
+            m.email === participant.email || m.phone === participant.phone
+          )
+
+          if (existingMember) {
+            // Use existing member ID and increment visit count
+            memberId = existingMember.id
+            await placeManagementAPI.updateRecord('external_members', { id: memberId }, {
+              visit_count: (existingMember.visit_count || 0) + 1,
+              last_visit_date: new Date().toISOString()
+            })
+            console.log('✅ Updated visit count for existing member:', existingMember.full_name)
+          } else {
+            // Create new member record in external_members table
+            memberId = generateUUID()
+            await placeManagementAPI.insertRecord('external_members', {
+              id: memberId,
+              full_name: participant.fullName,
+              email: participant.email || '',
+              phone: participant.phone,
+              reference_type: participant.referenceType,
+              reference_value: participant.referenceValue,
+              visit_count: 1,
+              last_visit_date: new Date().toISOString(),
+              is_active: true,
+              is_deleted: false,
+              is_blacklisted: false,
+              created_at: new Date().toISOString()
+            })
+            console.log('✅ Created new member:', participant.fullName)
+          }
+        } catch (error) {
+          console.error('Member check/create failed:', error)
+        }
+
+        // Insert external participant with member_id link
+        console.log('➕ Inserting new external participant:', participant.fullName)
+        await placeManagementAPI.insertRecord('external_participants', {
+          id: generateUUID(),
+          booking_id: bookingId!,
+          member_id: memberId,
+          full_name: participant.fullName,
+          email: participant.email,
+          phone: participant.phone,
+          reference_type: participant.referenceType,
+          reference_value: participant.referenceValue,
+          participation_status: 'invited'
+        })
       }
 
       // Update booking with has_external_participants flag

@@ -13,6 +13,7 @@ import { Utensils, Plus, Edit, Trash2, Search, X, Package, Coffee } from 'lucide
 import toast from 'react-hot-toast'
 import { RouteProtection } from '@/components/auth/route-protection'
 import { placeManagementAPI } from '@/lib/place-management-api'
+import { Table, TableBody, TableCell, TableRow } from '@/components/ui/table'
 
 interface RefreshmentType {
   id: string
@@ -268,173 +269,165 @@ export default function RefreshmentManagementPage() {
         title="Refreshment Management"
         subtitle="Manage refreshment types and items for bookings"
       >
-        <div className="space-y-6">
-          {/* Statistics Card */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Total Types</p>
-                    <p className="text-2xl font-bold">{totalTypes}</p>
-                    <p className="text-xs text-muted-foreground mt-1">{activeTypes} active</p>
-                  </div>
-                  <div className="h-12 w-12 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
-                    <Package className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Total Items</p>
-                    <p className="text-2xl font-bold">{totalItems}</p>
-                    <p className="text-xs text-muted-foreground mt-1">{activeItems} active</p>
-                  </div>
-                  <div className="h-12 w-12 rounded-full bg-green-100 dark:bg-green-900 flex items-center justify-center">
-                    <Coffee className="h-6 w-6 text-green-600 dark:text-green-400" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Selected Type</p>
-                    <p className="text-2xl font-bold">
-                      {selectedType ? getTypeName(selectedType) : 'None'}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {selectedType ? `${filteredItems.length} items` : 'Click a type card'}
-                    </p>
-                  </div>
-                  <div className="h-12 w-12 rounded-full bg-purple-100 dark:bg-purple-900 flex items-center justify-center">
-                    <Utensils className="h-6 w-6 text-purple-600 dark:text-purple-400" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Filtered Items</p>
-                    <p className="text-2xl font-bold">{filteredItems.length}</p>
-                    <p className="text-xs text-muted-foreground mt-1">Currently showing</p>
-                  </div>
-                  <div className="h-12 w-12 rounded-full bg-orange-100 dark:bg-orange-900 flex items-center justify-center">
-                    <Search className="h-6 w-6 text-orange-600 dark:text-orange-400" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+        <div className="space-y-3 px-2 sm:px-4 max-w-[98vw] mx-auto dark:bg-background">
+          {/* Statistics Table - Compact Design */}
+          <Card className="dark:bg-card dark:border-border shadow-md">
+            <CardContent className="p-0">
+              <Table>
+                <TableBody>
+                  <TableRow className="hover:bg-transparent">
+                    <TableCell className="py-2.5 px-4 border-r dark:border-border">
+                      <div className="flex items-center gap-2">
+                        <Package className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+                        <div>
+                          <p className="text-[13px] text-muted-foreground dark:text-muted-foreground">Total Types</p>
+                          <p className="text-xl font-bold dark:text-foreground">{totalTypes}</p>
+                          <p className="text-[11px] text-muted-foreground dark:text-muted-foreground">{activeTypes} active</p>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell className="py-2.5 px-4 border-r dark:border-border">
+                      <div className="flex items-center gap-2">
+                        <Coffee className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
+                        <div>
+                          <p className="text-[13px] text-muted-foreground dark:text-muted-foreground">Total Items</p>
+                          <p className="text-xl font-bold dark:text-foreground">{totalItems}</p>
+                          <p className="text-[11px] text-muted-foreground dark:text-muted-foreground">{activeItems} active</p>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell className="py-2.5 px-4 border-r dark:border-border">
+                      <div className="flex items-center gap-2">
+                        <Utensils className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
+                        <div>
+                          <p className="text-[13px] text-muted-foreground dark:text-muted-foreground">Selected Type</p>
+                          <p className="text-xl font-bold dark:text-foreground truncate max-w-[120px]">
+                            {selectedType ? getTypeName(selectedType) : 'None'}
+                          </p>
+                          <p className="text-[11px] text-muted-foreground dark:text-muted-foreground">
+                            {selectedType ? `${filteredItems.length} items` : 'Click a type'}
+                          </p>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell className="py-2.5 px-4 dark:border-border">
+                      <div className="flex items-center gap-2">
+                        <Search className="h-3.5 w-3.5 text-orange-600 dark:text-orange-400" />
+                        <div>
+                          <p className="text-[13px] text-muted-foreground dark:text-muted-foreground">Filtered Items</p>
+                          <p className="text-xl font-bold dark:text-foreground">{filteredItems.length}</p>
+                          <p className="text-[11px] text-muted-foreground dark:text-muted-foreground">Currently showing</p>
+                        </div>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
 
           {/* Types Section */}
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="flex items-center gap-2">
-                <Package className="h-5 w-5" />
+          <Card className="dark:bg-card dark:border-border shadow-md">
+            <CardHeader className="flex flex-row items-center justify-between pb-2 border-b dark:border-border/50">
+              <CardTitle className="flex items-center gap-2 text-[13px] font-semibold dark:text-foreground">
+                <Package className="h-4 w-4" />
                 Refreshment Types
               </CardTitle>
               <div className="flex items-center gap-2">
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground dark:text-muted-foreground" />
                   <Input
                     placeholder="Search types..."
                     value={typeSearchTerm}
                     onChange={(e) => setTypeSearchTerm(e.target.value)}
-                    className="pl-9 w-[250px]"
+                    className="pl-8 h-9 text-[13px] w-[200px] dark:bg-card dark:border-border dark:text-foreground"
                   />
                 </div>
-                <Button onClick={handleCreateType} size="sm">
-                  <Plus className="h-4 w-4 mr-2" />
+                <Button onClick={handleCreateType} size="sm" className="h-9 px-3 text-[13px] bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 dark:from-blue-500 dark:to-purple-500 dark:hover:from-blue-600 dark:hover:to-purple-600">
+                  <Plus className="h-3.5 w-3.5 mr-1.5" />
                   Add Type
                 </Button>
               </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-3 dark:bg-card">
               {isLoading ? (
-                <p className="text-center text-muted-foreground py-8">Loading...</p>
+                <p className="text-center text-muted-foreground dark:text-muted-foreground py-6 text-[13px]">Loading...</p>
               ) : filteredTypes.length === 0 ? (
-                <div className="text-center py-8">
-                  <p className="text-muted-foreground mb-4">
+                <div className="text-center py-6">
+                  <p className="text-muted-foreground dark:text-muted-foreground mb-3 text-[13px]">
                     {typeSearchTerm ? 'No types found matching your search' : 'No refreshment types found'}
                   </p>
-                  <Button onClick={handleCreateType} variant="outline">
-                    <Plus className="h-4 w-4 mr-2" />
+                  <Button onClick={handleCreateType} variant="outline" className="h-8 text-[12px] dark:border-border dark:text-foreground dark:hover:bg-muted">
+                    <Plus className="h-3.5 w-3.5 mr-1.5" />
                     Create First Type
                   </Button>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2.5 max-h-[calc(5*120px)] overflow-y-auto table-scroll-container-vertical">
                   {filteredTypes.map((type) => {
                     const itemCount = getTypeItemCount(type.id)
                     const isSelected = selectedType === type.id
                     return (
                       <Card
                         key={type.id}
-                        className={`cursor-pointer transition-all hover:shadow-lg ${
+                        className={`cursor-pointer transition-all hover:shadow-md dark:bg-card dark:border-border ${
                           isSelected 
-                            ? 'ring-2 ring-primary border-primary' 
-                            : 'hover:border-primary/50'
+                            ? 'ring-2 ring-primary border-primary dark:ring-primary dark:border-primary' 
+                            : 'hover:border-primary/50 dark:hover:border-primary/30'
                         }`}
                         onClick={() => setSelectedType(isSelected ? null : type.id)}
                       >
-                        <CardContent className="p-6">
-                          <div className="flex items-start justify-between mb-4">
-                            <div className="flex-1">
-                              <h3 className="font-semibold text-lg mb-1">{type.name}</h3>
-                              <Badge variant="outline" className="text-xs">{type.code}</Badge>
+                        <CardContent className="p-3">
+                          <div className="flex items-start justify-between mb-2">
+                            <div className="flex-1 min-w-0">
+                              <h3 className="font-semibold text-[13px] mb-1 truncate dark:text-foreground">{type.name}</h3>
+                              <Badge variant="outline" className="text-[11px] dark:border-border dark:text-foreground">{type.code}</Badge>
                             </div>
-                            <div className="flex gap-1">
+                            <div className="flex gap-1 ml-2">
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                className="h-8 w-8 p-0"
+                                className="h-7 w-7 p-0 dark:hover:bg-muted"
                                 onClick={(e) => {
                                   e.stopPropagation()
                                   handleEditType(type)
                                 }}
                               >
-                                <Edit className="h-4 w-4" />
+                                <Edit className="h-3.5 w-3.5 dark:text-foreground" />
                               </Button>
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                                className="h-7 w-7 p-0 text-destructive hover:text-destructive dark:hover:bg-muted"
                                 onClick={(e) => {
                                   e.stopPropagation()
                                   handleDeleteType(type)
                                 }}
                               >
-                                <Trash2 className="h-4 w-4" />
+                                <Trash2 className="h-3.5 w-3.5" />
                               </Button>
                             </div>
                           </div>
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
-                              <Badge variant={type.is_active ? 'default' : 'secondary'}>
+                              <Badge variant={type.is_active ? 'default' : 'secondary'} className="text-[11px] dark:border-border dark:text-foreground">
                                 {type.is_active ? 'Active' : 'Inactive'}
                               </Badge>
-                              <span className="text-sm text-muted-foreground">
+                              <span className="text-[11px] text-muted-foreground dark:text-muted-foreground">
                                 {itemCount} {itemCount === 1 ? 'item' : 'items'}
                               </span>
                             </div>
                             <Button
                               size="sm"
                               variant="outline"
-                              className="h-8 w-8 p-0"
+                              className="h-7 w-7 p-0 dark:border-border dark:hover:bg-muted"
                               onClick={(e) => {
                                 e.stopPropagation()
                                 handleCreateItem(type.id)
                               }}
                               title="Add item to this type"
                             >
-                              <Plus className="h-4 w-4" />
+                              <Plus className="h-3.5 w-3.5 dark:text-foreground" />
                             </Button>
                           </div>
                         </CardContent>
@@ -448,85 +441,87 @@ export default function RefreshmentManagementPage() {
 
           {/* Items Section - Only show when a type is selected */}
           {selectedType && (
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
+            <Card className="dark:bg-card dark:border-border shadow-md">
+              <CardHeader className="flex flex-row items-center justify-between pb-2 border-b dark:border-border/50">
                 <div className="flex items-center gap-3">
-                  <CardTitle className="flex items-center gap-2">
-                    <Coffee className="h-5 w-5" />
+                  <CardTitle className="flex items-center gap-2 text-[13px] font-semibold dark:text-foreground">
+                    <Coffee className="h-4 w-4" />
                     Items - {getTypeName(selectedType)}
                   </CardTitle>
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => setSelectedType(null)}
+                    className="h-8 px-2 text-[12px] dark:hover:bg-muted"
                   >
-                    <X className="h-4 w-4 mr-2" />
-                    Clear Selection
+                    <X className="h-3.5 w-3.5 mr-1.5" />
+                    Clear
                   </Button>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground dark:text-muted-foreground" />
                     <Input
                       placeholder="Search items..."
                       value={itemSearchTerm}
                       onChange={(e) => setItemSearchTerm(e.target.value)}
-                      className="pl-9 w-[250px]"
+                      className="pl-8 h-9 text-[13px] w-[200px] dark:bg-card dark:border-border dark:text-foreground"
                     />
                   </div>
-                  <Button onClick={() => handleCreateItem(selectedType)} size="sm">
-                    <Plus className="h-4 w-4 mr-2" />
+                  <Button onClick={() => handleCreateItem(selectedType)} size="sm" className="h-9 px-3 text-[13px] bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 dark:from-blue-500 dark:to-purple-500 dark:hover:from-blue-600 dark:hover:to-purple-600">
+                    <Plus className="h-3.5 w-3.5 mr-1.5" />
                     Add Item
                   </Button>
                 </div>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-3 dark:bg-card">
                 {filteredItems.length === 0 ? (
-                  <div className="text-center py-8">
-                    <p className="text-muted-foreground mb-4">
+                  <div className="text-center py-6">
+                    <p className="text-muted-foreground dark:text-muted-foreground mb-3 text-[13px]">
                       {itemSearchTerm 
                         ? 'No items found matching your search' 
                         : 'No items found for this type'}
                     </p>
-                    <Button onClick={() => handleCreateItem(selectedType)} variant="outline">
-                      <Plus className="h-4 w-4 mr-2" />
+                    <Button onClick={() => handleCreateItem(selectedType)} variant="outline" className="h-8 text-[12px] dark:border-border dark:text-foreground dark:hover:bg-muted">
+                      <Plus className="h-3.5 w-3.5 mr-1.5" />
                       Add First Item
                     </Button>
                   </div>
                 ) : (
-                  <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                  <div className="space-y-1.5 max-h-[calc(5*60px)] overflow-y-auto pr-2 table-scroll-container-vertical">
                     {filteredItems.map((item) => (
                       <div
                         key={item.id}
-                        className="flex items-center justify-between p-4 border rounded-lg hover:bg-accent/50 transition-colors"
+                        className="flex items-center justify-between p-2.5 border rounded-lg hover:bg-accent/50 dark:hover:bg-muted/30 transition-colors dark:border-border"
                       >
-                        <div className="flex items-center gap-3">
-                          <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                            <Utensils className="h-5 w-5 text-primary" />
+                        <div className="flex items-center gap-2.5">
+                          <div className="h-8 w-8 rounded-full bg-primary/10 dark:bg-primary/20 flex items-center justify-center">
+                            <Utensils className="h-3.5 w-3.5 text-primary dark:text-primary" />
                           </div>
                           <div>
-                            <p className="font-medium">{item.name}</p>
-                            <Badge variant={item.is_active ? 'default' : 'secondary'} className="text-xs">
+                            <p className="font-medium text-[13px] dark:text-foreground">{item.name}</p>
+                            <Badge variant={item.is_active ? 'default' : 'secondary'} className="text-[11px] dark:border-border dark:text-foreground">
                               {item.is_active ? 'Active' : 'Inactive'}
                             </Badge>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5">
                           <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => handleEditItem(item)}
+                            className="h-7 px-2 text-[11px] dark:hover:bg-muted"
                           >
-                            <Edit className="h-4 w-4 mr-2" />
+                            <Edit className="h-3.5 w-3.5 mr-1.5" />
                             Edit
                           </Button>
                           <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => handleDeleteItem(item)}
-                            className="text-destructive hover:text-destructive"
+                            className="h-7 px-2 text-[11px] text-destructive hover:text-destructive dark:hover:bg-muted"
                           >
-                            <Trash2 className="h-4 w-4 mr-2" />
+                            <Trash2 className="h-3.5 w-3.5 mr-1.5" />
                             Delete
                           </Button>
                         </div>
@@ -540,63 +535,63 @@ export default function RefreshmentManagementPage() {
 
           {/* Show all items if no type selected */}
           {!selectedType && (
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="flex items-center gap-2">
-                  <Coffee className="h-5 w-5" />
+            <Card className="dark:bg-card dark:border-border shadow-md">
+              <CardHeader className="flex flex-row items-center justify-between pb-2 border-b dark:border-border/50">
+                <CardTitle className="flex items-center gap-2 text-[13px] font-semibold dark:text-foreground">
+                  <Coffee className="h-4 w-4" />
                   All Items
                 </CardTitle>
                 <div className="flex items-center gap-2">
                   <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground dark:text-muted-foreground" />
                     <Input
                       placeholder="Search items..."
                       value={itemSearchTerm}
                       onChange={(e) => setItemSearchTerm(e.target.value)}
-                      className="pl-9 w-[250px]"
+                      className="pl-8 h-9 text-[13px] w-[200px] dark:bg-card dark:border-border dark:text-foreground"
                     />
                   </div>
-                  <Button onClick={() => handleCreateItem()} size="sm">
-                    <Plus className="h-4 w-4 mr-2" />
+                  <Button onClick={() => handleCreateItem()} size="sm" className="h-9 px-3 text-[13px] bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 dark:from-blue-500 dark:to-purple-500 dark:hover:from-blue-600 dark:hover:to-purple-600">
+                    <Plus className="h-3.5 w-3.5 mr-1.5" />
                     Add Item
                   </Button>
                 </div>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-3 dark:bg-card">
                 {filteredItems.length === 0 ? (
-                  <div className="text-center py-8">
-                    <p className="text-muted-foreground mb-4">
+                  <div className="text-center py-6">
+                    <p className="text-muted-foreground dark:text-muted-foreground mb-3 text-[13px]">
                       {itemSearchTerm ? 'No items found matching your search' : 'No refreshment items found'}
                     </p>
-                    <Button onClick={() => handleCreateItem()} variant="outline">
-                      <Plus className="h-4 w-4 mr-2" />
+                    <Button onClick={() => handleCreateItem()} variant="outline" className="h-8 text-[12px] dark:border-border dark:text-foreground dark:hover:bg-muted">
+                      <Plus className="h-3.5 w-3.5 mr-1.5" />
                       Create First Item
                     </Button>
                   </div>
                 ) : (
-                  <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                  <div className="space-y-1.5 max-h-[calc(5*60px)] overflow-y-auto pr-2 table-scroll-container-vertical">
                     {filteredItems.map((item) => (
                       <div
                         key={item.id}
-                        className="flex items-center justify-between p-4 border rounded-lg hover:bg-accent/50 transition-colors"
+                        className="flex items-center justify-between p-2.5 border rounded-lg hover:bg-accent/50 dark:hover:bg-muted/30 transition-colors dark:border-border"
                       >
-                        <div className="flex items-center gap-3">
-                          <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                            <Utensils className="h-5 w-5 text-primary" />
+                        <div className="flex items-center gap-2.5">
+                          <div className="h-8 w-8 rounded-full bg-primary/10 dark:bg-primary/20 flex items-center justify-center">
+                            <Utensils className="h-3.5 w-3.5 text-primary dark:text-primary" />
                           </div>
                           <div>
-                            <p className="font-medium">{item.name}</p>
+                            <p className="font-medium text-[13px] dark:text-foreground">{item.name}</p>
                             <div className="flex items-center gap-2 mt-1">
-                              <Badge variant="outline" className="text-xs">
+                              <Badge variant="outline" className="text-[11px] dark:border-border dark:text-foreground">
                                 {getTypeName(item.type_id)}
                               </Badge>
-                              <Badge variant={item.is_active ? 'default' : 'secondary'} className="text-xs">
+                              <Badge variant={item.is_active ? 'default' : 'secondary'} className="text-[11px] dark:border-border dark:text-foreground">
                                 {item.is_active ? 'Active' : 'Inactive'}
                               </Badge>
                             </div>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5">
                           <Button
                             variant="ghost"
                             size="sm"
@@ -604,17 +599,18 @@ export default function RefreshmentManagementPage() {
                               setSelectedType(item.type_id)
                               handleEditItem(item)
                             }}
+                            className="h-7 px-2 text-[11px] dark:hover:bg-muted"
                           >
-                            <Edit className="h-4 w-4 mr-2" />
+                            <Edit className="h-3.5 w-3.5 mr-1.5" />
                             Edit
                           </Button>
                           <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => handleDeleteItem(item)}
-                            className="text-destructive hover:text-destructive"
+                            className="h-7 px-2 text-[11px] text-destructive hover:text-destructive dark:hover:bg-muted"
                           >
-                            <Trash2 className="h-4 w-4 mr-2" />
+                            <Trash2 className="h-3.5 w-3.5 mr-1.5" />
                             Delete
                           </Button>
                         </div>
@@ -629,32 +625,34 @@ export default function RefreshmentManagementPage() {
 
         {/* Type Dialog */}
         <Dialog open={isTypeDialogOpen} onOpenChange={setIsTypeDialogOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{editingType ? 'Edit Type' : 'Create New Type'}</DialogTitle>
+          <DialogContent className="dark:bg-card dark:border-border">
+            <DialogHeader className="dark:border-border/50">
+              <DialogTitle className="dark:text-foreground text-[13px] font-semibold">{editingType ? 'Edit Type' : 'Create New Type'}</DialogTitle>
             </DialogHeader>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label>Name</Label>
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <Label className="text-[13px] dark:text-foreground">Name</Label>
                 <Input
                   value={typeFormData.name}
                   onChange={(e) => setTypeFormData({ ...typeFormData, name: e.target.value })}
                   placeholder="e.g., Beverages"
+                  className="h-9 text-[13px] dark:bg-card dark:border-border dark:text-foreground"
                 />
               </div>
-              <div className="space-y-2">
-                <Label>Code</Label>
+              <div className="space-y-1.5">
+                <Label className="text-[13px] dark:text-foreground">Code</Label>
                 <Input
                   value={typeFormData.code}
                   onChange={(e) => setTypeFormData({ ...typeFormData, code: e.target.value })}
                   placeholder="e.g., beverages"
+                  className="h-9 text-[13px] dark:bg-card dark:border-border dark:text-foreground"
                 />
               </div>
               <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setIsTypeDialogOpen(false)}>
+                <Button variant="outline" onClick={() => setIsTypeDialogOpen(false)} className="h-9 px-3 text-[13px] dark:border-border dark:text-foreground dark:hover:bg-muted">
                   Cancel
                 </Button>
-                <Button onClick={handleSaveType}>
+                <Button onClick={handleSaveType} className="h-9 px-3 text-[13px] bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 dark:from-blue-500 dark:to-purple-500 dark:hover:from-blue-600 dark:hover:to-purple-600">
                   {editingType ? 'Update' : 'Create'}
                 </Button>
               </div>
@@ -664,42 +662,43 @@ export default function RefreshmentManagementPage() {
 
         {/* Item Dialog */}
         <Dialog open={isItemDialogOpen} onOpenChange={setIsItemDialogOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{editingItem ? 'Edit Item' : 'Create New Item'}</DialogTitle>
+          <DialogContent className="dark:bg-card dark:border-border">
+            <DialogHeader className="dark:border-border/50">
+              <DialogTitle className="dark:text-foreground text-[13px] font-semibold">{editingItem ? 'Edit Item' : 'Create New Item'}</DialogTitle>
             </DialogHeader>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label>Type</Label>
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <Label className="text-[13px] dark:text-foreground">Type</Label>
                 <Select
                   value={itemFormData.type_id}
                   onValueChange={(value) => setItemFormData({ ...itemFormData, type_id: value })}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="h-9 text-[13px] dark:bg-card dark:border-border dark:text-foreground">
                     <SelectValue placeholder="Select type" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="dark:bg-card dark:border-border">
                     {types.map((type) => (
-                      <SelectItem key={type.id} value={type.id}>
+                      <SelectItem key={type.id} value={type.id} className="dark:text-foreground dark:hover:bg-muted text-[13px]">
                         {type.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2">
-                <Label>Item Name</Label>
+              <div className="space-y-1.5">
+                <Label className="text-[13px] dark:text-foreground">Item Name</Label>
                 <Input
                   value={itemFormData.name}
                   onChange={(e) => setItemFormData({ ...itemFormData, name: e.target.value })}
                   placeholder="e.g., Coffee, Tea, Sandwiches"
+                  className="h-9 text-[13px] dark:bg-card dark:border-border dark:text-foreground"
                 />
               </div>
               <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setIsItemDialogOpen(false)}>
+                <Button variant="outline" onClick={() => setIsItemDialogOpen(false)} className="h-9 px-3 text-[13px] dark:border-border dark:text-foreground dark:hover:bg-muted">
                   Cancel
                 </Button>
-                <Button onClick={handleSaveItem}>
+                <Button onClick={handleSaveItem} className="h-9 px-3 text-[13px] bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 dark:from-blue-500 dark:to-purple-500 dark:hover:from-blue-600 dark:hover:to-purple-600">
                   {editingItem ? 'Update' : 'Create'}
                 </Button>
               </div>

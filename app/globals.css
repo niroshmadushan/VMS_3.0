@@ -265,6 +265,58 @@
     background-size: 200% 100%;
     animation: shimmer 1.5s infinite;
   }
+
+  /* Custom scrollbar for table horizontal scrolling */
+  .table-scroll-container {
+    overflow-x: auto;
+    overflow-y: visible;
+    scrollbar-width: thin;
+    scrollbar-color: oklch(0.7 0.01 240) oklch(0.96 0.01 240);
+  }
+
+  .table-scroll-container::-webkit-scrollbar {
+    height: 8px;
+  }
+
+  .table-scroll-container::-webkit-scrollbar-track {
+    background: oklch(0.96 0.01 240);
+    border-radius: 4px;
+  }
+
+  .table-scroll-container::-webkit-scrollbar-thumb {
+    background: oklch(0.7 0.01 240);
+    border-radius: 4px;
+  }
+
+  .table-scroll-container::-webkit-scrollbar-thumb:hover {
+    background: oklch(0.6 0.01 240);
+  }
+
+  /* Custom scrollbar for table vertical scrolling (when rows exceed 7) */
+  .table-scroll-container-vertical {
+    overflow-x: visible;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: oklch(0.7 0.01 240) oklch(0.96 0.01 240);
+  }
+
+  .table-scroll-container-vertical::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .table-scroll-container-vertical::-webkit-scrollbar-track {
+    background: oklch(0.96 0.01 240);
+    border-radius: 4px;
+  }
+
+  .table-scroll-container-vertical::-webkit-scrollbar-thumb {
+    background: oklch(0.7 0.01 240);
+    border-radius: 4px;
+  }
+
+  .table-scroll-container-vertical::-webkit-scrollbar-thumb:hover {
+    background: oklch(0.6 0.01 240);
+  }
 }
 
 /* Updated animation keyframes for better performance and less conflict */

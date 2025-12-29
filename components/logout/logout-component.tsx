@@ -6,6 +6,7 @@
 import React, { useState } from 'react'
 import { useLogout } from '@/lib/use-logout'
 import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -35,6 +36,8 @@ export const LogoutComponent: React.FC<LogoutComponentProps> = ({
   const { logout, logoutAll, getSessions, terminateSession, loading, error } = useLogout()
   const [sessions, setSessions] = useState<any[]>([])
   const [showSessionsList, setShowSessionsList] = useState(false)
+  const [showLogoutDialog, setShowLogoutDialog] = useState(false)
+  const [showLogoutAllDialog, setShowLogoutAllDialog] = useState(false)
 
   const handleLogout = async () => {
     const result = await logout()
@@ -43,17 +46,24 @@ export const LogoutComponent: React.FC<LogoutComponentProps> = ({
     }
   }
 
-  const handleLogoutAll = async () => {
-    const confirmed = window.confirm(
-      'Are you sure you want to logout from ALL devices? ' +
-      'This will end all your active sessions.'
-    )
-    
-    if (confirmed) {
-      const result = await logoutAll()
-      if (result.success) {
-        alert('Logged out from all devices successfully')
-      }
+  const handleLogoutClick = () => {
+    setShowLogoutDialog(true)
+  }
+
+  const confirmLogout = async () => {
+    setShowLogoutDialog(false)
+    await handleLogout()
+  }
+
+  const handleLogoutAllClick = () => {
+    setShowLogoutAllDialog(true)
+  }
+
+  const confirmLogoutAll = async () => {
+    setShowLogoutAllDialog(false)
+    const result = await logoutAll()
+    if (result.success) {
+      console.log('Logged out from all devices successfully')
     }
   }
 
@@ -90,12 +100,12 @@ export const LogoutComponent: React.FC<LogoutComponentProps> = ({
           )}
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-56">
-          <DropdownMenuItem onClick={handleLogout} disabled={loading}>
+          <DropdownMenuItem onClick={handleLogoutClick} disabled={loading}>
             <LogOut className="mr-2 h-4 w-4" />
             <span>Logout Current Session</span>
           </DropdownMenuItem>
           
-          <DropdownMenuItem onClick={handleLogoutAll} disabled={loading}>
+          <DropdownMenuItem onClick={handleLogoutAllClick} disabled={loading}>
             <AlertTriangle className="mr-2 h-4 w-4" />
             <span>Logout All Devices</span>
           </DropdownMenuItem>
@@ -124,7 +134,7 @@ export const LogoutComponent: React.FC<LogoutComponentProps> = ({
       
       <div className="flex flex-col gap-3">
         <Button 
-          onClick={handleLogout}
+          onClick={handleLogoutClick}
           disabled={loading}
           variant="destructive"
           className="w-full"
@@ -138,7 +148,7 @@ export const LogoutComponent: React.FC<LogoutComponentProps> = ({
         </Button>
         
         <Button 
-          onClick={handleLogoutAll}
+          onClick={handleLogoutAllClick}
           disabled={loading}
           variant="outline"
           className="w-full border-orange-200 text-orange-600 hover:bg-orange-50"
@@ -199,6 +209,82 @@ export const LogoutComponent: React.FC<LogoutComponentProps> = ({
           </div>
         </div>
       )}
+
+      {/* Logout Confirmation Dialog */}
+      <Dialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
+        <DialogContent className="dark:bg-card dark:border-border">
+          <DialogHeader className="dark:border-border/50">
+            <DialogTitle className="flex items-center gap-2 dark:text-foreground">
+              <AlertTriangle className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+              Confirm Logout
+            </DialogTitle>
+            <DialogDescription className="dark:text-muted-foreground">
+              Are you sure you want to logout? You will need to login again to access your account.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="dark:border-border/50">
+            <Button
+              variant="outline"
+              onClick={() => setShowLogoutDialog(false)}
+              disabled={loading}
+              className="dark:border-border dark:text-foreground dark:hover:bg-muted"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmLogout}
+              disabled={loading}
+              className="dark:bg-red-600 dark:hover:bg-red-700"
+            >
+              {loading ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <LogOut className="h-4 w-4 mr-2" />
+              )}
+              Logout
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Logout All Confirmation Dialog */}
+      <Dialog open={showLogoutAllDialog} onOpenChange={setShowLogoutAllDialog}>
+        <DialogContent className="dark:bg-card dark:border-border">
+          <DialogHeader className="dark:border-border/50">
+            <DialogTitle className="flex items-center gap-2 dark:text-foreground">
+              <AlertTriangle className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+              Confirm Logout All Devices
+            </DialogTitle>
+            <DialogDescription className="dark:text-muted-foreground">
+              Are you sure you want to logout from ALL devices? This will end all your active sessions and you will need to login again on each device.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="dark:border-border/50">
+            <Button
+              variant="outline"
+              onClick={() => setShowLogoutAllDialog(false)}
+              disabled={loading}
+              className="dark:border-border dark:text-foreground dark:hover:bg-muted"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmLogoutAll}
+              disabled={loading}
+              className="dark:bg-red-600 dark:hover:bg-red-700"
+            >
+              {loading ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <AlertTriangle className="h-4 w-4 mr-2" />
+              )}
+              Logout All Devices
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

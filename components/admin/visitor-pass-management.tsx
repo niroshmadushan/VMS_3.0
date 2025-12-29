@@ -8,9 +8,10 @@ import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
+import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table"
 import {
   Users, Clock, Calendar, Search, CreditCard, CheckCircle, 
-  XCircle, Activity, MapPin, Building2, User, Phone, Mail, Eye, History
+  XCircle, Activity, MapPin, Building2, User, Phone, Mail, Eye, History, Maximize2
 } from "lucide-react"
 import { placeManagementAPI } from "@/lib/place-management-api"
 import toast from "react-hot-toast"
@@ -48,6 +49,18 @@ interface TodaysVisitor {
   assigned_pass_type?: string
   returned_pass_number?: string
   pass_return_time?: string
+  
+  // Returned passes support
+  returned_passes?: Array<{
+    pass_id: string
+    pass_number: string
+    pass_type: string
+    assigned_date: string
+    returned_date: string
+    booking_id: string
+    booking_title: string
+  }>
+  returned_passes_count?: number
   
   // Historical pass assignments
   historical_assignments?: PassAssignment[]
@@ -106,6 +119,7 @@ export function VisitorPassManagement() {
   const [isManualReturnDialogOpen, setIsManualReturnDialogOpen] = useState(false)
   const [selectedAssignment, setSelectedAssignment] = useState<PassAssignment | null>(null)
   const [manualReturnTime, setManualReturnTime] = useState("")
+  const [showDetailedHistory, setShowDetailedHistory] = useState(false)
 
   useEffect(() => {
     loadData()
@@ -262,8 +276,9 @@ export function VisitorPassManagement() {
           const durationMinutes = (endHour * 60 + endMin) - (startHour * 60 + startMin)
           
           // Find all historical pass assignments for this visitor (any date)
+          // Check both holder_reference_id and holder_id to match the external member
           const visitorAssignments = assignments.filter((a: any) => 
-            a.holder_reference_id === member.id && 
+            (a.holder_reference_id === member.id || a.holder_id === member.id) && 
             (a.is_deleted === false || a.is_deleted === 0)
           )
           
@@ -279,12 +294,43 @@ export function VisitorPassManagement() {
             ? bookingAssignment 
             : null
           
-          // Check if it's a returned assignment
+          // Check if it's a returned assignment for this booking
           const returnedAssignment = bookingAssignment && 
             bookingAssignment.action_type === 'returned' && 
             bookingAssignment.actual_return_date 
             ? bookingAssignment 
             : null
+          
+          // Find ALL returned passes for this visitor (across all bookings)
+          // Check BOTH holder_reference_id AND holder_id to match the external member
+          // Filter by action_type = 'returned' and actual_return_date is not null
+          const allReturnedAssignments = assignments.filter((a: any) => 
+            a.action_type === 'returned' && 
+            a.actual_return_date !== null &&
+            (a.holder_reference_id === member.id || a.holder_id === member.id) &&
+            (a.is_deleted === false || a.is_deleted === 0)
+          )
+          
+          // Build returned passes list
+          const returnedPassesList = allReturnedAssignments.map((a: any) => {
+            const pass = allPasses.find((p: any) => p.id === a.pass_id)
+            const assignmentBooking = bookings.find((b: any) => b.id === a.booking_id)
+            return {
+              pass_id: a.pass_id,
+              pass_number: pass?.pass_display_name || `Pass ${a.pass_number}`,
+              pass_type: pass?.pass_type_name || 'Unknown',
+              assigned_date: a.assigned_date,
+              returned_date: a.actual_return_date,
+              booking_id: a.booking_id,
+              booking_title: assignmentBooking?.title || 'Unknown Booking'
+            }
+          }).sort((a, b) => new Date(b.returned_date).getTime() - new Date(a.returned_date).getTime()) // Sort by most recent return first
+          
+          // Find ALL active passes for this visitor (assigned but not returned) - for reference
+          const activeAssignments = visitorAssignments.filter((a: any) => 
+            a.action_type === 'assigned' && 
+            !a.actual_return_date
+          )
           
           // Check for passes that need manual return (assigned but not returned from past days)
           const needsManualReturn = visitorAssignments.some((a: any) => 
@@ -293,9 +339,12 @@ export function VisitorPassManagement() {
             a.booking_id !== booking.id // Different booking (past booking)
           )
           
-          // Also check if pass is currently assigned to this visitor
+          // Find the currently assigned pass for this booking
+          // Priority: booking-specific assignment > any active pass for this visitor
           const assignedPass = todayAssignment 
             ? allPasses.find((p: any) => p.id === todayAssignment.pass_id) 
+            : activeAssignments.length > 0
+            ? allPasses.find((p: any) => p.id === activeAssignments[0].pass_id)
             : allPasses.find((p: any) => 
                 p.status === 'assigned' && 
                 p.current_holder_name === member.full_name &&
@@ -370,6 +419,10 @@ export function VisitorPassManagement() {
             assigned_pass_type: assignedPass?.pass_type_name,
             returned_pass_number: returnedAssignment ? allPasses.find((p: any) => p.id === returnedAssignment.pass_id)?.pass_display_name : undefined,
             pass_return_time: returnedAssignment?.actual_return_date,
+            
+            // Returned passes support
+            returned_passes: returnedPassesList,
+            returned_passes_count: returnedPassesList.length,
             
             // Historical data
             historical_assignments: historicalAssignmentsData,
@@ -482,10 +535,11 @@ export function VisitorPassManagement() {
       console.log('👤 Assigning pass by user:', assignedBy)
 
       // Check if assignment already exists for this pass and visitor
+      // Check both holder_reference_id and holder_id
       const existingAssignments = await placeManagementAPI.getTableData('pass_assignments', { limit: 5000 })
       const existingAssignment = Array.isArray(existingAssignments) ? existingAssignments.find((a: any) => 
         a.pass_id === selectedPassId &&
-        a.holder_reference_id === selectedVisitor.member_id &&
+        (a.holder_reference_id === selectedVisitor.member_id || a.holder_id === selectedVisitor.member_id) &&
         a.booking_id === selectedVisitor.booking_id &&
         (a.is_deleted === false || a.is_deleted === 0)
       ) : null
@@ -652,11 +706,16 @@ export function VisitorPassManagement() {
       })))
       
       // Debug: Show all assignments for this visitor
-      const visitorAssignments = assignments.filter((a: any) => a.holder_reference_id === visitor.member_id)
+      // Check both holder_reference_id and holder_id
+      const visitorAssignments = assignments.filter((a: any) => 
+        (a.holder_reference_id === visitor.member_id || a.holder_id === visitor.member_id) &&
+        (a.is_deleted === false || a.is_deleted === 0)
+      )
       console.log('👤 All assignments for this visitor:', visitorAssignments.map(a => ({
         id: a.id,
         pass_id: a.pass_id,
         holder_reference_id: a.holder_reference_id,
+        holder_id: a.holder_id,
         holder_name: a.holder_name,
         booking_id: a.booking_id,
         action_type: a.action_type,
@@ -668,10 +727,11 @@ export function VisitorPassManagement() {
       let activeAssignment = null
       
       // Strategy 1: Exact match (pass + visitor + booking)
+      // Check both holder_reference_id and holder_id
       let sortedAssignments = assignments
         .filter((a: any) => 
           a.pass_id === visitor.assigned_pass_id &&
-          a.holder_reference_id === visitor.member_id &&
+          (a.holder_reference_id === visitor.member_id || a.holder_id === visitor.member_id) &&
           a.booking_id === visitor.booking_id &&
           (a.is_deleted === false || a.is_deleted === 0)
         )
@@ -689,10 +749,11 @@ export function VisitorPassManagement() {
         console.log('✅ Found assignment with Strategy 1')
       } else {
         // Strategy 2: Pass + visitor only (ignore booking)
+        // Check both holder_reference_id and holder_id
         sortedAssignments = assignments
           .filter((a: any) => 
             a.pass_id === visitor.assigned_pass_id &&
-            a.holder_reference_id === visitor.member_id &&
+            (a.holder_reference_id === visitor.member_id || a.holder_id === visitor.member_id) &&
             (a.is_deleted === false || a.is_deleted === 0)
           )
           .sort((a: any, b: any) => new Date(b.created_at || b.assigned_date).getTime() - new Date(a.created_at || a.assigned_date).getTime())
@@ -740,6 +801,7 @@ export function VisitorPassManagement() {
         actual_return_date: activeAssignment.actual_return_date,
         pass_id: activeAssignment.pass_id,
         holder_reference_id: activeAssignment.holder_reference_id,
+        holder_id: activeAssignment.holder_id,
         booking_id: activeAssignment.booking_id
       } : 'None')
 
@@ -768,6 +830,7 @@ export function VisitorPassManagement() {
         })
         
         // Create a fallback return record
+        // Set both holder_reference_id and holder_id to ensure it's found
         await placeManagementAPI.insertRecord('pass_assignments', {
           pass_id: visitor.assigned_pass_id,
           pass_type_id: passes.find(p => p.id === visitor.assigned_pass_id)?.pass_type_id,
@@ -777,7 +840,7 @@ export function VisitorPassManagement() {
           holder_contact: visitor.visitor_phone,
           holder_type: 'external',
           holder_reference_id: visitor.member_id,
-          holder_id: visitor.member_id,
+          holder_id: visitor.member_id, // Ensure holder_id is set
           booking_id: visitor.booking_id,
           assigned_by: returnedBy,
           assigned_date: new Date().toISOString(),
@@ -829,67 +892,94 @@ export function VisitorPassManagement() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600"></div>
+      <div className="flex items-center justify-center h-96 dark:bg-background">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-blue-600 dark:border-blue-400"></div>
       </div>
     )
   }
 
   return (
-    <div className="space-y-6 max-w-[98%] mx-auto">
-      {/* Statistics & Available Passes - Single Line */}
-      <Card className="border-2 mb-4">
-        <CardContent className="p-2">
-          <div className="flex items-center justify-between gap-4 text-xs flex-wrap">
-            {/* Statistics */}
-            <div className="flex items-center gap-2">
-              <span className="text-muted-foreground font-medium">All Visitors:</span>
-              <span className="font-bold text-blue-700">{totalVisitors}</span>
-              </div>
-            <div className="flex items-center gap-2">
-              <span className="text-muted-foreground font-medium">Ongoing:</span>
-              <span className="font-bold text-green-700">{ongoingCount}</span>
-              </div>
-            <div className="flex items-center gap-2">
-              <span className="text-muted-foreground font-medium">Upcoming:</span>
-              <span className="font-bold text-orange-700">{upcomingCount}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-muted-foreground font-medium">With Pass:</span>
-              <span className="font-bold text-purple-700">{withPassCount}</span>
-              </div>
-            <div className="flex items-center gap-2">
-              <span className="text-muted-foreground font-medium">Need Pass:</span>
-              <span className="font-bold text-red-700">{withoutPassCount}</span>
-              </div>
-            
-            {/* Separator */}
-            <span className="text-muted-foreground">|</span>
-            
-            {/* Available Passes */}
-            {passTypes.map((type, index) => (
-              <div key={type.id} className="flex items-center gap-2">
-                <span className="text-muted-foreground font-medium">{type.name}:</span>
-                <span className="font-bold" style={{ color: type.color }}>{type.available_count}</span>
-                {index < passTypes.length - 1 && <span className="text-muted-foreground">|</span>}
-              </div>
-            ))}
-          </div>
+    <div className="space-y-3 px-2 sm:px-4 max-w-[98vw] mx-auto dark:bg-background">
+      {/* Statistics & Available Passes - Compact Table */}
+      <Card className="border shadow-md dark:bg-card dark:border-border mb-3">
+        <CardContent className="p-0">
+          <Table>
+            <TableBody>
+              <TableRow className="hover:bg-transparent">
+                <TableCell className="py-2.5 px-4 border-r dark:border-border">
+                  <div className="flex items-center gap-1.5">
+                    <Users className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+                    <div>
+                      <p className="text-[13px] text-muted-foreground dark:text-muted-foreground">All Visitors</p>
+                      <p className="text-xl font-bold text-blue-700 dark:text-blue-400">{totalVisitors}</p>
+                    </div>
+                  </div>
+                </TableCell>
+                <TableCell className="py-2.5 px-4 border-r dark:border-border">
+                  <div className="flex items-center gap-1.5">
+                    <Activity className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
+                    <div>
+                      <p className="text-[13px] text-muted-foreground dark:text-muted-foreground">Ongoing</p>
+                      <p className="text-xl font-bold text-green-700 dark:text-green-400">{ongoingCount}</p>
+                    </div>
+                  </div>
+                </TableCell>
+                <TableCell className="py-2.5 px-4 border-r dark:border-border">
+                  <div className="flex items-center gap-1.5">
+                    <Clock className="h-3.5 w-3.5 text-orange-600 dark:text-orange-400" />
+                    <div>
+                      <p className="text-[13px] text-muted-foreground dark:text-muted-foreground">Upcoming</p>
+                      <p className="text-xl font-bold text-orange-700 dark:text-orange-400">{upcomingCount}</p>
+                    </div>
+                  </div>
+                </TableCell>
+                <TableCell className="py-2.5 px-4 border-r dark:border-border">
+                  <div className="flex items-center gap-1.5">
+                    <CreditCard className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
+                    <div>
+                      <p className="text-[13px] text-muted-foreground dark:text-muted-foreground">With Pass</p>
+                      <p className="text-xl font-bold text-purple-700 dark:text-purple-400">{withPassCount}</p>
+                    </div>
+                  </div>
+                </TableCell>
+                <TableCell className="py-2.5 px-4 border-r dark:border-border">
+                  <div className="flex items-center gap-1.5">
+                    <XCircle className="h-3.5 w-3.5 text-red-600 dark:text-red-400" />
+                    <div>
+                      <p className="text-[13px] text-muted-foreground dark:text-muted-foreground">Need Pass</p>
+                      <p className="text-xl font-bold text-red-700 dark:text-red-400">{withoutPassCount}</p>
+                    </div>
+                  </div>
+                </TableCell>
+                {passTypes.map((type, index) => (
+                  <TableCell key={type.id} className={`py-2.5 px-4 ${index < passTypes.length - 1 ? 'border-r dark:border-border' : ''}`}>
+                    <div className="flex items-center gap-1.5">
+                      <CreditCard className="h-3.5 w-3.5" style={{ color: type.color }} />
+                      <div>
+                        <p className="text-[13px] text-muted-foreground dark:text-muted-foreground">{type.name}</p>
+                        <p className="text-xl font-bold" style={{ color: type.color }}>{type.available_count}</p>
+                      </div>
+                    </div>
+                  </TableCell>
+                ))}
+              </TableRow>
+            </TableBody>
+          </Table>
         </CardContent>
       </Card>
 
       {/* Filters and Search */}
-      <Card className="border-2 mb-4">
-        <CardContent className="pt-3 pb-3 px-3">
-          <div className="flex flex-col lg:flex-row gap-3">
+      <Card className="border shadow-md dark:bg-card dark:border-border mb-3">
+        <CardContent className="pt-2.5 pb-2.5 px-3 dark:bg-card">
+          <div className="flex flex-col lg:flex-row gap-2.5">
             <div className="flex-1 min-w-0">
               <div className="relative">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground dark:text-muted-foreground" />
                 <Input
                   placeholder="Search by name, email, phone, reference..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 h-10"
+                  className="pl-8 h-9 text-[13px] dark:bg-card dark:border-border dark:text-foreground"
                 />
               </div>
             </div>
@@ -897,21 +987,21 @@ export function VisitorPassManagement() {
               <Button 
                 variant={statusFilter === 'all' ? 'default' : 'outline'}
                 onClick={() => setStatusFilter('all')}
-                className="h-10 px-3 text-sm"
+                className="h-9 px-3 text-[13px] dark:border-border dark:hover:bg-muted"
               >
                 All ({totalVisitors})
               </Button>
               <Button 
                 variant={statusFilter === 'ongoing' ? 'default' : 'outline'}
                 onClick={() => setStatusFilter('ongoing')}
-                className={`h-10 px-3 text-sm ${statusFilter === 'ongoing' ? 'bg-green-500 hover:bg-green-600' : ''}`}
+                className={`h-9 px-3 text-[13px] ${statusFilter === 'ongoing' ? 'bg-green-500 hover:bg-green-600 dark:bg-green-600 dark:hover:bg-green-700' : 'dark:border-border dark:hover:bg-muted'}`}
               >
                 Ongoing ({ongoingCount})
               </Button>
               <Button 
                 variant={statusFilter === 'upcoming' ? 'default' : 'outline'}
                 onClick={() => setStatusFilter('upcoming')}
-                className={`h-10 px-3 text-sm ${statusFilter === 'upcoming' ? 'bg-orange-500 hover:bg-orange-600' : ''}`}
+                className={`h-9 px-3 text-[13px] ${statusFilter === 'upcoming' ? 'bg-orange-500 hover:bg-orange-600 dark:bg-orange-600 dark:hover:bg-orange-700' : 'dark:border-border dark:hover:bg-muted'}`}
               >
                 Upcoming ({upcomingCount})
               </Button>
@@ -921,22 +1011,22 @@ export function VisitorPassManagement() {
       </Card>
 
       {/* Visitors Table */}
-      <Card className="border-2 shadow-lg">
-        <CardHeader className="bg-gradient-to-r from-blue-50 to-purple-50 border-b-2 pb-2 pt-3 px-3">
+      <Card className="border shadow-md dark:bg-card dark:border-border">
+        <CardHeader className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/20 dark:to-purple-950/20 dark:bg-card border-b dark:border-border/50 pb-2 pt-2.5 px-3">
           <div className="flex flex-col sm:flex-row sm:items-center gap-2">
             <div className="flex items-center gap-2">
-              <Calendar className="h-4 w-4 text-blue-600" />
-              <CardTitle className="text-sm font-semibold">Active & Upcoming Visitors</CardTitle>
+              <Calendar className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+              <CardTitle className="text-[13px] font-semibold dark:text-foreground">Active & Upcoming Visitors</CardTitle>
             </div>
-            <Badge className="bg-blue-600 text-white text-xs px-2 py-0.5 self-start sm:self-center">
+            <Badge className="bg-blue-600 dark:bg-blue-600 text-white text-[11px] px-2 py-0.5 self-start sm:self-center">
               {filteredVisitors.length} Visitor{filteredVisitors.length !== 1 ? 's' : ''}
             </Badge>
           </div>
-          <p className="text-xs text-muted-foreground mt-1">
+          <p className="text-[11px] text-muted-foreground dark:text-muted-foreground mt-1">
             Showing today, upcoming bookings, and past bookings with unreturned passes
           </p>
-          <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded text-xs">
-            <p className="text-amber-800">
+          <div className="mt-1.5 p-2 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded text-[11px]">
+            <p className="text-amber-800 dark:text-amber-300">
               <strong>Note:</strong> Only visitors who have confirmed their attendance are eligible for pass assignment.
             </p>
           </div>
@@ -961,7 +1051,7 @@ export function VisitorPassManagement() {
                         <th className="text-left p-2 font-semibold text-xs whitespace-nowrap">Reference</th>
                         <th className="text-left p-2 font-semibold text-xs whitespace-nowrap">Booking</th>
                         <th className="text-left p-2 font-semibold text-xs whitespace-nowrap">Place</th>
-                        <th className="text-center p-2 font-semibold text-xs whitespace-nowrap">Pass</th>
+                        <th className="text-center p-2 font-semibold text-xs whitespace-nowrap">Current Pass</th>
                         <th className="text-center p-2 font-semibold text-xs whitespace-nowrap">History</th>
                         <th className="text-center p-2 font-semibold text-xs whitespace-nowrap sticky right-[100px] bg-gradient-to-r from-blue-100 to-purple-100 z-10">Status</th>
                         <th className="text-center p-2 font-semibold text-xs whitespace-nowrap sticky right-0 bg-gradient-to-r from-blue-100 to-purple-100 z-10">Actions</th>
@@ -1073,42 +1163,21 @@ export function VisitorPassManagement() {
                         </td>
                         
                           <td className="p-2 text-center whitespace-nowrap">
-                            <div className="space-y-0.5">
-                            {visitor.historical_assignments && visitor.historical_assignments.length > 0 && (
+                            {visitor.historical_assignments && visitor.historical_assignments.length > 0 ? (
                               <Button
                                 size="sm"
                                 variant="outline"
                                 onClick={() => openHistoryDialog(visitor)}
-                                  className="text-blue-600 hover:bg-blue-50 text-[10px] h-6 px-2"
+                                className="text-blue-600 hover:bg-blue-50 text-[10px] h-6 px-2"
+                                title={`View ${visitor.historical_assignments.length} pass assignment(s)`}
                               >
-                                  <Eye className="h-2.5 w-2.5 mr-0.5" />
-                                View ({visitor.historical_assignments.length})
+                                <Eye className="h-2.5 w-2.5 mr-0.5" />
+                                {visitor.historical_assignments.length}
                               </Button>
+                            ) : (
+                              <span className="text-[10px] text-muted-foreground">—</span>
                             )}
-                            {(() => {
-                              const todayAssignments = visitor.historical_assignments?.filter((assignment: any) => {
-                                const today = new Date().toISOString().split('T')[0]
-                                const assignmentDate = assignment.assigned_date ? assignment.assigned_date.split('T')[0] : null
-                                return assignmentDate === today
-                              }) || []
-                              
-                              return todayAssignments.length > 1 && (
-                                  <div className="mt-0.5">
-                                    <Badge className="bg-blue-100 text-blue-800 text-[10px] px-1 py-0">
-                                    {todayAssignments.length} Today
-                                  </Badge>
-                                </div>
-                              )
-                            })()}
-                            {visitor.needs_manual_return && (
-                                <div className="mt-0.5">
-                                  <Badge className="bg-orange-100 text-orange-800 text-[10px] px-1 py-0">
-                                  Manual Return
-                                </Badge>
-                              </div>
-                            )}
-                          </div>
-                        </td>
+                          </td>
                         
                           <td className="p-2 text-center whitespace-nowrap sticky right-[100px] bg-white z-10 shadow-[2px_0_5px_rgba(0,0,0,0.1)]">
                             <Badge className={`px-2 py-0.5 font-bold text-[10px] ${getStatusColor(visitor.current_status)}`}>
@@ -1119,15 +1188,27 @@ export function VisitorPassManagement() {
                           <td className="p-2 text-center whitespace-nowrap sticky right-0 bg-white z-10 shadow-[2px_0_5px_rgba(0,0,0,0.1)]">
                             <div className="flex gap-0.5 justify-center">
                             {visitor.assigned_pass_id ? (
-                              <Button 
-                                size="sm"
-                                variant="outline"
-                                onClick={() => openReturnDialog(visitor)}
-                                  className="border-green-500 text-green-700 hover:bg-green-50 text-[10px] h-6 px-2"
-                              >
-                                  <CheckCircle className="h-2.5 w-2.5 mr-0.5" />
-                                Return
-                              </Button>
+                              <>
+                                <Button 
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => openReturnDialog(visitor)}
+                                    className="border-green-500 text-green-700 hover:bg-green-50 text-[10px] h-6 px-2"
+                                >
+                                    <CheckCircle className="h-2.5 w-2.5 mr-0.5" />
+                                  Return
+                                </Button>
+                                {visitor.current_status !== 'cancelled' && (
+                                  <Button 
+                                    size="sm"
+                                    onClick={() => openAssignDialog(visitor)}
+                                      className="text-[10px] h-6 px-2"
+                                  >
+                                      <CreditCard className="h-2.5 w-2.5 mr-0.5" />
+                                    Re-assign
+                                  </Button>
+                                )}
+                              </>
                             ) : visitor.current_status !== 'cancelled' && (
                               <Button 
                                 size="sm"
@@ -1301,6 +1382,14 @@ export function VisitorPassManagement() {
                   <p className="font-bold text-lg">{selectedVisitor.visitor_name}</p>
                   <p className="text-sm">{selectedVisitor.visitor_email}</p>
                   <p className="text-sm">{selectedVisitor.reference_type}: {selectedVisitor.reference_value}</p>
+                  {selectedVisitor.returned_pass_number && (
+                    <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded">
+                      <p className="text-xs text-green-800">
+                        <strong>Previous Pass:</strong> {selectedVisitor.returned_pass_number} was returned for this booking.
+                        You can assign a new pass.
+                      </p>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
@@ -1347,105 +1436,148 @@ export function VisitorPassManagement() {
         </DialogContent>
       </Dialog>
 
-      {/* Historical Assignments Dialog */}
-      <Dialog open={isHistoryDialogOpen} onOpenChange={setIsHistoryDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Eye className="h-6 w-6 text-blue-600" />
-              Pass Assignment History - {selectedVisitor?.visitor_name}
-            </DialogTitle>
+      {/* Historical Assignments Dialog - Compact/Detailed View */}
+      <Dialog open={isHistoryDialogOpen} onOpenChange={(open) => {
+        setIsHistoryDialogOpen(open)
+        if (!open) setShowDetailedHistory(false)
+      }}>
+        <DialogContent className={showDetailedHistory ? "max-w-6xl max-h-[90vh] overflow-y-auto" : "max-w-md max-h-[70vh] overflow-y-auto"}>
+          <DialogHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <div>
+                <DialogTitle className="flex items-center gap-2 text-sm">
+                  <Eye className="h-4 w-4 text-blue-600" />
+                  Pass History - {selectedVisitor?.visitor_name}
+                </DialogTitle>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {historicalAssignments.length} assignment{historicalAssignments.length !== 1 ? 's' : ''}
+                </p>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setShowDetailedHistory(!showDetailedHistory)}
+                className="text-xs h-7 px-2"
+              >
+                {showDetailedHistory ? (
+                  <>
+                    <Eye className="h-3 w-3 mr-1" />
+                    Compact
+                  </>
+                ) : (
+                  <>
+                    <History className="h-3 w-3 mr-1" />
+                    Detailed
+                  </>
+                )}
+              </Button>
+            </div>
           </DialogHeader>
           
           {historicalAssignments.length === 0 ? (
-            <div className="text-center py-8">
-              <p className="text-muted-foreground">No pass assignments found</p>
+            <div className="text-center py-6">
+              <p className="text-sm text-muted-foreground">No pass assignments found</p>
             </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="border rounded-lg overflow-hidden">
-                <table className="w-full">
-                  <thead className="bg-gray-50">
+          ) : showDetailedHistory ? (
+            // Detailed Table View
+            <div className="border rounded-lg overflow-hidden">
+              <div className="max-h-[70vh] overflow-y-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/30 dark:to-purple-950/30 sticky top-0 z-10">
                     <tr>
-                      <th className="text-left p-3 font-medium">Pass</th>
-                      <th className="text-left p-3 font-medium">Action</th>
-                      <th className="text-left p-3 font-medium">Booking</th>
-                      <th className="text-left p-3 font-medium">Assigned Date</th>
-                      <th className="text-left p-3 font-medium">Return Date</th>
-                      <th className="text-left p-3 font-medium">Assigned By</th>
-                      <th className="text-center p-3 font-medium">Actions</th>
+                      <th className="text-left p-3 font-semibold text-xs border-b dark:border-border">Pass</th>
+                      <th className="text-left p-3 font-semibold text-xs border-b dark:border-border">Type</th>
+                      <th className="text-left p-3 font-semibold text-xs border-b dark:border-border">Action</th>
+                      <th className="text-left p-3 font-semibold text-xs border-b dark:border-border">Booking</th>
+                      <th className="text-left p-3 font-semibold text-xs border-b dark:border-border">Assigned Date</th>
+                      <th className="text-left p-3 font-semibold text-xs border-b dark:border-border">Return Date</th>
+                      <th className="text-left p-3 font-semibold text-xs border-b dark:border-border">Assigned By</th>
+                      <th className="text-center p-3 font-semibold text-xs border-b dark:border-border">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {historicalAssignments.map((assignment, idx) => (
                       <tr 
                         key={assignment.id}
-                        className={`border-t ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}
+                        className={`border-b dark:border-border ${
+                          idx % 2 === 0 
+                            ? 'bg-white dark:bg-card' 
+                            : 'bg-gray-50/50 dark:bg-gray-800/30'
+                        } hover:bg-blue-50 dark:hover:bg-blue-950/20 transition-colors`}
                       >
                         <td className="p-3">
-                          <div>
-                            <Badge 
-                              className="mb-1"
-                              style={{ 
-                                backgroundColor: assignment.pass_type_name === 'VIP Pass' ? '#8b5cf6' : '#3b82f6',
-                                color: 'white'
-                              }}
-                            >
-                              {assignment.pass_display_name}
-                            </Badge>
-                            <p className="text-sm text-muted-foreground">{assignment.pass_type_name}</p>
-                          </div>
+                          <Badge 
+                            className="text-xs px-2 py-1"
+                            style={{ 
+                              backgroundColor: assignment.pass_type_name === 'VIP Pass' ? '#8b5cf6' : '#3b82f6',
+                              color: 'white'
+                            }}
+                          >
+                            {assignment.pass_display_name}
+                          </Badge>
                         </td>
-                        
+                        <td className="p-3">
+                          <p className="text-xs text-muted-foreground dark:text-muted-foreground">{assignment.pass_type_name}</p>
+                        </td>
                         <td className="p-3">
                           <Badge 
                             className={
                               assignment.action_type === 'assigned' 
-                                ? 'bg-green-500 text-white' 
+                                ? 'bg-green-500 text-white dark:bg-green-600' 
                                 : assignment.action_type === 'returned'
-                                ? 'bg-blue-500 text-white'
-                                : 'bg-red-500 text-white'
+                                ? 'bg-blue-500 text-white dark:bg-blue-600'
+                                : 'bg-red-500 text-white dark:bg-red-600'
                             }
                           >
                             {assignment.action_type.toUpperCase()}
                           </Badge>
                         </td>
-                        
                         <td className="p-3">
                           <div>
-                            <p className="font-medium">{assignment.booking_title}</p>
-                            <p className="text-sm text-muted-foreground">{assignment.booking_date}</p>
+                            <p className="font-medium text-xs dark:text-foreground">{assignment.booking_title}</p>
+                            <p className="text-xs text-muted-foreground dark:text-muted-foreground">{assignment.booking_date}</p>
                           </div>
                         </td>
-                        
                         <td className="p-3">
-                          <p className="text-sm">
-                            {new Date(assignment.assigned_date).toLocaleString()}
+                          <p className="text-xs dark:text-foreground">
+                            {new Date(assignment.assigned_date).toLocaleString('en-US', {
+                              year: 'numeric',
+                              month: 'short',
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
                           </p>
                         </td>
-                        
                         <td className="p-3">
-                          <p className="text-sm">
+                          <p className="text-xs dark:text-foreground">
                             {assignment.actual_return_date 
-                              ? new Date(assignment.actual_return_date).toLocaleString()
-                              : 'Not returned'
+                              ? new Date(assignment.actual_return_date).toLocaleString('en-US', {
+                                  year: 'numeric',
+                                  month: 'short',
+                                  day: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                })
+                              : <span className="text-muted-foreground dark:text-muted-foreground">Not returned</span>
                             }
                           </p>
                         </td>
-                        
                         <td className="p-3">
-                          <p className="text-sm">{assignment.assigned_by_name}</p>
+                          <p className="text-xs dark:text-foreground">{assignment.assigned_by_name}</p>
                         </td>
-                        
                         <td className="p-3 text-center">
                           {assignment.action_type === 'assigned' && !assignment.actual_return_date && (
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => openManualReturnDialog(assignment)}
-                              className="text-orange-600 hover:bg-orange-50"
+                              onClick={() => {
+                                setIsHistoryDialogOpen(false)
+                                openManualReturnDialog(assignment)
+                              }}
+                              className="text-xs h-7 px-2 text-orange-600 hover:bg-orange-50 dark:text-orange-400 dark:hover:bg-orange-950/30"
                             >
-                              Set Return Time
+                              Set Return
                             </Button>
                           )}
                         </td>
@@ -1454,6 +1586,70 @@ export function VisitorPassManagement() {
                   </tbody>
                 </table>
               </div>
+            </div>
+          ) : (
+            // Compact Card View
+            <div className="space-y-2 max-h-[60vh] overflow-y-auto">
+              {historicalAssignments.map((assignment, idx) => (
+                <div 
+                  key={assignment.id}
+                  className={`p-2.5 rounded-lg border text-xs ${
+                    assignment.action_type === 'assigned' 
+                      ? 'bg-green-50 border-green-200 dark:bg-green-950/20 dark:border-green-800' 
+                      : assignment.action_type === 'returned'
+                      ? 'bg-blue-50 border-blue-200 dark:bg-blue-950/20 dark:border-blue-800'
+                      : 'bg-gray-50 border-gray-200 dark:bg-gray-800 dark:border-gray-700'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <Badge 
+                          className="text-[10px] px-1.5 py-0"
+                          style={{ 
+                            backgroundColor: assignment.pass_type_name === 'VIP Pass' ? '#8b5cf6' : '#3b82f6',
+                            color: 'white'
+                          }}
+                        >
+                          {assignment.pass_display_name}
+                        </Badge>
+                        <Badge 
+                          variant="outline"
+                          className={`text-[9px] px-1 py-0 ${
+                            assignment.action_type === 'assigned' 
+                              ? 'border-green-500 text-green-700 dark:border-green-400 dark:text-green-300' 
+                              : 'border-blue-500 text-blue-700 dark:border-blue-400 dark:text-blue-300'
+                          }`}
+                        >
+                          {assignment.action_type.toUpperCase()}
+                        </Badge>
+                      </div>
+                      <p className="text-[10px] text-muted-foreground dark:text-muted-foreground truncate">
+                        {assignment.booking_title}
+                      </p>
+                      <div className="flex items-center gap-2 mt-1 text-[9px] text-muted-foreground dark:text-muted-foreground">
+                        <span>Assigned: {new Date(assignment.assigned_date).toLocaleDateString()}</span>
+                        {assignment.actual_return_date && (
+                          <span>• Returned: {new Date(assignment.actual_return_date).toLocaleDateString()}</span>
+                        )}
+                      </div>
+                    </div>
+                    {assignment.action_type === 'assigned' && !assignment.actual_return_date && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setIsHistoryDialogOpen(false)
+                          openManualReturnDialog(assignment)
+                        }}
+                        className="text-[9px] h-5 px-1.5 text-orange-600 hover:bg-orange-50 dark:text-orange-400 dark:hover:bg-orange-950/30"
+                      >
+                        Return
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </DialogContent>

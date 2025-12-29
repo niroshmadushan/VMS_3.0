@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
+import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table"
 import { 
   Users, MapPin, Calendar, UserCheck, TrendingUp, TrendingDown, Clock, 
   AlertCircle, Plus, Eye, Activity, CheckCircle, XCircle, Loader2,
@@ -212,10 +213,10 @@ export function AdminOverview() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-96">
+      <div className="flex items-center justify-center h-96 dark:bg-background">
         <div className="text-center">
-          <Loader2 className="h-12 w-12 animate-spin mx-auto text-blue-600 mb-4" />
-          <p className="text-muted-foreground">Loading dashboard...</p>
+          <Loader2 className="h-10 w-10 animate-spin mx-auto text-blue-600 dark:text-blue-400 mb-3" />
+          <p className="text-muted-foreground dark:text-muted-foreground text-[13px]">Loading dashboard...</p>
         </div>
       </div>
     )
@@ -265,31 +266,31 @@ export function AdminOverview() {
   ]
 
   const quickActions = [
-    { icon: Calendar, label: "New Booking", href: "/staff/bookings/new", color: "blue" },
-    { icon: UserCheck, label: "External Members", href: "/staff/external-members", color: "green" },
-    { icon: BarChart3, label: "Timeline View", href: "/staff/timeline", color: "purple" },
-    { icon: Clock, label: "Check Availability", href: "/staff/availability", color: "orange" },
+    { icon: Calendar, label: "New Booking", href: "/staff/bookings/new", color: "blue", bgColor: "bg-blue-50 dark:bg-blue-950/20", hoverBg: "group-hover:bg-blue-100 dark:group-hover:bg-blue-950/30", borderColor: "border-blue-200 dark:border-blue-800", iconColor: "text-blue-600 dark:text-blue-400" },
+    { icon: UserCheck, label: "External Members", href: "/staff/external-members", color: "green", bgColor: "bg-green-50 dark:bg-green-950/20", hoverBg: "group-hover:bg-green-100 dark:group-hover:bg-green-950/30", borderColor: "border-green-200 dark:border-green-800", iconColor: "text-green-600 dark:text-green-400" },
+    { icon: BarChart3, label: "Timeline View", href: "/staff/timeline", color: "purple", bgColor: "bg-purple-50 dark:bg-purple-950/20", hoverBg: "group-hover:bg-purple-100 dark:group-hover:bg-purple-950/30", borderColor: "border-purple-200 dark:border-purple-800", iconColor: "text-purple-600 dark:text-purple-400" },
+    { icon: Clock, label: "Check Availability", href: "/staff/availability", color: "orange", bgColor: "bg-orange-50 dark:bg-orange-950/20", hoverBg: "group-hover:bg-orange-100 dark:group-hover:bg-orange-950/30", borderColor: "border-orange-200 dark:border-orange-800", iconColor: "text-orange-600 dark:text-orange-400" },
   ]
 
   return (
-    <div className="space-y-6 animate-fade-in max-w-full">
+    <div className="space-y-3 px-2 sm:px-4 max-w-[98vw] mx-auto dark:bg-background animate-fade-in">
       {/* System Alerts (if any) */}
       {alerts.filter(a => !a.resolved && a.severity === 'high').length > 0 && (
-        <Card className="border-2 border-red-500 bg-red-50">
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-red-900">
-              <AlertCircle className="h-5 w-5" />
+        <Card className="border-2 border-red-500 dark:border-red-600 bg-red-50 dark:bg-red-950/20 shadow-md">
+          <CardHeader className="pb-2 pt-2.5">
+            <CardTitle className="flex items-center gap-2 text-red-900 dark:text-red-400 text-[13px] font-semibold">
+              <AlertCircle className="h-3.5 w-3.5" />
               System Alerts ({alerts.filter(a => !a.resolved && a.severity === 'high').length})
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
+          <CardContent className="p-2.5 dark:bg-red-950/20">
+            <div className="space-y-1.5">
               {alerts.filter(a => !a.resolved && a.severity === 'high').slice(0, 3).map((alert) => (
-                <div key={alert.id} className="flex items-start gap-2 p-2 bg-white rounded border border-red-200">
-                  <AlertCircle className="h-4 w-4 text-red-600 mt-0.5 flex-shrink-0" />
+                <div key={alert.id} className="flex items-start gap-2 p-2 bg-white dark:bg-red-950/30 rounded border border-red-200 dark:border-red-800">
+                  <AlertCircle className="h-3.5 w-3.5 text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-red-900">{alert.title}</p>
-                    <p className="text-xs text-red-700">{alert.message}</p>
+                    <p className="text-[13px] font-medium text-red-900 dark:text-red-300">{alert.title}</p>
+                    <p className="text-[11px] text-red-700 dark:text-red-400">{alert.message}</p>
                   </div>
                 </div>
               ))}
@@ -298,75 +299,78 @@ export function AdminOverview() {
         </Card>
       )}
 
-      {/* Statistics Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        {stats.map((stat, index) => (
-          <Card
-            key={stat.title}
-            className="relative overflow-hidden group hover:shadow-lg transition-all duration-300 animate-slide-up hover-lift border-2"
-            style={{ animationDelay: `${index * 100}ms` }}
-          >
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">{stat.title}</CardTitle>
-              <div className={`p-3 rounded-lg ${stat.bgColor}`}>
-                <stat.icon className={`h-5 w-5 ${stat.color}`} />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-baseline gap-2">
-                <div className="text-3xl font-bold">{stat.value}</div>
-                <Badge variant={stat.trend === "up" ? "default" : "secondary"} className="text-xs gap-1">
-                  {getTrendIcon(stat.change)}
-                  {stat.change}
-                </Badge>
-              </div>
-              <p className="text-xs text-muted-foreground mt-2">{stat.description}</p>
-              <div className="absolute inset-x-0 bottom-0 h-1 bg-gradient-to-r from-transparent via-primary/20 to-transparent group-hover:via-primary/40 transition-all duration-300" />
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      {/* Statistics Table - Compact Design */}
+      <Card className="border shadow-md dark:bg-card dark:border-border">
+        <CardContent className="p-0">
+          <Table>
+            <TableBody>
+              <TableRow className="hover:bg-transparent">
+                {stats.map((stat, index) => (
+                  <TableCell key={stat.title} className={`py-2.5 px-4 ${index < stats.length - 1 ? 'border-r dark:border-border' : ''}`}>
+                    <div className="flex items-center gap-1.5">
+                      <div className={`p-2 rounded-lg ${stat.bgColor} dark:bg-opacity-20`}>
+                        <stat.icon className={`h-3.5 w-3.5 ${stat.color} dark:text-opacity-80`} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[13px] text-muted-foreground dark:text-muted-foreground">{stat.title}</p>
+                        <div className="flex items-baseline gap-1.5">
+                          <p className="text-xl font-bold dark:text-foreground">{stat.value}</p>
+                          <Badge variant={stat.trend === "up" ? "default" : "secondary"} className="text-[11px] gap-0.5 dark:border-border dark:text-foreground">
+                            {getTrendIcon(stat.change)}
+                            {stat.change}
+                          </Badge>
+                        </div>
+                        <p className="text-[11px] text-muted-foreground dark:text-muted-foreground mt-0.5">{stat.description}</p>
+                      </div>
+                    </div>
+                  </TableCell>
+                ))}
+              </TableRow>
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
         {/* Recent Activity - Takes 2 columns */}
-        <Card className="lg:col-span-2 animate-scale-in border-2">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4 bg-gradient-to-r from-blue-50 to-purple-50 border-b-2">
-            <CardTitle className="flex items-center gap-2">
-              <Clock className="h-5 w-5 text-blue-600" />
+        <Card className="lg:col-span-2 border shadow-md dark:bg-card dark:border-border">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 pt-2.5 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/20 dark:to-purple-950/20 dark:bg-card border-b dark:border-border/50">
+            <CardTitle className="flex items-center gap-2 text-[13px] font-semibold dark:text-foreground">
+              <Clock className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
               Recent Activity
             </CardTitle>
-            <Badge variant="outline" className="text-xs animate-pulse bg-green-50 border-green-500 text-green-700">
+            <Badge variant="outline" className="text-[11px] animate-pulse bg-green-50 dark:bg-green-950/30 border-green-500 dark:border-green-600 text-green-700 dark:text-green-400">
               <Activity className="h-3 w-3 mr-1" />
               Live
             </Badge>
           </CardHeader>
-          <CardContent className="space-y-0 pt-4">
+          <CardContent className="space-y-0 pt-2.5 dark:bg-card">
             {recentActivity.length === 0 ? (
-              <div className="text-center py-8">
-                <Clock className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
-                <p className="text-sm text-muted-foreground">No recent activity</p>
+              <div className="text-center py-6">
+                <Clock className="h-10 w-10 mx-auto text-muted-foreground dark:text-muted-foreground mb-2" />
+                <p className="text-[13px] text-muted-foreground dark:text-muted-foreground">No recent activity</p>
               </div>
             ) : (
-              <div className="space-y-3 max-h-96 overflow-y-auto">
+              <div className="space-y-1.5 max-h-[calc(7*60px)] overflow-y-auto pr-2 table-scroll-container-vertical">
                 {recentActivity.map((activity, index) => (
                   <div
                     key={activity.id || index}
-                    className={`flex items-start gap-4 p-3 rounded-lg hover:bg-muted/50 transition-colors group hover-lift border ${
-                      activity.urgent ? 'border-red-300 bg-red-50' : 'border-transparent'
+                    className={`flex items-start gap-2.5 p-2.5 rounded-lg hover:bg-muted/50 dark:hover:bg-muted/30 transition-colors border ${
+                      activity.urgent ? 'border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-950/20' : 'border-transparent dark:border-border'
                     }`}
                   >
                     <div
-                      className={`w-3 h-3 rounded-full ${getActivityColor(activity.type)} mt-1.5 group-hover:scale-110 transition-transform flex-shrink-0`}
+                      className={`w-2.5 h-2.5 rounded-full ${getActivityColor(activity.type)} dark:opacity-80 mt-1.5 transition-transform flex-shrink-0`}
                     />
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-medium truncate">{activity.title}</p>
-                        {activity.urgent && <AlertCircle className="h-4 w-4 text-red-600 flex-shrink-0" />}
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-[13px] font-medium truncate dark:text-foreground">{activity.title}</p>
+                        {activity.urgent && <AlertCircle className="h-3.5 w-3.5 text-red-600 dark:text-red-400 flex-shrink-0" />}
                       </div>
-                      <p className="text-xs text-muted-foreground truncate">{activity.description}</p>
-                      <p className="text-xs text-muted-foreground mt-1">by {activity.user}</p>
+                      <p className="text-[11px] text-muted-foreground dark:text-muted-foreground truncate">{activity.description}</p>
+                      <p className="text-[11px] text-muted-foreground dark:text-muted-foreground mt-0.5">by {activity.user}</p>
                     </div>
-                    <span className="text-xs text-muted-foreground flex-shrink-0">{activity.relativeTime}</span>
+                    <span className="text-[11px] text-muted-foreground dark:text-muted-foreground flex-shrink-0">{activity.relativeTime}</span>
                   </div>
                 ))}
               </div>
@@ -375,26 +379,26 @@ export function AdminOverview() {
         </Card>
 
         {/* Quick Actions */}
-        <Card className="animate-scale-in border-2" style={{ animationDelay: "200ms" }}>
-          <CardHeader className="pb-4 bg-gradient-to-r from-green-50 to-blue-50 border-b-2">
-            <CardTitle className="flex items-center gap-2">
-              <Plus className="h-5 w-5 text-green-600" />
+        <Card className="border shadow-md dark:bg-card dark:border-border">
+          <CardHeader className="pb-2 pt-2.5 bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-950/20 dark:to-blue-950/20 dark:bg-card border-b dark:border-border/50">
+            <CardTitle className="flex items-center gap-2 text-[13px] font-semibold dark:text-foreground">
+              <Plus className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
               Quick Actions
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-0 pt-4">
-            <div className="grid grid-cols-1 gap-3">
+          <CardContent className="space-y-0 pt-2.5 dark:bg-card">
+            <div className="grid grid-cols-1 gap-2 max-h-[calc(7*60px)] overflow-y-auto pr-2 table-scroll-container-vertical">
               {quickActions.map((action) => (
                 <Button
                   key={action.label}
                   onClick={() => router.push(action.href)}
-                  className="h-16 flex items-center justify-start gap-3 bg-card hover:bg-muted border-2 border-border hover:border-primary/50 transition-all duration-300 hover:scale-[1.02] group"
+                  className="h-12 flex items-center justify-start gap-2.5 bg-card dark:bg-card hover:bg-muted dark:hover:bg-muted/50 border-2 border-border dark:border-border hover:border-primary/50 dark:hover:border-primary/30 transition-all duration-300 hover:scale-[1.02] group cursor-pointer"
                   variant="outline"
                 >
-                  <div className={`p-3 rounded-lg bg-${action.color}-50 group-hover:bg-${action.color}-100 transition-colors border-2 border-${action.color}-200`}>
-                    <action.icon className={`h-5 w-5 text-${action.color}-600`} />
+                  <div className={`p-2 rounded-lg ${action.bgColor} ${action.hoverBg} transition-colors border ${action.borderColor}`}>
+                    <action.icon className={`h-4 w-4 ${action.iconColor}`} />
                   </div>
-                  <span className="text-sm font-medium">{action.label}</span>
+                  <span className="text-[13px] font-medium dark:text-foreground">{action.label}</span>
                 </Button>
               ))}
             </div>
@@ -402,52 +406,52 @@ export function AdminOverview() {
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
         {/* Today's Schedule */}
-        <Card className="animate-slide-up border-2" style={{ animationDelay: "300ms" }}>
-          <CardHeader className="bg-gradient-to-r from-purple-50 to-pink-50 border-b-2">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Calendar className="h-5 w-5 text-purple-600" />
+        <Card className="border shadow-md dark:bg-card dark:border-border">
+          <CardHeader className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-950/20 dark:to-pink-950/20 dark:bg-card border-b dark:border-border/50 pb-2 pt-2.5">
+            <CardTitle className="text-[13px] font-semibold flex items-center gap-2 dark:text-foreground">
+              <Calendar className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
               Today's Schedule
               {schedule.length > 0 && (
-                <Badge className="ml-auto bg-purple-600 text-white">
+                <Badge className="ml-auto bg-purple-600 dark:bg-purple-600 text-white text-[11px]">
                   {schedule.length} Bookings
                 </Badge>
               )}
             </CardTitle>
           </CardHeader>
-          <CardContent className="pt-4">
+          <CardContent className="pt-2.5 dark:bg-card">
             {schedule.length === 0 ? (
-              <div className="text-center py-8">
-                <Calendar className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
-                <p className="text-sm text-muted-foreground">No bookings scheduled for today</p>
+              <div className="text-center py-6">
+                <Calendar className="h-10 w-10 mx-auto text-muted-foreground dark:text-muted-foreground mb-2" />
+                <p className="text-[13px] text-muted-foreground dark:text-muted-foreground">No bookings scheduled for today</p>
               </div>
             ) : (
-              <div className="space-y-3 max-h-96 overflow-y-auto">
+              <div className="space-y-1.5 max-h-[calc(7*60px)] overflow-y-auto pr-2 table-scroll-container-vertical">
                 {schedule.map((booking) => (
                   <div 
                     key={booking.id} 
-                    className="flex items-center gap-3 p-3 rounded-lg border-2 hover:shadow-md transition-all"
-                    style={{ borderLeftWidth: '4px', borderLeftColor: booking.color || '#3b82f6' }}
+                    className="flex items-center gap-2.5 p-2.5 rounded-lg border hover:shadow-md dark:hover:shadow-lg transition-all dark:border-border"
+                    style={{ borderLeftWidth: '3px', borderLeftColor: booking.color || '#3b82f6' }}
                   >
-                    <div className={`w-2 h-12 ${getStatusColor(booking.status)} rounded-full flex-shrink-0`} />
+                    <div className={`w-1.5 h-10 ${getStatusColor(booking.status)} dark:opacity-80 rounded-full flex-shrink-0`} />
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold truncate">{booking.title}</p>
-                      <p className="text-xs text-muted-foreground truncate">
+                      <p className="text-[13px] font-bold truncate dark:text-foreground">{booking.title}</p>
+                      <p className="text-[11px] text-muted-foreground dark:text-muted-foreground truncate">
                         {booking.place_name} • {booking.start_time.substring(0, 5)} - {booking.end_time.substring(0, 5)}
                       </p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <Badge variant="outline" className="text-xs">
+                      <div className="flex items-center gap-1.5 mt-1">
+                        <Badge variant="outline" className="text-[11px] dark:border-border dark:text-foreground">
                           {booking.participants_count} participants
                         </Badge>
                         {booking.external_visitors_count > 0 && (
-                          <Badge variant="outline" className="text-xs">
+                          <Badge variant="outline" className="text-[11px] dark:border-border dark:text-foreground">
                             {booking.external_visitors_count} visitors
                           </Badge>
                         )}
                       </div>
                     </div>
-                    <Badge className={`${getStatusColor(booking.status)} text-white text-xs`}>
+                    <Badge className={`${getStatusColor(booking.status)} dark:opacity-90 text-white text-[11px]`}>
                       {booking.status}
                     </Badge>
                   </div>
@@ -458,46 +462,46 @@ export function AdminOverview() {
         </Card>
 
         {/* System Alerts */}
-        <Card className="animate-slide-up border-2" style={{ animationDelay: "400ms" }}>
-          <CardHeader className="bg-gradient-to-r from-red-50 to-orange-50 border-b-2">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <AlertCircle className="h-5 w-5 text-red-600" />
+        <Card className="border shadow-md dark:bg-card dark:border-border">
+          <CardHeader className="bg-gradient-to-r from-red-50 to-orange-50 dark:from-red-950/20 dark:to-orange-950/20 dark:bg-card border-b dark:border-border/50 pb-2 pt-2.5">
+            <CardTitle className="text-[13px] font-semibold flex items-center gap-2 dark:text-foreground">
+              <AlertCircle className="h-3.5 w-3.5 text-red-600 dark:text-red-400" />
               System Alerts
               {alerts.filter(a => !a.resolved).length > 0 && (
-                <Badge className="ml-auto bg-red-600 text-white">
+                <Badge className="ml-auto bg-red-600 dark:bg-red-600 text-white text-[11px]">
                   {alerts.filter(a => !a.resolved).length} Active
                 </Badge>
               )}
             </CardTitle>
           </CardHeader>
-          <CardContent className="pt-4">
+          <CardContent className="pt-2.5 dark:bg-card">
             {alerts.filter(a => !a.resolved).length === 0 ? (
-              <div className="text-center py-8">
-                <CheckCircle className="h-12 w-12 mx-auto text-green-500 mb-2" />
-                <p className="text-sm font-medium text-green-700">All Clear!</p>
-                <p className="text-xs text-muted-foreground">No active alerts</p>
+              <div className="text-center py-6">
+                <CheckCircle className="h-10 w-10 mx-auto text-green-500 dark:text-green-400 mb-2" />
+                <p className="text-[13px] font-medium text-green-700 dark:text-green-400">All Clear!</p>
+                <p className="text-[11px] text-muted-foreground dark:text-muted-foreground">No active alerts</p>
               </div>
             ) : (
-              <div className="space-y-3 max-h-96 overflow-y-auto">
+              <div className="space-y-1.5 max-h-[calc(7*60px)] overflow-y-auto pr-2 table-scroll-container-vertical">
                 {alerts.filter(a => !a.resolved).map((alert) => (
                   <div 
                     key={alert.id} 
-                    className={`p-3 rounded-lg border-2 ${getAlertColor(alert.severity)}`}
+                    className={`p-2.5 rounded-lg border-2 ${getAlertColor(alert.severity)} dark:border-opacity-50`}
                   >
-                    <div className="flex items-start gap-2">
-                      <AlertCircle className={`h-4 w-4 mt-0.5 flex-shrink-0 ${
-                        alert.severity === 'high' ? 'text-red-600' :
-                        alert.severity === 'medium' ? 'text-orange-600' :
-                        'text-yellow-600'
+                    <div className="flex items-start gap-1.5">
+                      <AlertCircle className={`h-3.5 w-3.5 mt-0.5 flex-shrink-0 ${
+                        alert.severity === 'high' ? 'text-red-600 dark:text-red-400' :
+                        alert.severity === 'medium' ? 'text-orange-600 dark:text-orange-400' :
+                        'text-yellow-600 dark:text-yellow-400'
                       }`} />
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-bold">{alert.title}</p>
-                        <p className="text-xs text-muted-foreground mt-1">{alert.message}</p>
+                        <p className="text-[13px] font-bold dark:text-foreground">{alert.title}</p>
+                        <p className="text-[11px] text-muted-foreground dark:text-muted-foreground mt-0.5">{alert.message}</p>
                         <Badge 
-                          className={`mt-2 text-xs ${
-                            alert.severity === 'high' ? 'bg-red-600' :
-                            alert.severity === 'medium' ? 'bg-orange-600' :
-                            'bg-yellow-600'
+                          className={`mt-1.5 text-[11px] ${
+                            alert.severity === 'high' ? 'bg-red-600 dark:bg-red-600' :
+                            alert.severity === 'medium' ? 'bg-orange-600 dark:bg-orange-600' :
+                            'bg-yellow-600 dark:bg-yellow-600'
                           } text-white`}
                         >
                           {alert.severity.toUpperCase()}

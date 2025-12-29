@@ -655,335 +655,327 @@ export function UserManagement() {
           background: #94a3b8;
         }
       `}} />
-    <div className="space-y-6">
-      {/* Statistics Cards */}
+      <div className="space-y-3 px-2 sm:px-4 max-w-[98vw] mx-auto dark:bg-background">
+      {/* Compact Statistics Table */}
       {statistics && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <Card className="border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-blue-100">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-blue-700">Total Users</p>
-                  <p className="text-4xl font-bold text-blue-900 mt-2">{statistics.overview.totalUsers}</p>
-                  <p className="text-xs text-blue-600 mt-1">All registered users</p>
-                </div>
-                <div className="p-4 bg-blue-500 rounded-lg">
-                  <Users className="h-8 w-8 text-white" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-2 border-green-200 bg-gradient-to-br from-green-50 to-green-100">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-green-700">Active Users</p>
-                  <p className="text-4xl font-bold text-green-900 mt-2">{statistics.overview.activeUsers}</p>
-                  <p className="text-xs text-green-600 mt-1">Verified & unlocked</p>
-                </div>
-                <div className="p-4 bg-green-500 rounded-lg">
-                  <UserCheck className="h-8 w-8 text-white" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-2 border-orange-200 bg-gradient-to-br from-orange-50 to-orange-100">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-orange-700">Recent Registrations</p>
-                  <p className="text-4xl font-bold text-orange-900 mt-2">{statistics.overview.recentRegistrations}</p>
-                  <p className="text-xs text-orange-600 mt-1">Last 30 days</p>
-                </div>
-                <div className="p-4 bg-orange-500 rounded-lg">
-                  <TrendingUp className="h-8 w-8 text-white" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-2 border-purple-200 bg-gradient-to-br from-purple-50 to-purple-100">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-purple-700">Active Logins</p>
-                  <p className="text-4xl font-bold text-purple-900 mt-2">{statistics.overview.recentActiveLogins}</p>
-                  <p className="text-xs text-purple-600 mt-1">Last 7 days</p>
-                </div>
-                <div className="p-4 bg-purple-500 rounded-lg">
-                  <Activity className="h-8 w-8 text-white" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        <Card className="border shadow-sm dark:bg-card dark:border-border">
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableBody>
+                  <TableRow className="hover:bg-transparent border-b dark:border-border">
+                    <TableCell className="py-2.5 px-4 font-medium text-[13px] dark:text-foreground">
+                      <div className="flex items-center gap-2">
+                        <Users className="h-4 w-4 text-muted-foreground dark:text-muted-foreground" />
+                        Total Users
+                      </div>
+                    </TableCell>
+                    <TableCell className="py-2.5 px-4 text-right dark:text-foreground">
+                      <span className="text-xl font-bold">{statistics.overview.totalUsers}</span>
+                    </TableCell>
+                    <TableCell className="py-2.5 px-4 font-medium text-[13px] dark:text-foreground">
+                      <div className="flex items-center gap-2">
+                        <UserCheck className="h-4 w-4 text-green-600 dark:text-green-400" />
+                        Active Users
+                      </div>
+                    </TableCell>
+                    <TableCell className="py-2.5 px-4 text-right dark:text-foreground">
+                      <span className="text-xl font-bold text-green-600 dark:text-green-400">{statistics.overview.activeUsers}</span>
+                    </TableCell>
+                    <TableCell className="py-2.5 px-4 font-medium text-[13px] dark:text-foreground">
+                      <div className="flex items-center gap-2">
+                        <TrendingUp className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                        Recent Registrations
+                      </div>
+                    </TableCell>
+                    <TableCell className="py-2.5 px-4 text-right dark:text-foreground">
+                      <span className="text-xl font-bold text-orange-600 dark:text-orange-400">{statistics.overview.recentRegistrations}</span>
+                    </TableCell>
+                    <TableCell className="py-2.5 px-4 font-medium text-[13px] dark:text-foreground">
+                      <div className="flex items-center gap-2">
+                        <Activity className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                        Active Logins
+                      </div>
+                    </TableCell>
+                    <TableCell className="py-2.5 px-4 text-right dark:text-foreground">
+                      <span className="text-xl font-bold text-purple-600 dark:text-purple-400">{statistics.overview.recentActiveLogins}</span>
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
-      {/* Main Content */}
-      <Tabs defaultValue="users" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="users">👥 User Management</TabsTrigger>
-          <TabsTrigger value="analytics">📊 Analytics</TabsTrigger>
-        </TabsList>
+      {/* Main Content - All in One Line */}
+      <Tabs defaultValue="users" className="dark:text-foreground">
+        {/* Compact Header with Search, Filters, Create Button, and Tabs in One Line */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 pb-2 border-b border-border/50 dark:border-border">
+          {/* Search */}
+          <div className="flex-1 min-w-0 sm:min-w-[200px] relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground dark:text-muted-foreground z-10" />
+            <Input
+              placeholder="Search by name, email..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10 w-full h-9 text-[13px] dark:bg-card dark:border-border dark:text-foreground"
+            />
+          </div>
+
+          {/* Filters and Button Container */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Role Filter */}
+            <Select value={roleFilter || "all"} onValueChange={(value) => setRoleFilter(value === "all" ? "" : value)}>
+              <SelectTrigger className="w-full sm:w-[130px] h-9 text-[13px] dark:bg-card dark:border-border dark:text-foreground">
+                <SelectValue placeholder="Role" />
+              </SelectTrigger>
+              <SelectContent className="dark:bg-card dark:border-border">
+                <SelectItem value="all" className="dark:text-foreground dark:hover:bg-muted text-[13px]">All Roles</SelectItem>
+                <SelectItem value="admin" className="dark:text-foreground dark:hover:bg-muted text-[13px]">Administrator</SelectItem>
+                <SelectItem value="staff" className="dark:text-foreground dark:hover:bg-muted text-[13px]">Staff</SelectItem>
+                <SelectItem value="assistant" className="dark:text-foreground dark:hover:bg-muted text-[13px]">Smart Assistant</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Status Filter */}
+            <Select value={statusFilter || "all"} onValueChange={(value) => setStatusFilter(value === "all" ? "" : value)}>
+              <SelectTrigger className="w-full sm:w-[130px] h-9 text-[13px] dark:bg-card dark:border-border dark:text-foreground">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent className="dark:bg-card dark:border-border">
+                <SelectItem value="all" className="dark:text-foreground dark:hover:bg-muted text-[13px]">All Status</SelectItem>
+                <SelectItem value="active" className="dark:text-foreground dark:hover:bg-muted text-[13px]">Active</SelectItem>
+                <SelectItem value="inactive" className="dark:text-foreground dark:hover:bg-muted text-[13px]">Inactive</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Create Button */}
+            <Button
+              onClick={() => setIsCreateUserDialogOpen(true)}
+              className="h-9 px-3 text-[13px] bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 dark:from-blue-500 dark:to-purple-500 dark:hover:from-blue-600 dark:hover:to-purple-600 shadow-lg whitespace-nowrap"
+            >
+              <UserPlus className="h-3.5 w-3.5 mr-1.5" />
+              Create User
+            </Button>
+
+            {/* Tabs */}
+            <TabsList className="h-9 dark:bg-muted dark:border-border ml-auto">
+              <TabsTrigger value="users" className="text-[13px] px-3 dark:data-[state=active]:bg-background dark:data-[state=active]:text-foreground">👥 Users</TabsTrigger>
+              <TabsTrigger value="analytics" className="text-[13px] px-3 dark:data-[state=active]:bg-background dark:data-[state=active]:text-foreground">📊 Analytics</TabsTrigger>
+            </TabsList>
+          </div>
+        </div>
 
         {/* Users Tab */}
-        <TabsContent value="users" className="space-y-6">
-          {/* Filters and Search */}
-          <Card className="border-2">
-            <CardContent className="pt-6">
-              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
-                <div className="flex-1 min-w-0">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-3 h-5 w-5 text-muted-foreground" />
-                    <Input
-                      placeholder="Search by name, email..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10 w-full"
-                    />
-                  </div>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <Select value={roleFilter || "all"} onValueChange={(value) => setRoleFilter(value === "all" ? "" : value)}>
-                    <SelectTrigger className="w-full sm:w-32">
-                      <SelectValue placeholder="Role" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Roles</SelectItem>
-                      <SelectItem value="admin">Administrator</SelectItem>
-                      <SelectItem value="staff">Staff</SelectItem>
-                      <SelectItem value="assistant">Smart Assistant</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Select value={statusFilter || "all"} onValueChange={(value) => setStatusFilter(value === "all" ? "" : value)}>
-                    <SelectTrigger className="w-full sm:w-32">
-                      <SelectValue placeholder="Status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Status</SelectItem>
-                      <SelectItem value="active">Active</SelectItem>
-                      <SelectItem value="inactive">Inactive</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Button
-                    onClick={() => setIsCreateUserDialogOpen(true)}
-                    className="bg-gradient-to-r from-primary to-secondary hover:from-primary/90 hover:to-secondary/90 w-full sm:w-auto whitespace-nowrap"
-                  >
-                    <UserPlus className="h-4 w-4 mr-2" />
-                    <span className="hidden sm:inline">Create User</span>
-                    <span className="sm:hidden">Create</span>
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+        <TabsContent value="users" className="space-y-3 mt-3">
 
           {/* Users Table */}
-          <Card className="border-2 shadow-xl">
-            <CardHeader className="bg-gradient-to-r from-blue-50 to-purple-50 border-b-2">
-              <CardTitle className="flex items-center gap-2 text-xl">
-                <Users className="h-6 w-6 text-blue-600" />
-                User Management
-                <Badge className="ml-auto bg-blue-600 text-white text-base px-4 py-2">
-                  {pagination.total} Users
-                </Badge>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="pt-6">
+          <Card className="border shadow-md dark:bg-card dark:border-border">
+            <CardContent className="p-0 dark:bg-card">
               {isLoading ? (
                 <div className="flex items-center justify-center h-32">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                 </div>
               ) : error ? (
-                <div className="text-center py-8">
+                <div className="text-center py-8 px-4">
                   <AlertTriangle className="h-12 w-12 mx-auto text-red-500 mb-4" />
-                  <p className="text-red-600 font-medium">{error}</p>
+                  <p className="text-red-600 dark:text-red-400 font-medium">{error}</p>
                   <Button onClick={loadUsers} className="mt-4">Retry</Button>
                 </div>
               ) : users.length === 0 ? (
-                <div className="text-center py-16">
-                  <Users className="h-20 w-20 mx-auto text-muted-foreground mb-4" />
-                  <p className="text-xl font-bold text-muted-foreground mb-2">No users found</p>
-                  <p className="text-sm text-muted-foreground">
+                <div className="text-center py-16 px-4">
+                  <Users className="h-20 w-20 mx-auto text-muted-foreground dark:text-muted-foreground mb-4" />
+                  <p className="text-xl font-bold text-muted-foreground dark:text-muted-foreground mb-2">No users found</p>
+                  <p className="text-sm text-muted-foreground dark:text-muted-foreground">
                     {searchTerm || roleFilter || statusFilter 
                       ? 'Try adjusting your search or filters' 
                       : 'No users have been registered yet'}
                   </p>
                 </div>
               ) : (
-                <div className="border-2 rounded-lg overflow-hidden shadow-lg">
-                  <div className="relative overflow-x-auto">
-                    <Table className="w-full">
-                      <TableHeader className="bg-gradient-to-r from-blue-100 to-purple-100">
-                        <TableRow>
-                          <TableHead className="font-bold min-w-[200px]">User Details</TableHead>
-                          <TableHead className="font-bold min-w-[150px]">Contact</TableHead>
-                          <TableHead className="font-bold min-w-[100px]">Role</TableHead>
-                          <TableHead className="font-bold min-w-[100px]">Status</TableHead>
-                          <TableHead className="font-bold min-w-[150px]">Last Login</TableHead>
-                          <TableHead className="font-bold min-w-[120px]">Created</TableHead>
-                          <TableHead className="font-bold text-center min-w-[200px]">Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                    </Table>
-                    <div className="max-h-[450px] overflow-y-auto">
-                      <Table className="w-full">
-                        <TableBody>
-                          {users.map((user) => (
-                            <TableRow key={user.id} className="hover:bg-blue-50 transition-colors">
-                              <TableCell className="min-w-[200px]">
-                                <div className="space-y-1">
-                                  <p className="font-bold">
-                                    {user.first_name && user.last_name 
-                                      ? `${user.first_name} ${user.last_name}`
-                                      : 'No Name Set'
-                                    }
-                                  </p>
-                                  <p className="text-sm text-muted-foreground">{user.email}</p>
-                                  {user.phone && (
-                                    <p className="text-sm text-muted-foreground flex items-center gap-1">
-                                      <Phone className="h-3 w-3" />
-                                      {user.phone}
-                                    </p>
-                                  )}
-                                </div>
-                              </TableCell>
-                              <TableCell className="min-w-[150px]">
-                                <div className="space-y-1">
-                                  {user.city && user.country && (
-                                    <p className="text-sm flex items-center gap-1">
-                                      <MapPin className="h-3 w-3 text-muted-foreground" />
-                                      {user.city}, {user.country}
-                                    </p>
-                                  )}
-                                  {user.website && (
-                                    <p className="text-sm flex items-center gap-1">
-                                      <Globe className="h-3 w-3 text-muted-foreground" />
-                                      <a href={user.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
-                                        Website
-                                      </a>
-                                    </p>
-                                  )}
-                                </div>
-                              </TableCell>
-                              <TableCell className="min-w-[100px]">
-                                <Badge variant={getRoleBadgeVariant(user.role)}>
-                                  {user.role.toUpperCase()}
-                                </Badge>
-                              </TableCell>
-                              <TableCell className="min-w-[100px]">
-                                {getStatusBadge(user)}
-                              </TableCell>
-                              <TableCell className="min-w-[150px]">
-                                <div className="text-sm">
-                                  <p>{formatDateTime(user.last_login)}</p>
-                                  {user.login_attempts > 0 && (
-                                    <p className="text-red-600 text-xs">
-                                      {user.login_attempts} failed attempts
-                                    </p>
-                                  )}
-                                </div>
-                              </TableCell>
-                              <TableCell className="min-w-[120px]">
-                                <div className="text-sm">
-                                  <p>{formatDate(user.user_created_at)}</p>
-                                </div>
-                              </TableCell>
-                              <TableCell className="min-w-[200px]">
-                                <div className="flex items-center gap-1 justify-center">
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => openUserDialog(user)}
-                                    title="Edit User"
-                                  >
-                                    <Edit className="h-4 w-4" />
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => openProfileDialog(user)}
-                                    title="Edit Profile"
-                                  >
-                                    <Eye className="h-4 w-4" />
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => handleSendPasswordReset(user.id)}
-                                    title="Send Password Reset"
-                                  >
-                                    <Mail className="h-4 w-4" />
-                                  </Button>
-                                  {user.status === 'active' ? (
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() => openDeactivateDialog(user)}
-                                      title="Deactivate User"
-                                    >
-                                      <ShieldX className="h-4 w-4" />
-                                    </Button>
-                                  ) : (
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() => handleActivateUser(user.id)}
-                                      title="Activate User"
-                                    >
-                                      <ShieldCheck className="h-4 w-4" />
-                                    </Button>
-                                  )}
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => handleDeleteUser(user.id)}
-                                    title="Delete User"
-                                    className="text-red-600 hover:text-red-700"
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
+                <div className="border rounded-lg overflow-hidden dark:border-border">
+                  <div className="overflow-x-auto table-scroll-container">
+                    <div className="inline-block min-w-full align-middle">
+                      <Table className="w-full dark:bg-card" style={{ minWidth: 'max-content' }}>
+                        <TableHeader className="sticky top-0 bg-background dark:bg-card z-10 shadow-sm dark:border-border">
+                          <TableRow className="dark:border-border">
+                            <TableHead className="font-semibold text-[13px] min-w-[180px] dark:text-foreground">User Details</TableHead>
+                            <TableHead className="font-semibold text-[13px] min-w-[140px] dark:text-foreground">Contact</TableHead>
+                            <TableHead className="font-semibold text-[13px] min-w-[90px] dark:text-foreground">Role</TableHead>
+                            <TableHead className="font-semibold text-[13px] min-w-[90px] dark:text-foreground">Status</TableHead>
+                            <TableHead className="font-semibold text-[13px] min-w-[140px] dark:text-foreground">Last Login</TableHead>
+                            <TableHead className="font-semibold text-[13px] min-w-[110px] dark:text-foreground">Created</TableHead>
+                            <TableHead className="font-semibold text-[13px] text-center min-w-[180px] sticky right-0 bg-background dark:bg-card z-10 shadow-[2px_0_5px_rgba(0,0,0,0.1)] dark:shadow-[2px_0_5px_rgba(255,255,255,0.1)] dark:text-foreground">Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
                       </Table>
                     </div>
                   </div>
-                </div>
-              )}
-
-              {/* Pagination */}
-              {pagination.totalPages > 1 && (
-                <div className="flex items-center justify-between mt-6">
-                  <p className="text-sm text-muted-foreground">
-                    Showing {((pagination.page - 1) * pagination.limit) + 1} to {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} users
-                  </p>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
-                      disabled={pagination.page === 1}
-                    >
-                      Previous
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
-                      disabled={pagination.page === pagination.totalPages}
-                    >
-                      Next
-                    </Button>
+                  <div className="max-h-[calc(7*48px)] overflow-y-auto table-scroll-container-vertical">
+                    <div className="overflow-x-auto table-scroll-container">
+                      <div className="inline-block min-w-full align-middle">
+                        <Table className="w-full dark:bg-card" style={{ minWidth: 'max-content' }}>
+                          <TableBody>
+                            {users.map((user) => (
+                              <TableRow key={user.id} className="hover:bg-muted/50 dark:hover:bg-muted/30 transition-colors dark:border-border">
+                                <TableCell className="min-w-[180px] text-[13px] dark:text-foreground">
+                                  <div className="space-y-0.5">
+                                    <p className="font-semibold dark:text-foreground">
+                                      {user.first_name && user.last_name 
+                                        ? `${user.first_name} ${user.last_name}`
+                                        : 'No Name Set'
+                                      }
+                                    </p>
+                                    <p className="text-xs text-muted-foreground dark:text-muted-foreground">{user.email}</p>
+                                    {user.phone && (
+                                      <p className="text-xs text-muted-foreground dark:text-muted-foreground flex items-center gap-1">
+                                        <Phone className="h-3 w-3" />
+                                        {user.phone}
+                                      </p>
+                                    )}
+                                  </div>
+                                </TableCell>
+                                <TableCell className="min-w-[140px] text-[13px] dark:text-foreground">
+                                  <div className="space-y-0.5">
+                                    {user.city && user.country && (
+                                      <p className="text-xs flex items-center gap-1 dark:text-foreground">
+                                        <MapPin className="h-3 w-3 text-muted-foreground dark:text-muted-foreground" />
+                                        {user.city}, {user.country}
+                                      </p>
+                                    )}
+                                    {user.website && (
+                                      <p className="text-xs flex items-center gap-1">
+                                        <Globe className="h-3 w-3 text-muted-foreground dark:text-muted-foreground" />
+                                        <a href={user.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">
+                                          Website
+                                        </a>
+                                      </p>
+                                    )}
+                                  </div>
+                                </TableCell>
+                                <TableCell className="min-w-[90px]">
+                                  <Badge variant={getRoleBadgeVariant(user.role)} className="text-[11px] dark:border-border">
+                                    {user.role.toUpperCase()}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="min-w-[90px]">
+                                  {getStatusBadge(user)}
+                                </TableCell>
+                                <TableCell className="min-w-[140px] text-[13px] dark:text-foreground">
+                                  <div>
+                                    <p className="text-xs dark:text-foreground">{formatDateTime(user.last_login)}</p>
+                                    {user.login_attempts > 0 && (
+                                      <p className="text-red-600 dark:text-red-400 text-[11px]">
+                                        {user.login_attempts} failed attempts
+                                      </p>
+                                    )}
+                                  </div>
+                                </TableCell>
+                                <TableCell className="min-w-[110px] text-[13px] dark:text-foreground">
+                                  <p className="text-xs dark:text-foreground">{formatDate(user.user_created_at)}</p>
+                                </TableCell>
+                                <TableCell className="min-w-[180px] sticky right-0 bg-background dark:bg-card z-10 shadow-[2px_0_5px_rgba(0,0,0,0.1)] dark:shadow-[2px_0_5px_rgba(255,255,255,0.1)]">
+                                  <div className="flex items-center gap-1 justify-center">
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => openUserDialog(user)}
+                                      title="Edit User"
+                                      className="h-7 px-2 text-[11px] dark:border-border dark:hover:bg-muted"
+                                    >
+                                      <Edit className="h-3.5 w-3.5" />
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => openProfileDialog(user)}
+                                      title="Edit Profile"
+                                      className="h-7 px-2 text-[11px] dark:border-border dark:hover:bg-muted"
+                                    >
+                                      <Eye className="h-3.5 w-3.5" />
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => handleSendPasswordReset(user.id)}
+                                      title="Send Password Reset"
+                                      className="h-7 px-2 text-[11px] dark:border-border dark:hover:bg-muted"
+                                    >
+                                      <Mail className="h-3.5 w-3.5" />
+                                    </Button>
+                                    {user.status === 'active' ? (
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => openDeactivateDialog(user)}
+                                        title="Deactivate User"
+                                        className="h-7 px-2 text-[11px] dark:border-border dark:hover:bg-muted"
+                                      >
+                                        <ShieldX className="h-3.5 w-3.5" />
+                                      </Button>
+                                    ) : (
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => handleActivateUser(user.id)}
+                                        title="Activate User"
+                                        className="h-7 px-2 text-[11px] dark:border-border dark:hover:bg-muted"
+                                      >
+                                        <ShieldCheck className="h-3.5 w-3.5" />
+                                      </Button>
+                                    )}
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => handleDeleteUser(user.id)}
+                                      title="Delete User"
+                                      className="h-7 px-2 text-[11px] text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 dark:border-border dark:hover:bg-muted"
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
             </CardContent>
           </Card>
+
+          {/* Pagination */}
+          {pagination.totalPages > 1 && (
+            <div className="flex items-center justify-between mt-3 px-2">
+              <p className="text-xs text-muted-foreground dark:text-muted-foreground">
+                Showing {((pagination.page - 1) * pagination.limit) + 1} to {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} users
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
+                  disabled={pagination.page === 1}
+                  className="h-8 text-[12px] dark:border-border dark:hover:bg-muted"
+                >
+                  Previous
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
+                  disabled={pagination.page === pagination.totalPages}
+                  className="h-8 text-[12px] dark:border-border dark:hover:bg-muted"
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
         </TabsContent>
 
         {/* Analytics Tab */}
