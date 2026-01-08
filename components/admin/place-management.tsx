@@ -658,16 +658,52 @@ export function PlaceManagement() {
   return (
     <div className="w-full max-w-[1920px] mx-auto space-y-4 px-4 py-4">
       {/* Header Section */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Place Management</h1>
-          <p className="text-sm text-muted-foreground mt-1">Manage places and their status</p>
+      <div className="pb-2 border-b">
+        <div className="flex flex-col lg:flex-row gap-3 items-start lg:items-center">
+          <div className="flex-1 w-full">
+              <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                <Input
+                placeholder="Search places by name or location..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 h-11 text-base"
+                />
+          </div>
         </div>
+
+          <div className="flex gap-2 w-full lg:w-auto">
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-full lg:w-[140px] h-11">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="inactive">Inactive</SelectItem>
+              </SelectContent>
+            </Select>
+            
+            <Select value={typeFilter} onValueChange={setTypeFilter}>
+              <SelectTrigger className="w-full lg:w-[140px] h-11">
+                <SelectValue placeholder="Type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Types</SelectItem>
+                {placeTypes.map((type) => (
+                  <SelectItem key={type.value} value={type.value}>
+                    {type.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button onClick={resetForm} className="flex items-center gap-2">
+              <Button onClick={resetForm} className="flex items-center gap-2 whitespace-nowrap">
               <Plus className="h-4 w-4" />
-              Add Place
+                Add Place
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -740,46 +776,6 @@ export function PlaceManagement() {
             </form>
           </DialogContent>
         </Dialog>
-      </div>
-
-      {/* Search Bar - Top of Page */}
-      <div className="flex flex-col lg:flex-row gap-3 items-start lg:items-center">
-        <div className="flex-1 w-full">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-            <Input
-              placeholder="Search places by name or location..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 h-11 text-base"
-            />
-          </div>
-        </div>
-        <div className="flex gap-2 w-full lg:w-auto">
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-full lg:w-[140px] h-11">
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="active">Active</SelectItem>
-              <SelectItem value="inactive">Inactive</SelectItem>
-            </SelectContent>
-          </Select>
-          
-          <Select value={typeFilter} onValueChange={setTypeFilter}>
-            <SelectTrigger className="w-full lg:w-[140px] h-11">
-              <SelectValue placeholder="Type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Types</SelectItem>
-              {placeTypes.map((type) => (
-                <SelectItem key={type.value} value={type.value}>
-                  {type.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
         </div>
       </div>
 
@@ -843,12 +839,6 @@ export function PlaceManagement() {
 
       {/* Places Table */}
       <Card className="border shadow-sm">
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <MapPin className="h-5 w-5" />
-            Places ({filteredPlaces.length})
-          </CardTitle>
-        </CardHeader>
         <CardContent className="p-0">
           {filteredPlaces.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
@@ -859,8 +849,8 @@ export function PlaceManagement() {
             <div className="table-scroll-container">
               <div className="relative">
                 <div className="overflow-x-auto">
-                  <Table className="w-full">
-                    <TableHeader>
+              <Table className="w-full">
+                <TableHeader>
                       <TableRow className="bg-muted/50">
                         <TableHead className="font-semibold min-w-[250px] whitespace-nowrap">Name & Description</TableHead>
                         <TableHead className="font-semibold min-w-[180px] whitespace-nowrap">Location</TableHead>
@@ -868,64 +858,64 @@ export function PlaceManagement() {
                         <TableHead className="font-semibold min-w-[140px] whitespace-nowrap">Status</TableHead>
                         <TableHead className="font-semibold min-w-[130px] whitespace-nowrap">Created</TableHead>
                         <TableHead className="font-semibold min-w-[160px] text-right whitespace-nowrap">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                  </Table>
+                  </TableRow>
+                </TableHeader>
+              </Table>
                 </div>
                 <div className="max-h-[560px] overflow-y-auto table-scroll-container-vertical overflow-x-auto">
-                  <Table className="w-full">
-                    <TableBody>
-                      {filteredPlaces.map((place) => (
+                <Table className="w-full">
+                  <TableBody>
+                    {filteredPlaces.map((place) => (
                         <TableRow key={place.id} className="hover:bg-muted/30 transition-colors">
                           <TableCell className="min-w-[250px]">
-                            <div>
+                          <div>
                               <div className="font-semibold text-base">{place.name}</div>
                               {place.description && (
                                 <div className="text-sm text-muted-foreground mt-1 line-clamp-2">
                                   {place.description}
                                 </div>
                               )}
-                            </div>
-                          </TableCell>
+                          </div>
+                        </TableCell>
                           <TableCell className="min-w-[180px]">
                             <div className="flex items-center gap-2 text-sm">
                               <MapPin className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                               <span className="truncate">{place.city}{place.state ? `, ${place.state}` : ''}</span>
-                            </div>
-                          </TableCell>
+                          </div>
+                        </TableCell>
                           <TableCell className="min-w-[120px] text-center">
                             <div className="flex items-center justify-center gap-2">
                               <Users className="h-4 w-4 text-muted-foreground" />
                               <span className="font-medium">{place.capacity}</span>
-                            </div>
-                          </TableCell>
+                          </div>
+                        </TableCell>
                           <TableCell className="min-w-[140px]">
                             <div className="flex items-center gap-3">
-                              {getStatusBadge(place)}
-                              <Switch
-                                checked={place.is_active}
-                                onCheckedChange={() => toggleStatus(place.id)}
+                            {getStatusBadge(place)}
+                            <Switch
+                              checked={place.is_active}
+                              onCheckedChange={() => toggleStatus(place.id)}
                                 className="scale-90"
-                              />
-                            </div>
-                          </TableCell>
+                            />
+                          </div>
+                        </TableCell>
                           <TableCell className="min-w-[130px]">
                             <div className="flex items-center gap-2 text-sm text-muted-foreground">
                               <Calendar className="h-4 w-4" />
-                              {format(new Date(place.created_at), 'MMM dd, yyyy')}
-                            </div>
-                          </TableCell>
+                            {format(new Date(place.created_at), 'MMM dd, yyyy')}
+                          </div>
+                        </TableCell>
                           <TableCell className="min-w-[160px]">
                             <div className="flex items-center justify-end gap-1">
-                              <Button 
-                                variant="ghost" 
-                                size="sm"
-                                onClick={() => handleOpenConfig(place)}
-                                title="Configure availability & hours"
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              onClick={() => handleOpenConfig(place)}
+                              title="Configure availability & hours"
                                 className="h-8 w-8 p-0"
-                              >
-                                <Clock className="h-4 w-4" />
-                              </Button>
+                            >
+                              <Clock className="h-4 w-4" />
+                            </Button>
                               <Button 
                                 variant="ghost" 
                                 size="sm" 
@@ -933,23 +923,23 @@ export function PlaceManagement() {
                                 title="Edit place"
                                 className="h-8 w-8 p-0"
                               >
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
                                 className="text-red-600 hover:text-red-700 hover:bg-red-50 h-8 w-8 p-0"
-                                onClick={() => handleDeletePlace(place.id)}
-                                title="Delete place (soft delete)"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                              onClick={() => handleDeletePlace(place.id)}
+                              title="Delete place (soft delete)"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
                 </div>
               </div>
             </div>

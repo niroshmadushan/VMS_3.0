@@ -459,22 +459,16 @@ export function StaffBookingManagement() {
     try {
       setIsLoadingUsers(true)
       
-      console.log('👥 Fetching users from userprofile table...')
-      
       // Fetch all users and filter by role on frontend
       // This ensures compatibility with all API versions
       const allUsersResponse = await placeManagementAPI.getTableData('userprofile', {
         limit: 500
       })
       
-      console.log('📦 Total users fetched:', allUsersResponse.length)
-      
       // Filter for admin and employee roles only
       const filteredUsers = allUsersResponse.filter((user: any) => 
         user.role === 'admin' || user.role === 'employee'
       )
-      
-      console.log('✅ Admin & Employee users:', filteredUsers.length)
       
       setUsers(filteredUsers)
       
@@ -486,7 +480,6 @@ export function StaffBookingManagement() {
         })
       }
     } catch (error: any) {
-      console.error('❌ Failed to fetch users:', error)
       toast.error('Failed to load users', {
         position: 'top-center',
         duration: 3000,
@@ -510,10 +503,7 @@ export function StaffBookingManagement() {
       setIsLoadingPlaces(true)
       setPlacesError(null)
       
-      console.log('📅 Fetching available places for date:', dateString)
-      
       const dayOfWeek = getDayOfWeek(dateString)
-      console.log('📅 Day of week:', dayOfWeek)
       
       // Step 1: Get all active places
       const allPlaces = await placeManagementAPI.getPlaces({
@@ -521,14 +511,10 @@ export function StaffBookingManagement() {
         limit: 100
       })
       
-      console.log('📍 Active places found:', allPlaces.length)
-      
       // Step 2: Get configurations for all places
       const configurationsResponse = await placeManagementAPI.getTableData('place_configuration', {
         limit: 100
       })
-      
-      console.log('⚙️ Configurations found:', configurationsResponse.length)
       
       // Step 3: Filter places based on date availability and booking settings
       const availablePlacesForDate = allPlaces
@@ -537,24 +523,19 @@ export function StaffBookingManagement() {
           const config = configurationsResponse.find((c: any) => c.place_id === place.id)
           
           if (!config) {
-            console.log(`⚠️ No configuration found for place: ${place.name}`)
             return null
           }
           
           // Check if bookings are allowed
           if (!config.allow_bookings) {
-            console.log(`🚫 Bookings not allowed for: ${place.name}`)
             return null
           }
           
           // Check if place is available on this day of week
           const dayKey = `available_${dayOfWeek}` as keyof PlaceConfiguration
           if (!config[dayKey]) {
-            console.log(`📅 ${place.name} not available on ${dayOfWeek}`)
             return null
           }
-          
-          console.log(`✅ ${place.name} is available on ${dayOfWeek}`)
           
           return {
             ...place,
@@ -564,8 +545,6 @@ export function StaffBookingManagement() {
           }
         })
         .filter((place: AvailablePlace | null): place is AvailablePlace => place !== null)
-      
-      console.log(`✅ Available places for ${dateString}:`, availablePlacesForDate.length)
       
       setAvailablePlaces(availablePlacesForDate)
       
@@ -578,8 +557,7 @@ export function StaffBookingManagement() {
       }
       
     } catch (error: any) {
-      console.error('❌ Failed to fetch available places:', error)
-      const errorMessage = error.message || 'Failed to load available places'
+      const errorMessage = 'Failed to load available places'
       setPlacesError(errorMessage)
       toast.error(errorMessage, {
         position: 'top-center',
@@ -615,14 +593,11 @@ export function StaffBookingManagement() {
       )
       
       // Fetch ALL cancellations once at the start (more reliable than filtering per booking)
-      console.log('\n  🔍 ========== FETCHING ALL CANCELLATIONS ==========')
       let allCancellations: any[] = []
       try {
         const allCancellationsResponse = await placeManagementAPI.getTableData('booking_cancellations', {
           limit: 1000 // Get all cancellations
         })
-        
-        console.log(`  📥 RAW CANCELLATIONS API RESPONSE:`, allCancellationsResponse)
         
         // Handle different response formats
         if (Array.isArray(allCancellationsResponse)) {
@@ -632,16 +607,8 @@ export function StaffBookingManagement() {
         } else if (allCancellationsResponse && allCancellationsResponse.success && Array.isArray(allCancellationsResponse.data)) {
           allCancellations = allCancellationsResponse.data
         }
-        
-        console.log(`  📊 Total cancellations fetched: ${allCancellations.length}`)
-        console.log(`  📋 Cancellation booking IDs:`, allCancellations.map((c: any) => ({
-          id: c.id,
-          booking_id: c.booking_id || c.bookingId,
-          reason: c.cancellation_reason || c.cancellationReason
-        })))
-        console.log(`  ==========================================\n`)
       } catch (error) {
-        console.error(`  ❌ Error fetching all cancellations:`, error)
+        // Silent fail - cancellations list will remain empty
       }
       
       // Transform database records to Booking interface
@@ -685,12 +652,6 @@ export function StaffBookingManagement() {
           let cancellationData: BookingCancellation | undefined = undefined
           const isCancelledStatus = booking.status?.toLowerCase() === 'cancelled' || booking.status === 'cancelled' || booking.status === 'Cancelled'
           if (isCancelledStatus) {
-            console.log(`\n  🔍 ========== MATCHING CANCELLATION DATA ==========`)
-            console.log(`  📋 Booking ID: "${booking.id}"`)
-            console.log(`  📋 Booking Title: "${booking.title}"`)
-            console.log(`  📋 Booking Status: "${booking.status}"`)
-            console.log(`  📊 Total cancellations available: ${allCancellations.length}`)
-            
             // Find matching cancellation (try multiple field name variations)
             const matchingCancellation = allCancellations.find((c: any) => {
               const bookingIdMatch = c.booking_id === booking.id || 
@@ -698,22 +659,10 @@ export function StaffBookingManagement() {
                                     String(c.booking_id || '').toLowerCase() === String(booking.id || '').toLowerCase() ||
                                     String(c.bookingId || '').toLowerCase() === String(booking.id || '').toLowerCase()
               
-              if (bookingIdMatch) {
-                console.log(`  ✅ Found matching cancellation:`, {
-                  cancellation_id: c.id,
-                  cancellation_booking_id: c.booking_id || c.bookingId,
-                  booking_id: booking.id,
-                  reason: c.cancellation_reason || c.cancellationReason
-                })
-              }
-              
               return bookingIdMatch
             })
             
             if (matchingCancellation) {
-              console.log(`  📋 Raw cancellation object:`, matchingCancellation)
-              console.log(`  📋 Cancellation object keys:`, Object.keys(matchingCancellation))
-              
               const reason = matchingCancellation.cancellation_reason || 
                            matchingCancellation.cancellationReason ||
                            matchingCancellation['cancellation_reason'] ||
@@ -728,14 +677,6 @@ export function StaffBookingManagement() {
                 cancellation_type: matchingCancellation.cancellation_type || matchingCancellation.cancellationType || 'user_cancelled',
                 cancelled_at: matchingCancellation.cancelled_at || matchingCancellation.cancelledAt
               }
-              
-              console.log(`  ✅ Final cancellation data object:`, cancellationData)
-              console.log(`  ✅ Cancellation reason (final):`, cancellationData.cancellation_reason)
-              console.log(`  ==========================================\n`)
-            } else {
-              console.log(`  ⚠️ No matching cancellation found for booking ${booking.id}`)
-              console.log(`  📋 Available cancellation booking IDs:`, allCancellations.map((c: any) => c.booking_id || c.bookingId))
-              console.log(`  ==========================================\n`)
             }
           }
           
@@ -856,28 +797,10 @@ export function StaffBookingManagement() {
         })
       )
       
-      // Log cancellation data for each booking to verify correct assignment
-      console.log('\n📋 CANCELLATION DATA VERIFICATION:')
-      transformedBookings.forEach((b, idx) => {
-        if (b.status === 'cancelled' || b.status === 'Cancelled') {
-          console.log(`\n${idx + 1}. Booking "${b.title}" (ID: ${b.id}):`)
-          if (b.cancellation) {
-            console.log(`   ✅ Has cancellation data:`)
-            console.log(`      - Reason: "${b.cancellation.cancellation_reason}"`)
-            console.log(`      - Booking ID: ${b.cancellation.booking_id}`)
-            console.log(`      - Cancelled by: ${b.cancellation.cancelled_by}`)
-          } else {
-            console.log(`   ⚠️ No cancellation data found`)
-          }
-        }
-      })
-      console.log('\n')
-      
       setBookings(transformedBookings)
       
     } catch (error: any) {
-      console.error('❌ Failed to fetch bookings:', error)
-      const errorMessage = error.message || 'Failed to load bookings'
+      const errorMessage = 'Failed to load bookings'
       setBookingsError(errorMessage)
       toast.error(errorMessage, {
         position: 'top-center',
@@ -891,19 +814,15 @@ export function StaffBookingManagement() {
 
   // Fetch bookings on mount
   useEffect(() => {
-    console.log('🔄 Component mounted - Fetching bookings from database...')
     fetchBookings()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Generate available time gaps (complete ranges between bookings)
   const generateAvailableTimeGaps = (placeId: string, date: string) => {
-    console.log('🕐 Generating available time gaps for place:', placeId, 'date:', date)
-    
     const selectedPlace = availablePlaces.find(p => p.id === placeId)
     
     if (!selectedPlace || !selectedPlace.configuration) {
-      console.log('⚠️ No place configuration found')
       setAvailableTimeGaps([])
       setCurrentPlaceConfig(null)
       return
@@ -917,8 +836,6 @@ export function StaffBookingManagement() {
     
     const openTime = config.start_time.substring(0, 5) // HH:MM
     const closeTime = config.end_time.substring(0, 5)
-    
-    console.log('⏰ Operating hours:', openTime, '-', closeTime, '| Min Duration:', minDuration, 'min')
     
     // Helper functions
     const timeToMinutes = (time: string) => {
@@ -948,55 +865,32 @@ export function StaffBookingManagement() {
     const closeMinutes = timeToMinutes(closeTime)
     
     // Get existing bookings for this date and place, sorted by start time
-    console.log('🔍 Checking bookings - Total in state:', bookings.length)
-    console.log('🔍 Filtering for date:', date, 'place:', selectedPlace.name, 'placeId:', placeId)
-    
     const existingBookings = bookings.filter(booking => {
-      console.log('  Checking booking:', {
-        id: booking.id,
-        title: booking.title,
-        date: booking.date,
-        place: booking.place,
-        placeId: booking.placeId,
-        status: booking.status,
-        time: `${booking.startTime}-${booking.endTime}`
-      })
-      
       // Match by place ID if available, fallback to place name
       const placeMatches = booking.placeId ? booking.placeId === placeId : booking.place === selectedPlace.name
       
       if (booking.date !== date) {
-        console.log('    ❌ Date mismatch:', booking.date, '!=', date)
         return false
       }
       
       if (!placeMatches) {
-        console.log('    ❌ Place mismatch:', booking.placeId || booking.place, '!=', placeId, 'or', selectedPlace.name)
         return false
       }
       
       if (booking.status === 'cancelled') {
-        console.log('    ⏭️ Cancelled booking')
         return false
       }
       
       if (editingBooking && booking.id === editingBooking.id) {
-        console.log('    ⏭️ Current editing booking')
         return false
       }
       
-      console.log('    ✅ Booking matches criteria')
       return true
     }).map(booking => ({
       start: timeToMinutes(booking.startTime),
       end: timeToMinutes(booking.endTime),
       title: booking.title
     })).sort((a, b) => a.start - b.start)
-    
-    console.log('📋 Existing bookings found:', existingBookings.length)
-    existingBookings.forEach(b => {
-      console.log(`  📌 ${b.title}: ${minutesToTime(b.start)} - ${minutesToTime(b.end)}`)
-    })
     
     // Find gaps between bookings
     const gaps: {start: string, end: string, duration: string}[] = []
@@ -1015,9 +909,6 @@ export function StaffBookingManagement() {
             end: minutesToTime(booking.start),
             duration: formatDuration(gapDuration)
           })
-          console.log(`✅ Gap found: ${minutesToTime(currentTime)} - ${minutesToTime(booking.start)} (${formatDuration(gapDuration)})`)
-        } else {
-          console.log(`⏭️ Gap too small: ${minutesToTime(currentTime)} - ${minutesToTime(booking.start)} (${formatDuration(gapDuration)})`)
         }
       }
       
@@ -1035,22 +926,17 @@ export function StaffBookingManagement() {
           end: minutesToTime(closeMinutes),
           duration: formatDuration(gapDuration)
         })
-        console.log(`✅ Gap found: ${minutesToTime(currentTime)} - ${minutesToTime(closeMinutes)} (${formatDuration(gapDuration)})`)
       }
     }
     
-    console.log(`✅ Total available gaps: ${gaps.length}`)
     setAvailableTimeGaps(gaps)
   }
 
   // Generate available start times (flexible booking) - OLD SYSTEM
   const generateAvailableStartTimes = (placeId: string, date: string) => {
-    console.log('🕐 Generating available start times for place:', placeId, 'date:', date)
-    
     const selectedPlace = availablePlaces.find(p => p.id === placeId)
     
     if (!selectedPlace || !selectedPlace.configuration) {
-      console.log('⚠️ No place configuration found')
       setAvailableStartTimes([])
       setCurrentPlaceConfig(null)
       return
@@ -1067,8 +953,6 @@ export function StaffBookingManagement() {
     // Parse operating hours
     const openTime = config.start_time.substring(0, 5) // HH:MM
     const closeTime = config.end_time.substring(0, 5)
-    
-    console.log('⏰ Operating hours:', openTime, '-', closeTime, '| Interval:', slotInterval, 'min | Min Duration:', minDuration, 'min')
     
     // Helper functions
     const timeToMinutes = (time: string) => {
@@ -1096,8 +980,6 @@ export function StaffBookingManagement() {
       end: timeToMinutes(booking.endTime)
     })).sort((a, b) => a.start - b.start)
     
-    console.log('📋 Existing bookings:', existingBookings)
-    
     // Generate all possible time points with the interval
     const allTimes: string[] = []
     for (let time = openMinutes; time < closeMinutes; time += slotInterval) {
@@ -1123,18 +1005,14 @@ export function StaffBookingManagement() {
       return !hasConflict
     })
     
-    console.log('✅ Available start times:', availableStarts.length)
     setAvailableStartTimes(availableStarts)
   }
   
   // Generate available end times based on selected start time
   const generateAvailableEndTimes = (placeId: string, date: string, startTime: string) => {
-    console.log('🕐 Generating available end times for start:', startTime)
-    
     const selectedPlace = availablePlaces.find(p => p.id === placeId)
     
     if (!selectedPlace || !selectedPlace.configuration) {
-      console.log('⚠️ No place configuration found')
       setAvailableEndTimes([])
       return
     }
@@ -1174,8 +1052,6 @@ export function StaffBookingManagement() {
     const nextBooking = existingBookings.find(booking => booking.start >= startMinutes)
     const maxEndMinutes = nextBooking ? nextBooking.start : closeMinutes
     
-    console.log('📍 Max end time:', minutesToTime(maxEndMinutes), '(next booking at', nextBooking ? minutesToTime(nextBooking.start) : 'close', ')')
-    
     // Generate available end times
     const availableEnds: string[] = []
     for (let time = minEndMinutes; time <= maxEndMinutes; time += slotInterval) {
@@ -1184,18 +1060,14 @@ export function StaffBookingManagement() {
       }
     }
     
-    console.log('✅ Available end times:', availableEnds.length)
     setAvailableEndTimes(availableEnds)
   }
 
   // Generate time slots based on place configuration (OLD SYSTEM - DEPRECATED)
   const generateTimeSlots = (placeId: string, date: string) => {
-    console.log('🕐 Generating time slots for place:', placeId, 'date:', date)
-    
     const selectedPlace = availablePlaces.find(p => p.id === placeId)
     
     if (!selectedPlace || !selectedPlace.configuration) {
-      console.log('⚠️ No place configuration found')
       setAvailableTimeSlots([])
       return
     }
@@ -1206,8 +1078,6 @@ export function StaffBookingManagement() {
     // Parse operating hours
     const startTime = config.start_time.substring(0, 5) // HH:MM:SS -> HH:MM
     const endTime = config.end_time.substring(0, 5)
-    
-    console.log('⏰ Operating hours:', startTime, '-', endTime, '| Slot duration:', slotDuration, 'min')
     
     // Convert time to minutes
     const timeToMinutes = (time: string) => {
@@ -1236,8 +1106,6 @@ export function StaffBookingManagement() {
         allSlots.push(`${slotStart} - ${slotEnd}`)
       }
     }
-    
-    console.log('📋 All possible slots:', allSlots.length, 'slots')
     
     // Filter out booked slots
     const availableSlots = allSlots.filter(slot => {
@@ -1268,9 +1136,7 @@ export function StaffBookingManagement() {
           (slotStart <= bookingStart && slotEnd >= bookingEnd)
         )
         
-        if (overlap) {
-          console.log('❌ Slot', slot, 'conflicts with', booking.title)
-        }
+        // Check for overlap
         
         return overlap
       })
@@ -1278,7 +1144,6 @@ export function StaffBookingManagement() {
       return !hasConflict
     })
     
-    console.log('✅ Available slots:', availableSlots.length, 'slots')
     setAvailableTimeSlots(availableSlots)
   }
 
@@ -1449,8 +1314,6 @@ export function StaffBookingManagement() {
   }
 
   const checkAvailability = (date: string, placeId: string, startTime: string, endTime: string, excludeId?: string) => {
-    console.log('🔍 Checking availability:', { date, placeId, startTime, endTime, excludeId })
-    
     // Find the selected place configuration
     const selectedPlace = availablePlaces.find(p => p.id === placeId)
     
@@ -1478,8 +1341,6 @@ export function StaffBookingManagement() {
       return false
     }
     
-    console.log('✅ Time is within operating hours:', placeStartTime, '-', placeEndTime)
-    
     // Step 2: Check if start time is before end time
     if (startTime >= endTime) {
       toast.error("End time must be after start time", {
@@ -1494,7 +1355,6 @@ export function StaffBookingManagement() {
     const conflictingBookings = bookings.filter((booking) => {
       // Skip if this is the booking being edited
       if (excludeId && booking.id === excludeId) {
-        console.log('⏭️ Skipping current booking:', booking.id)
         return false
       }
       
@@ -1505,7 +1365,6 @@ export function StaffBookingManagement() {
       
       // Skip cancelled bookings
       if (booking.status === "cancelled") {
-        console.log('⏭️ Skipping cancelled booking:', booking.id)
         return false
       }
 
@@ -1521,10 +1380,6 @@ export function StaffBookingManagement() {
         (newStart <= bookingStart && newEnd >= bookingEnd)
       )
       
-      if (hasOverlap) {
-        console.log('❌ Conflict found with booking:', booking.title, booking.startTime, '-', booking.endTime)
-      }
-      
       return hasOverlap
     })
 
@@ -1538,7 +1393,6 @@ export function StaffBookingManagement() {
       return false
     }
     
-    console.log('✅ No conflicts found. Booking is available!')
     return true
   }
 
@@ -1706,7 +1560,6 @@ export function StaffBookingManagement() {
           updated_at: currentTimestamp
         }
 
-        console.log('📝 Creating new booking:', newBookingData)
 
         await placeManagementAPI.insertRecord('bookings', newBookingData)
 
@@ -1766,7 +1619,7 @@ export function StaffBookingManagement() {
     setIsDialogOpen(false)
     resetForm()
     } catch (error: any) {
-      console.error('❌ Failed to save booking:', error)
+      // Silent fail - error handled by toast
       toast.error(error.message || 'Failed to save booking', {
         position: 'top-center',
         duration: 4000,
@@ -1789,6 +1642,7 @@ export function StaffBookingManagement() {
       })
       return
     }
+    
     // Check if booking is completed or cancelled
     if (booking.status === "completed") {
       toast.error("Cannot edit completed bookings", {
@@ -1808,9 +1662,14 @@ export function StaffBookingManagement() {
       return
     }
 
-    // Open edit dialog with booking data
-    setEditingBooking(booking)
-    setIsDialogOpen(true)
+    setConfirmTitle("Edit Booking")
+    setConfirmMessage(`Do you want to edit "${booking.title}"?`)
+    setConfirmAction(() => () => {
+      // Redirect to update page with booking ID
+      window.location.href = `/staff/bookings/update?id=${booking.id}`
+      setIsConfirmDialogOpen(false)
+    })
+    setIsConfirmDialogOpen(true)
   }
 
   const handleCancel = async (id: string) => {
@@ -1839,12 +1698,6 @@ export function StaffBookingManagement() {
   }
 
   const handleShowCancellationReason = async (booking: Booking) => {
-    console.log(`🔍 handleShowCancellationReason called for booking ${booking.id}:`, {
-      hasCancellation: !!booking.cancellation,
-      cancellation: booking.cancellation,
-      status: booking.status
-    })
-    
     // If cancellation data is already loaded, use it
     if (booking.cancellation) {
       const cancellationWithReason = {
@@ -1854,14 +1707,12 @@ export function StaffBookingManagement() {
                            ''
       }
       
-      console.log(`✅ Using existing cancellation data:`, cancellationWithReason)
       setSelectedCancellation(cancellationWithReason)
       setIsCancellationReasonDialogOpen(true)
       return
     }
     
     // If cancellation data is not loaded, try to fetch it
-    console.log(`⚠️ Cancellation data not found in booking, fetching from database...`)
     try {
       const cancellationResponse = await placeManagementAPI.getTableData('booking_cancellations', {
         filters: [
@@ -1871,8 +1722,6 @@ export function StaffBookingManagement() {
         sortBy: 'cancelled_at',
         sortOrder: 'desc'
       })
-      
-      console.log(`📥 Cancellation API response:`, cancellationResponse)
       
       // Handle different response formats
       let cancellations: any[] = []
@@ -1901,11 +1750,9 @@ export function StaffBookingManagement() {
           cancelled_at: cancellation.cancelled_at || cancellation.cancelledAt
         }
         
-        console.log(`✅ Fetched cancellation data:`, cancellationData)
         setSelectedCancellation(cancellationData)
         setIsCancellationReasonDialogOpen(true)
       } else {
-        console.log(`❌ No cancellation data found in database for booking ${booking.id}`)
         toast.error('Cancellation reason not found in database', {
           position: 'top-center',
           duration: 3000,
@@ -1913,7 +1760,6 @@ export function StaffBookingManagement() {
         })
       }
     } catch (error) {
-      console.error('❌ Error fetching cancellation data:', error)
       toast.error('Failed to load cancellation data', {
         position: 'top-center',
         duration: 3000,
@@ -2021,8 +1867,7 @@ export function StaffBookingManagement() {
       setCancellationReason("")
       setBookingToCancel(null)
     } catch (error: any) {
-      console.error('Failed to cancel booking:', error)
-      toast.error(error.message || 'Failed to cancel booking', {
+      toast.error('Failed to cancel booking', {
         position: 'top-center',
         duration: 4000,
         icon: '❌'
@@ -2084,30 +1929,24 @@ export function StaffBookingManagement() {
     })
   }
 
-  const getStatusBadgeVariant = (status: string): any => {
-    switch (status) {
-      case "pending":
-        return "secondary" // Gray
-      case "upcoming":
-        return { className: "bg-orange-500 text-white hover:bg-orange-600" } // Orange
-      case "ongoing":
-      case "in_progress":
-        return { className: "bg-green-500 text-white hover:bg-green-600" } // Green
-      case "completed":
-        return { className: "bg-blue-500 text-white hover:bg-blue-600" } // Blue
-      case "cancelled":
-        return "destructive" // Red
-      default:
-        return "outline"
-    }
-  }
-
   const getStatusBadgeProps = (status: string) => {
-    const variant = getStatusBadgeVariant(status)
-    if (typeof variant === 'object') {
-      return variant
+    const statusLower = (status || '').toLowerCase()
+    switch (statusLower) {
+      case "pending":
+        return { className: "text-[11px] bg-gray-500 dark:bg-gray-600 text-white hover:bg-gray-600 dark:hover:bg-gray-700" } // Gray
+      case "upcoming":
+        return { className: "text-[11px] bg-orange-500 dark:bg-orange-600 text-white hover:bg-orange-600 dark:hover:bg-orange-700" } // Orange
+      case "ongoing":
+      case "in-progress":
+      case "in_progress":
+        return { className: "text-[11px] bg-green-500 dark:bg-green-600 text-white hover:bg-green-600 dark:hover:bg-green-700" } // Green
+      case "completed":
+        return { className: "text-[11px] bg-blue-500 dark:bg-blue-600 text-white hover:bg-blue-600 dark:hover:bg-blue-700" } // Blue
+      case "cancelled":
+        return { className: "text-[11px] bg-red-500 dark:bg-red-600 text-white hover:bg-red-600 dark:hover:bg-red-700" } // Red
+      default:
+        return { className: "text-[11px] bg-gray-400 dark:bg-gray-500 text-white hover:bg-gray-500 dark:hover:bg-gray-600" } // Default Gray
     }
-    return { variant }
   }
 
   // Format time to HH:MM (removes seconds and handles timestamps)
@@ -2133,7 +1972,7 @@ export function StaffBookingManagement() {
         return `${hours}:${minutes}`
       }
     } catch (e) {
-      console.error('Error parsing time:', time, e)
+      // Silent fail - return original time string
     }
     
     return time
@@ -2154,7 +1993,7 @@ export function StaffBookingManagement() {
         })
       }
     } catch (e) {
-      console.error('Error parsing date:', date, e)
+      // Silent fail - return original date string
     }
     
     return date
@@ -2219,27 +2058,20 @@ export function StaffBookingManagement() {
 
   // Email notification helper functions
   const handleSendEmailClick = async (booking: Booking) => {
-    console.log('🔍 handleSendEmailClick called with booking:', booking)
     setSelectedBookingForEmail(booking)
     setSelectedEmailParticipants([])
     setEmailType('booking_details')
     setIsEmailDialogOpen(true)
     
     // Load participants for this booking
-    console.log('🔍 About to call loadBookingParticipants')
     await loadBookingParticipants(booking.id)
-    console.log('🔍 loadBookingParticipants completed')
   }
 
   const loadBookingParticipants = async (bookingId: string) => {
     try {
       setIsLoadingParticipants(true)
-      console.log('🔍 Loading participants for booking ID:', bookingId)
-      console.log('🔍 Using OLD METHOD - fetch from database like original booking system')
       
       // Use the NEW Booking Email API to get participants
-      console.log('🔍 Fetching participants using NEW API...')
-      
       // Get token from localStorage (check both possible keys) - same as OTP email sending
       const token = localStorage.getItem('authToken') || 
                     localStorage.getItem('jwt_token') || 
@@ -2247,7 +2079,6 @@ export function StaffBookingManagement() {
                     ''
       
       if (!token) {
-        console.error('❌ No authentication token found in localStorage')
         toast.error('Authentication required. Please log in again.', {
           position: 'top-center',
           duration: 3000
@@ -2259,10 +2090,6 @@ export function StaffBookingManagement() {
       // Get required headers from environment (same as OTP email sending)
       const appId = process.env.NEXT_PUBLIC_APP_ID || 'default_app_id'
       const serviceKey = process.env.NEXT_PUBLIC_SERVICE_KEY || 'default_service_key'
-      
-      console.log('🔍 Using token for API request:', token.substring(0, 20) + '...')
-      console.log('🔍 App-Id:', appId)
-      console.log('🔍 Service-Key:', serviceKey ? '✅ Set' : '❌ Missing')
       
       // Use same headers as OTP email sending
       const response = await fetch(`/api/booking-email/${bookingId}/participants`, {
@@ -2276,7 +2103,6 @@ export function StaffBookingManagement() {
       
       // Check if response is unauthorized
       if (response.status === 401) {
-        console.error('❌ Unauthorized: Token may be expired or invalid')
         toast.error('Authentication failed. Please log in again.', {
           position: 'top-center',
           duration: 3000
@@ -2288,7 +2114,6 @@ export function StaffBookingManagement() {
       // Check if response is not OK
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
-        console.error('❌ API Error:', response.status, errorData)
         toast.error(errorData.message || 'Failed to load participants from API', {
           position: 'top-center',
           duration: 3000
@@ -2298,7 +2123,6 @@ export function StaffBookingManagement() {
       }
       
       const result = await response.json()
-      console.log('🔍 NEW API Response:', result)
       
       if (result.success) {
         const participants: BookingParticipant[] = result.data.participants.map((p: any) => ({
@@ -2311,28 +2135,12 @@ export function StaffBookingManagement() {
           has_email: p.email ? 1 : 0
         }))
         
-        console.log('🔍 Participants from NEW API:', participants.length, participants)
-        
-        // Debug each participant's email data
-        participants.forEach((participant, index) => {
-          console.log(`🔍 Participant ${index + 1} from NEW API:`, {
-            id: participant.id,
-            full_name: participant.full_name,
-            email: participant.email,
-            has_email: participant.has_email,
-            member_type: participant.member_type
-          })
-        })
-        
         setBookingParticipants(participants)
-        console.log('🔍 Set bookingParticipants state with NEW API data')
       } else {
-        console.error('❌ Failed to get participants from NEW API:', result.message)
         setBookingParticipants([])
       }
       
     } catch (error: any) {
-      console.error('🔍 Error loading participants:', error)
       setBookingParticipants([])
       toast.error('Failed to load participants')
     } finally {
@@ -2344,18 +2152,8 @@ export function StaffBookingManagement() {
   const createParticipantsFromBooking = (booking: Booking): BookingParticipant[] => {
     const participants: BookingParticipant[] = []
     
-    console.log('🔍 Creating participants from booking:', {
-      id: booking.id,
-      title: booking.title,
-      responsiblePerson: booking.responsiblePerson,
-      responsiblePersonEmail: booking.responsiblePersonEmail,
-      selectedEmployees: booking.selectedEmployees,
-      externalParticipants: booking.externalParticipants
-    })
-    
     // Add responsible person
     if (booking.responsiblePerson) {
-      console.log('🔍 Adding responsible person:', booking.responsiblePerson, booking.responsiblePersonEmail)
       
       // Handle both string and object formats for responsiblePerson
       let responsiblePersonName = ''
@@ -2374,16 +2172,6 @@ export function StaffBookingManagement() {
         responsiblePersonEmail = booking.responsiblePerson.email || 
                                 booking.responsiblePersonEmail || 
                                 ''
-        
-        console.log('🔍 Responsible person object details:', {
-          name: booking.responsiblePerson.name,
-          full_name: booking.responsiblePerson.full_name,
-          fullName: booking.responsiblePerson.fullName,
-          email: booking.responsiblePerson.email,
-          responsiblePersonEmail: booking.responsiblePersonEmail,
-          extractedName: responsiblePersonName,
-          extractedEmail: responsiblePersonEmail
-        })
       }
       
       participants.push({
@@ -2395,20 +2183,11 @@ export function StaffBookingManagement() {
         member_type: 'employee',
         has_email: responsiblePersonEmail ? 1 : 0
       })
-    } else {
-      console.log('🔍 No responsible person found')
     }
     
     // Add internal participants (employees)
     if (booking.selectedEmployees && Array.isArray(booking.selectedEmployees)) {
-      console.log('🔍 Adding internal participants:', booking.selectedEmployees.length)
       booking.selectedEmployees.forEach((employee, index) => {
-        console.log('🔍 Internal employee:', employee)
-        console.log('🔍 Employee email check:', {
-          email: employee.email,
-          hasEmail: !!employee.email,
-          emailType: typeof employee.email
-        })
         participants.push({
           id: `internal-${booking.id}-${index}`,
           full_name: String(employee.name || 'Unknown Employee'),
@@ -2419,20 +2198,11 @@ export function StaffBookingManagement() {
           has_email: employee.email ? 1 : 0
         })
       })
-    } else {
-      console.log('🔍 No internal participants found')
     }
     
     // Add external participants
     if (booking.externalParticipants && Array.isArray(booking.externalParticipants)) {
-      console.log('🔍 Adding external participants:', booking.externalParticipants.length)
       booking.externalParticipants.forEach((participant, index) => {
-        console.log('🔍 External participant:', participant)
-        console.log('🔍 External participant email check:', {
-          email: participant.email,
-          hasEmail: !!participant.email,
-          emailType: typeof participant.email
-        })
         participants.push({
           id: `external-${booking.id}-${index}`,
           full_name: String(participant.fullName || 'Unknown Participant'),
@@ -2443,36 +2213,7 @@ export function StaffBookingManagement() {
           has_email: participant.email ? 1 : 0
         })
       })
-    } else {
-      console.log('🔍 No external participants found')
     }
-    
-    console.log('🔍 Final participants created:', participants.length, participants)
-    
-    // Always add a test participant to ensure UI works
-    console.log('🔍 Adding test participant to ensure UI works')
-    participants.push({
-      id: `test-${booking.id}`,
-      full_name: 'Test Participant',
-      email: 'test@example.com',
-      phone: '+1234567890',
-      company_name: 'Test Company',
-      member_type: 'visitor',
-      has_email: 1
-    })
-    
-    console.log('🔍 Final participants with test:', participants.length, participants)
-    
-    // Debug each participant's email data
-    participants.forEach((participant, index) => {
-      console.log(`🔍 Participant ${index + 1}:`, {
-        id: participant.id,
-        full_name: participant.full_name,
-        email: participant.email,
-        has_email: participant.has_email,
-        member_type: participant.member_type
-      })
-    })
     
     return participants
   }
@@ -2504,8 +2245,6 @@ export function StaffBookingManagement() {
 
     try {
       setIsSendingEmails(true)
-      
-      console.log('📧 Sending reminder emails:', reminderType)
 
       // Use the NEW Booking Email API for reminders
       const response = await fetch(`/api/booking-email/${selectedBookingForEmail.id}/send-reminder`, {
@@ -2521,7 +2260,6 @@ export function StaffBookingManagement() {
       })
 
       const result = await response.json()
-      console.log('📧 Reminder API Response:', result)
 
       if (result.success) {
         const { emailsSent, emailsFailed } = result.data || {}
@@ -2541,8 +2279,7 @@ export function StaffBookingManagement() {
       }
       
     } catch (error: any) {
-      console.error('❌ Error sending reminder emails:', error)
-      toast.error(`Failed to send reminder emails: ${error.message}`)
+      toast.error('Failed to send reminder emails')
     } finally {
       setIsSendingEmails(false)
     }
@@ -2561,11 +2298,6 @@ export function StaffBookingManagement() {
     bookingRefId?: string
   }) => {
     try {
-      console.log('📧 ==========================================')
-      console.log('📧 SEND BOOKING EMAIL FROM FRONTEND (NEW API) - STAFF')
-      console.log('📧 ==========================================')
-      console.log('📧 Booking Data:', bookingData)
-
       // Get token from localStorage (check all possible keys)
       const token = localStorage.getItem('authToken') || 
                     localStorage.getItem('jwt_token') || 
@@ -2573,7 +2305,6 @@ export function StaffBookingManagement() {
                     ''
 
       if (!token) {
-        console.error('❌ No authentication token found')
         toast.error('Authentication required. Please log in again.', {
           position: 'top-center',
           duration: 3000
@@ -2589,19 +2320,8 @@ export function StaffBookingManagement() {
         'Authorization': `Bearer ${token}`
       }
       const requestBody = JSON.stringify(bookingData)
-      
-      console.log('📧 ==========================================')
-      console.log('📧 FULL API REQUEST - FRONTEND (STAFF)')
-      console.log('📧 ==========================================')
-      console.log('📧 REQUEST URL:', apiUrl)
-      console.log('📧 REQUEST METHOD:', requestMethod)
-      console.log('📧 REQUEST HEADERS:', JSON.stringify(requestHeaders, null, 2))
-      console.log('📧 AUTHORIZATION HEADER:', requestHeaders['Authorization'] ? `Bearer ${token.substring(0, 30)}...` : '❌ Missing')
-      console.log('📧 REQUEST BODY:', requestBody)
-      console.log('📧 ==========================================')
 
       const requestStartTime = Date.now()
-      console.log('📧 Sending fetch request at:', new Date().toISOString())
       
       const response = await fetch(apiUrl, {
         method: requestMethod,
@@ -2610,9 +2330,6 @@ export function StaffBookingManagement() {
       })
 
       const requestDuration = Date.now() - requestStartTime
-      console.log('📧 Request Duration:', requestDuration + 'ms')
-      console.log('📧 Response Status:', response.status)
-      console.log('📧 Response OK:', response.ok)
 
       // Handle non-OK responses
       if (!response.ok) {
@@ -2621,7 +2338,6 @@ export function StaffBookingManagement() {
           errorData = await response.json()
         } catch (parseError) {
           const errorText = await response.text()
-          console.error('❌ Backend returned non-JSON error:', errorText)
           toast.error(`Error: ${response.status} ${response.statusText}`, {
             position: 'top-center',
             duration: 3000
@@ -2629,18 +2345,7 @@ export function StaffBookingManagement() {
           return null
         }
         
-        console.error('❌ ==========================================')
-        console.error('❌ API ERROR RESPONSE')
-        console.error('❌ ==========================================')
-        console.error('❌ Status:', response.status)
-        console.error('❌ Status Text:', response.statusText)
-        console.error('❌ Error Message:', errorData.message)
-        console.error('❌ Error Details:', errorData.error)
-        console.error('❌ Full Error Response:', JSON.stringify(errorData, null, 2))
-        console.error('❌ ==========================================')
-        
         if (response.status === 401) {
-          console.error('❌ Unauthorized: Token expired or invalid')
           toast.error(errorData.message || 'Authentication failed. Please log in again.', {
             position: 'top-center',
             duration: 3000
@@ -2655,19 +2360,10 @@ export function StaffBookingManagement() {
       }
 
       const result = await response.json()
-      console.log('📧 ==========================================')
-      console.log('📧 RESPONSE RESULT')
-      console.log('📧 ==========================================')
-      console.log('📧 Full Result:', JSON.stringify(result, null, 2))
-      console.log('📧 Success:', result.success)
-      console.log('📧 Message:', result.message)
-      console.log('📧 ==========================================')
 
       if (result.success) {
-        console.log('✅ Email sending success:', result)
         return result
       } else {
-        console.error('❌ Email sending failed:', result)
         toast.error(result.message || 'Failed to send emails', {
           position: 'top-center',
           duration: 3000
@@ -2675,14 +2371,6 @@ export function StaffBookingManagement() {
         return null
       }
     } catch (error: any) {
-      console.error('❌ ==========================================')
-      console.error('❌ FRONTEND - EMAIL SENDING EXCEPTION (STAFF)')
-      console.error('❌ ==========================================')
-      console.error('❌ Error Type:', error.constructor.name)
-      console.error('❌ Error Message:', error.message)
-      console.error('❌ Error Stack:', error.stack)
-      console.error('❌ Full Error:', error)
-
       toast.error('Failed to send emails. Please try again.', {
         position: 'top-center',
         duration: 3000
@@ -2692,14 +2380,7 @@ export function StaffBookingManagement() {
   }
 
   const sendEmailNotifications = async () => {
-    console.log('📧 ==========================================')
-    console.log('📧 EMAIL SENDING FUNCTION CALLED (STAFF)')
-    console.log('📧 ==========================================')
-    
     if (!selectedBookingForEmail || selectedEmailParticipants.length === 0) {
-      console.error('❌ EMAIL SEND ERROR: No booking or participants selected')
-      console.error('❌ selectedBookingForEmail:', selectedBookingForEmail)
-      console.error('❌ selectedEmailParticipants.length:', selectedEmailParticipants.length)
       toast.error('Please select participants to send emails to')
       return
     }
@@ -2714,7 +2395,6 @@ export function StaffBookingManagement() {
                     ''
       
       if (!token) {
-        console.error('❌ No authentication token found')
         toast.error('Authentication required. Please log in again.', {
           position: 'top-center',
           duration: 3000
@@ -2722,17 +2402,7 @@ export function StaffBookingManagement() {
         return
       }
       
-      console.log('📧 ==========================================')
-      console.log('📧 EMAIL SENDING - INITIAL DATA (NEW SIMPLIFIED API) - STAFF')
-      console.log('📧 ==========================================')
-      console.log('📧 Booking Title:', selectedBookingForEmail.title)
-      console.log('📧 Booking Date:', selectedBookingForEmail.date)
-      console.log('📧 Selected Participants Count:', selectedEmailParticipants.length)
-      console.log('📧 Email Type:', emailType)
-      console.log('📧 Token Available:', !!token)
-      
       if (!selectedEmailParticipants || selectedEmailParticipants.length === 0) {
-        console.error('❌ NO PARTICIPANTS SELECTED')
         toast.error('Please select at least one participant to send emails to', {
           position: 'top-center',
           duration: 3000
@@ -2749,7 +2419,6 @@ export function StaffBookingManagement() {
       )
       
       if (selectedParticipantsWithEmails.length === 0) {
-        console.error('❌ NO PARTICIPANTS WITH VALID EMAILS FOUND!')
         toast.error('No participants with valid emails found. Please select participants with email addresses.', {
           position: 'top-center',
           duration: 3000
@@ -2761,14 +2430,6 @@ export function StaffBookingManagement() {
       const participantEmails = selectedParticipantsWithEmails
         .map(p => p.email)
         .filter((email): email is string => !!email && email.trim() !== '')
-      
-      console.log('📧 ==========================================')
-      console.log('📧 SELECTED PARTICIPANTS WITH VALID EMAILS')
-      console.log('📧 ==========================================')
-      selectedParticipantsWithEmails.forEach((p, index) => {
-        console.log(`📧   ${index + 1}. ${p.full_name} (${p.email})`)
-      })
-      console.log('📧 Total emails to send:', participantEmails.length)
       
       // Format time - ensure it has seconds (HH:MM:SS)
       const formatTime = (time: string): string => {
@@ -2814,33 +2475,10 @@ export function StaffBookingManagement() {
         bookingRefId: selectedBookingForEmail.bookingRefId || '' // Include booking reference ID
       }
       
-      console.log('📧 ==========================================')
-      console.log('📧 PREPARED BOOKING DATA FOR NEW SIMPLIFIED API')
-      console.log('📧 ==========================================')
-      console.log('📧 meetingName:', bookingData.meetingName)
-      console.log('📧 date:', bookingData.date)
-      console.log('📧 startTime:', bookingData.startTime)
-      console.log('📧 endTime:', bookingData.endTime)
-      console.log('📧 place:', bookingData.place || '(not provided)')
-      console.log('📧 description:', bookingData.description || '(not provided)')
-      console.log('📧 participantEmails:', participantEmails)
-      console.log('📧 participantEmails count:', participantEmails.length)
-      console.log('📧 emailType:', bookingData.emailType)
-      console.log('📧 bookingRefId:', bookingData.bookingRefId || '(not provided)')
-      console.log('📧 ==========================================')
-      console.log('📧 USING NEW SIMPLIFIED API - NO BOOKING ID NEEDED!')
-      console.log('📧 ==========================================')
-      
       // Use the new simplified API function
       const result = await sendBookingEmailFromFrontend(bookingData)
       
       if (result && result.success) {
-        console.log('📧 ==========================================')
-        console.log('📧 EMAIL SENDING SUCCESS')
-        console.log('📧 ==========================================')
-        console.log('📧 Emails Sent:', result.data?.emailsSent)
-        console.log('📧 Emails Failed:', result.data?.emailsFailed)
-        console.log('📧 Total Participants:', result.data?.totalParticipants)
         
         // Show success alert popup
         if (result.data?.emailsFailed && result.data.emailsFailed > 0) {
@@ -2857,35 +2495,19 @@ export function StaffBookingManagement() {
         setSelectedEmailParticipants([])
         setBookingParticipants([])
       } else {
-        console.error('❌ ==========================================')
-        console.error('❌ EMAIL SENDING FAILED')
-        console.error('❌ ==========================================')
-        console.error('❌ Result:', result)
         // Show error alert popup
         setEmailAlertMessage(result?.message || 'Failed to send emails. Please try again.')
         setEmailAlertType("error")
         setIsEmailAlertDialogOpen(true)
       }
       
-      console.log('📧 ==========================================')
-      console.log('📧 EMAIL SENDING FUNCTION COMPLETED')
-      console.log('📧 ==========================================')
-      
     } catch (error: any) {
-      console.error('❌ ==========================================')
-      console.error('❌ EMAIL SENDING EXCEPTION')
-      console.error('❌ ==========================================')
-      console.error('❌ Error Type:', error.constructor.name)
-      console.error('❌ Error Message:', error.message)
-      console.error('❌ Error Stack:', error.stack)
-      console.error('❌ Full Error Object:', error)
       // Show error alert popup
-      setEmailAlertMessage(`Failed to send email notifications: ${error.message}`)
+      setEmailAlertMessage('Failed to send email notifications')
       setEmailAlertType("error")
       setIsEmailAlertDialogOpen(true)
     } finally {
       setIsSendingEmails(false)
-      console.log('📧 Email sending state reset (isSendingEmails = false)')
     }
   }
 
@@ -3693,7 +3315,7 @@ export function StaffBookingManagement() {
                         </div>
                       </TableCell>
                       <TableCell className="text-[12px]">
-                        <Badge {...getStatusBadgeProps(booking.status)} className="text-[11px]">{booking.status}</Badge>
+                        <Badge {...getStatusBadgeProps(booking.status)}>{booking.status}</Badge>
                       </TableCell>
                       <TableCell className="text-[12px]">
                         <div className="flex items-center gap-1.5 flex-wrap">

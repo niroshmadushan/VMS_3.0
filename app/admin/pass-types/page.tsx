@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { DashboardLayout } from "@/components/layout/dashboard-layout"
+import { RouteProtection } from "@/components/auth/route-protection"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -12,7 +13,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table"
 import { 
   Plus, Edit, Trash2, Eye, CreditCard, TrendingUp, 
-  CheckCircle, XCircle, AlertCircle, Ticket, Grid3x3
+  CheckCircle, XCircle, AlertCircle, Ticket, Grid3x3, AlertTriangle, Loader2
 } from "lucide-react"
 import { placeManagementAPI } from "@/lib/place-management-api"
 import toast from "react-hot-toast"
@@ -52,6 +53,9 @@ function PassTypesContent() {
   const [editingPassType, setEditingPassType] = useState<PassType | null>(null)
   const [viewingPassType, setViewingPassType] = useState<PassType | null>(null)
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false)
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [passTypeToDelete, setPassTypeToDelete] = useState<PassType | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   const [formData, setFormData] = useState({
     name: "",
@@ -327,56 +331,46 @@ function PassTypesContent() {
     const existingPasses = Array.isArray(response) ? 
       response.filter((p: any) => p.pass_type_id === passTypeId && !p.is_deleted) : []
     
-    const existingNumbers = existingPasses.map((p: any) => p.pass_number)
-    
-    // Add new passes
-    for (let i = newMin; i <= newMax; i++) {
-      if (!existingNumbers.includes(i)) {
-        const displayName = prefix ? `${prefix}-${String(i).padStart(3, '0')}` : String(i).padStart(3, '0')
-        await placeManagementAPI.insertRecord('passes', {
-          pass_type_id: passTypeId,
-          pass_number: i,
-          pass_display_name: displayName,
-          status: 'available',
-          is_active: true,
-          is_deleted: false
-        })
-      } else {
-        // Update display name if prefix changed
-        const existingPass = existingPasses.find((p: any) => p.pass_number === i)
-        if (existingPass) {
-          const newDisplayName = prefix ? `${prefix}-${String(i).padStart(3, '0')}` : String(i).padStart(3, '0')
-          if (existingPass.pass_display_name !== newDisplayName) {
-            await placeManagementAPI.updateRecord('passes',
-              { id: existingPass.id },
-              { pass_display_name: newDisplayName }
-            )
-          }
-        }
-      }
-    }
-    
-    // Soft delete passes outside the new range (only if they're available)
+    // Update existing passes within the new range (update display_name if prefix changed)
     for (const pass of existingPasses) {
-      if (pass.pass_number < newMin || pass.pass_number > newMax) {
+      if (pass.pass_number >= newMin && pass.pass_number <= newMax) {
+        // Pass is within new range, update display name if needed
+        const newDisplayName = prefix ? `${prefix}-${String(pass.pass_number).padStart(3, '0')}` : String(pass.pass_number).padStart(3, '0')
+        if (pass.pass_display_name !== newDisplayName) {
+          await placeManagementAPI.updateRecord('passes',
+            { id: pass.id },
+            { pass_display_name: newDisplayName }
+          )
+        }
+      } else {
+        // Pass is outside new range, soft delete if available
         if (pass.status === 'available') {
-          await placeManagementAPI.softDeleteRecord('passes', { id: pass.id })
+          await placeManagementAPI.softDeleteRecord('passes', pass.id)
         }
       }
     }
   }
 
-  const handleDelete = async (passType: PassType) => {
-    if (!confirm(`Are you sure you want to delete "${passType.name}"? This will also delete all associated passes.`)) {
-      return
-    }
+  const openDeleteDialog = (passType: PassType) => {
+    setPassTypeToDelete(passType)
+    setIsDeleteDialogOpen(true)
+  }
+
+  const handleDelete = async () => {
+    if (!passTypeToDelete) return
 
     try {
-      await placeManagementAPI.softDeleteRecord('pass_types', { id: passType.id })
-      toast.success('Pass type deleted')
+      setIsDeleting(true)
+      await placeManagementAPI.softDeleteRecord('pass_types', passTypeToDelete.id)
+      toast.success('Pass type deleted successfully')
+      setIsDeleteDialogOpen(false)
+      setPassTypeToDelete(null)
       loadPassTypes()
-    } catch (error) {
-      toast.error('Failed to delete pass type')
+    } catch (error: any) {
+      console.error('Error deleting pass type:', error)
+      toast.error(error?.message || 'Failed to delete pass type')
+    } finally {
+      setIsDeleting(false)
     }
   }
 
@@ -557,7 +551,7 @@ function PassTypesContent() {
                     <Button size="sm" variant="outline" className="h-8 w-8 p-0 dark:border-border dark:hover:bg-muted" onClick={() => handleOpenDialog(pt)}>
                       <Edit className="h-3.5 w-3.5" />
                     </Button>
-                    <Button size="sm" variant="destructive" className="h-8 w-8 p-0 dark:bg-red-600 dark:hover:bg-red-700" onClick={() => handleDelete(pt)}>
+                    <Button size="sm" variant="destructive" className="h-8 w-8 p-0 dark:bg-red-600 dark:hover:bg-red-700" onClick={() => openDeleteDialog(pt)}>
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>
                   </div>
@@ -599,20 +593,21 @@ function PassTypesContent() {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label>Prefix (Optional)</Label>
+                <Label className="text-[13px] dark:text-foreground">Prefix (Optional)</Label>
                 <Input 
                   value={formData.prefix} 
                   onChange={(e) => setFormData({...formData, prefix: e.target.value.toUpperCase()})}
                   placeholder="e.g., V, VIP, C"
                   maxLength={10}
+                  className="h-9 text-[13px] dark:bg-card dark:border-border dark:text-foreground"
                 />
-                <p className="text-xs text-muted-foreground mt-1">
+                <p className="text-xs text-muted-foreground mt-1 dark:text-muted-foreground">
                   Display: {formData.prefix || '#'}-001
                 </p>
               </div>
 
               <div>
-                <Label>Color *</Label>
+                <Label className="text-[13px] dark:text-foreground">Color *</Label>
                 <div className="flex gap-2">
                   <Input 
                     type="color"
@@ -624,7 +619,7 @@ function PassTypesContent() {
                     value={formData.color} 
                     onChange={(e) => setFormData({...formData, color: e.target.value})}
                     placeholder="#3B82F6"
-                    className="flex-1"
+                    className="flex-1 h-9 text-[13px] dark:bg-card dark:border-border dark:text-foreground"
                   />
                 </div>
               </div>
@@ -632,47 +627,49 @@ function PassTypesContent() {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label>Minimum Number *</Label>
+                <Label className="text-[13px] dark:text-foreground">Minimum Number *</Label>
                 <Input 
                   type="number"
                   min="1"
                   value={formData.min_number} 
                   onChange={(e) => setFormData({...formData, min_number: parseInt(e.target.value) || 1})}
                   required 
+                  className="h-9 text-[13px] dark:bg-card dark:border-border dark:text-foreground"
                 />
               </div>
 
               <div>
-                <Label>Maximum Number *</Label>
+                <Label className="text-[13px] dark:text-foreground">Maximum Number *</Label>
                 <Input 
                   type="number"
                   min={formData.min_number}
                   value={formData.max_number} 
                   onChange={(e) => setFormData({...formData, max_number: parseInt(e.target.value) || 10})}
                   required 
+                  className="h-9 text-[13px] dark:bg-card dark:border-border dark:text-foreground"
                 />
               </div>
             </div>
 
-            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-              <p className="text-sm font-semibold text-blue-900 mb-2">Preview:</p>
+            <div className="p-4 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+              <p className="text-sm font-semibold text-blue-900 dark:text-blue-400 mb-2">Preview:</p>
               <div className="flex items-center gap-2">
                 <Badge className="font-mono text-base px-3 py-1" style={{ backgroundColor: formData.color }}>
                   {formData.prefix || '#'}{String(formData.min_number).padStart(3, '0')}
                 </Badge>
-                <span className="text-muted-foreground">to</span>
+                <span className="text-muted-foreground dark:text-muted-foreground">to</span>
                 <Badge className="font-mono text-base px-3 py-1" style={{ backgroundColor: formData.color }}>
                   {formData.prefix || '#'}{String(formData.max_number).padStart(3, '0')}
                 </Badge>
-                <Badge variant="secondary" className="ml-auto">
+                <Badge variant="secondary" className="ml-auto dark:bg-secondary dark:text-secondary-foreground dark:border-border">
                   {formData.max_number - formData.min_number + 1} passes total
                 </Badge>
               </div>
             </div>
 
             {editingPassType && (
-              <div className="p-3 bg-yellow-50 border border-yellow-300 rounded-lg">
-                <p className="text-xs text-yellow-900 font-semibold flex items-center gap-2">
+              <div className="p-3 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-300 dark:border-yellow-800 rounded-lg">
+                <p className="text-xs text-yellow-900 dark:text-yellow-400 font-semibold flex items-center gap-2">
                   <AlertCircle className="h-4 w-4" />
                   Changing the range will add new passes or remove unused ones
                 </p>
@@ -700,12 +697,12 @@ function PassTypesContent() {
           {viewingPassType && (
             <div className="space-y-4">
               <div 
-                className="p-6 rounded-lg"
+                className="p-6 rounded-lg dark:bg-muted/30"
                 style={{ 
                   background: `linear-gradient(135deg, ${viewingPassType.color}20 0%, ${viewingPassType.color}40 100%)`
                 }}
               >
-                <h3 className="text-2xl font-bold mb-2 flex items-center gap-2">
+                <h3 className="text-2xl font-bold mb-2 flex items-center gap-2 dark:text-foreground">
                   <div 
                     className="w-6 h-6 rounded-full" 
                     style={{ backgroundColor: viewingPassType.color }}
@@ -713,54 +710,48 @@ function PassTypesContent() {
                   {viewingPassType.name}
                 </h3>
                 {viewingPassType.description && (
-                  <p className="text-muted-foreground">{viewingPassType.description}</p>
+                  <p className="text-muted-foreground dark:text-muted-foreground">{viewingPassType.description}</p>
                 )}
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                <div className="p-4 bg-gray-50 rounded-lg border">
-                  <p className="text-sm text-muted-foreground mb-1">Prefix</p>
-                  <p className="text-lg font-bold font-mono">{viewingPassType.prefix || 'None'}</p>
+                <div className="p-4 bg-gray-50 dark:bg-muted/50 rounded-lg border dark:border-border">
+                  <p className="text-sm text-muted-foreground dark:text-muted-foreground mb-1">Prefix</p>
+                  <p className="text-lg font-bold font-mono dark:text-foreground">{viewingPassType.prefix || 'None'}</p>
                 </div>
-                <div className="p-4 bg-gray-50 rounded-lg border">
-                  <p className="text-sm text-muted-foreground mb-1">Color Code</p>
-                  <p className="text-lg font-bold font-mono">{viewingPassType.color}</p>
+                <div className="p-4 bg-gray-50 dark:bg-muted/50 rounded-lg border dark:border-border">
+                  <p className="text-sm text-muted-foreground dark:text-muted-foreground mb-1">Color Code</p>
+                  <p className="text-lg font-bold font-mono dark:text-foreground">{viewingPassType.color}</p>
                 </div>
-                <div className="p-4 bg-gray-50 rounded-lg border">
-                  <p className="text-sm text-muted-foreground mb-1">Pass Range</p>
-                  <p className="text-lg font-bold">
+                <div className="p-4 bg-gray-50 dark:bg-muted/50 rounded-lg border dark:border-border">
+                  <p className="text-sm text-muted-foreground dark:text-muted-foreground mb-1">Pass Range</p>
+                  <p className="text-lg font-bold dark:text-foreground">
                     {viewingPassType.min_number} - {viewingPassType.max_number}
                   </p>
                 </div>
-                <div className="p-4 bg-gray-50 rounded-lg border">
-                  <p className="text-sm text-muted-foreground mb-1">Total Passes</p>
-                  <p className="text-lg font-bold">{viewingPassType.total_passes}</p>
+                <div className="p-4 bg-gray-50 dark:bg-muted/50 rounded-lg border dark:border-border">
+                  <p className="text-sm text-muted-foreground dark:text-muted-foreground mb-1">Total Passes</p>
+                  <p className="text-lg font-bold dark:text-foreground">{viewingPassType.total_passes}</p>
                 </div>
               </div>
 
               {getStatsForType(viewingPassType.id) && (
-                <div className="grid grid-cols-4 gap-3">
-                  <div className="p-4 bg-green-50 rounded-lg border-2 border-green-200 text-center">
-                    <p className="text-xs text-green-600 font-semibold mb-1">AVAILABLE</p>
-                    <p className="text-3xl font-bold text-green-900">
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="p-4 bg-green-50 dark:bg-green-950/20 rounded-lg border-2 border-green-200 dark:border-green-800 text-center">
+                    <p className="text-xs text-green-600 dark:text-green-400 font-semibold mb-1">AVAILABLE</p>
+                    <p className="text-3xl font-bold text-green-900 dark:text-green-400">
                       {getStatsForType(viewingPassType.id)!.available_count}
                     </p>
                   </div>
-                  <div className="p-4 bg-orange-50 rounded-lg border-2 border-orange-200 text-center">
-                    <p className="text-xs text-orange-600 font-semibold mb-1">ASSIGNED</p>
-                    <p className="text-3xl font-bold text-orange-900">
+                  <div className="p-4 bg-orange-50 dark:bg-orange-950/20 rounded-lg border-2 border-orange-200 dark:border-orange-800 text-center">
+                    <p className="text-xs text-orange-600 dark:text-orange-400 font-semibold mb-1">ASSIGNED</p>
+                    <p className="text-3xl font-bold text-orange-900 dark:text-orange-400">
                       {getStatsForType(viewingPassType.id)!.assigned_count}
                     </p>
                   </div>
-                  <div className="p-4 bg-red-50 rounded-lg border-2 border-red-200 text-center">
-                    <p className="text-xs text-red-600 font-semibold mb-1">LOST</p>
-                    <p className="text-3xl font-bold text-red-900">
-                      {getStatsForType(viewingPassType.id)!.lost_count}
-                    </p>
-                  </div>
-                  <div className="p-4 bg-blue-50 rounded-lg border-2 border-blue-200 text-center">
-                    <p className="text-xs text-blue-600 font-semibold mb-1">USAGE</p>
-                    <p className="text-3xl font-bold text-blue-900">
+                  <div className="p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg border-2 border-blue-200 dark:border-blue-800 text-center">
+                    <p className="text-xs text-blue-600 dark:text-blue-400 font-semibold mb-1">USAGE</p>
+                    <p className="text-3xl font-bold text-blue-900 dark:text-blue-400">
                       {getStatsForType(viewingPassType.id)!.utilization_percentage}%
                     </p>
                   </div>
@@ -768,15 +759,94 @@ function PassTypesContent() {
               )}
 
               <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setIsViewDialogOpen(false)}>
+                <Button variant="outline" onClick={() => setIsViewDialogOpen(false)} className="dark:border-border dark:text-foreground dark:hover:bg-muted">
                   Close
                 </Button>
                 <Button onClick={() => {
                   setIsViewDialogOpen(false)
                   handleOpenDialog(viewingPassType)
-                }}>
+                }} className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 dark:from-blue-500 dark:to-purple-500 dark:hover:from-blue-600 dark:hover:to-purple-600">
                   <Edit className="h-4 w-4 mr-2" />
                   Edit Pass Type
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent className="max-w-md dark:bg-card dark:border-border">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600 dark:text-red-400">
+              <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-full">
+                <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400" />
+              </div>
+              Delete Pass Type
+            </DialogTitle>
+          </DialogHeader>
+          
+          {passTypeToDelete && (
+            <div className="space-y-4">
+              <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                <p className="text-sm font-semibold text-red-900 dark:text-red-200 mb-2">
+                  Are you sure you want to delete this pass type?
+                </p>
+                <p className="text-xs text-red-700 dark:text-red-300 mb-3">
+                  This action will permanently mark the pass type as deleted. This action cannot be undone.
+                </p>
+                <div className="mt-3 pt-3 border-t border-red-200 dark:border-red-800">
+                  <p className="text-sm font-medium text-red-900 dark:text-red-200 mb-1">Pass Type Details:</p>
+                  <p className="text-sm text-muted-foreground dark:text-muted-foreground">
+                    <span className="font-semibold">{passTypeToDelete.name}</span>
+                    {passTypeToDelete.prefix && (
+                      <>
+                        <br />
+                        Prefix: <span className="font-medium">{passTypeToDelete.prefix}</span>
+                      </>
+                    )}
+                    <br />
+                    Total Passes: <span className="font-medium">{passTypeToDelete.total_passes}</span>
+                    {passTypeToDelete.description && (
+                      <>
+                        <br />
+                        Description: <span className="text-xs">{passTypeToDelete.description}</span>
+                      </>
+                    )}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-2 justify-end pt-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setIsDeleteDialogOpen(false)
+                    setPassTypeToDelete(null)
+                  }}
+                  disabled={isDeleting}
+                  className="dark:border-border dark:text-foreground"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={handleDelete}
+                  disabled={isDeleting}
+                  className="bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-700"
+                >
+                  {isDeleting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Deleting...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Delete Pass Type
+                    </>
+                  )}
                 </Button>
               </div>
             </div>
@@ -786,8 +856,6 @@ function PassTypesContent() {
     </div>
   )
 }
-
-import { RouteProtection } from "@/components/auth/route-protection"
 
 export default function PassTypesPage() {
   return (

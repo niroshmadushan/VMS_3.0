@@ -165,7 +165,9 @@ export function UserManagement() {
   const [isUserDialogOpen, setIsUserDialogOpen] = useState(false)
   const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false)
   const [isDeactivateDialogOpen, setIsDeactivateDialogOpen] = useState(false)
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [isCreateUserDialogOpen, setIsCreateUserDialogOpen] = useState(false)
+  const [userToDelete, setUserToDelete] = useState<User | null>(null)
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
   const [deactivateReason, setDeactivateReason] = useState('')
 
@@ -441,14 +443,12 @@ export function UserManagement() {
     }
   }
 
-  const handleDeleteUser = async (userId: string) => {
-    if (!confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
-      return
-    }
+  const handleDeleteUser = async () => {
+    if (!userToDelete) return
 
     try {
       setIsLoading(true)
-      const response = await fetch(`${API_BASE}/api/user-management/users/${userId}`, {
+      const response = await fetch(`${API_BASE}/api/user-management/users/${userToDelete.id}`, {
         method: 'DELETE',
         headers: getAuthHeaders()
       })
@@ -461,6 +461,8 @@ export function UserManagement() {
       
       if (data.success) {
         toast.success('User deleted successfully')
+        setIsDeleteDialogOpen(false)
+        setUserToDelete(null)
         loadUsers()
       } else {
         throw new Error(data.error || 'Failed to delete user')
@@ -591,6 +593,11 @@ export function UserManagement() {
     setIsDeactivateDialogOpen(true)
   }
 
+  const openDeleteDialog = (user: User) => {
+    setUserToDelete(user)
+    setIsDeleteDialogOpen(true)
+  }
+
   const getRoleBadgeVariant = (role: string) => {
     switch (role) {
       case 'admin': return 'default'
@@ -668,7 +675,7 @@ export function UserManagement() {
                       <div className="flex items-center gap-2">
                         <Users className="h-4 w-4 text-muted-foreground dark:text-muted-foreground" />
                         Total Users
-                      </div>
+                </div>
                     </TableCell>
                     <TableCell className="py-2.5 px-4 text-right dark:text-foreground">
                       <span className="text-xl font-bold">{statistics.overview.totalUsers}</span>
@@ -677,7 +684,7 @@ export function UserManagement() {
                       <div className="flex items-center gap-2">
                         <UserCheck className="h-4 w-4 text-green-600 dark:text-green-400" />
                         Active Users
-                      </div>
+                </div>
                     </TableCell>
                     <TableCell className="py-2.5 px-4 text-right dark:text-foreground">
                       <span className="text-xl font-bold text-green-600 dark:text-green-400">{statistics.overview.activeUsers}</span>
@@ -686,7 +693,7 @@ export function UserManagement() {
                       <div className="flex items-center gap-2">
                         <TrendingUp className="h-4 w-4 text-orange-600 dark:text-orange-400" />
                         Recent Registrations
-                      </div>
+              </div>
                     </TableCell>
                     <TableCell className="py-2.5 px-4 text-right dark:text-foreground">
                       <span className="text-xl font-bold text-orange-600 dark:text-orange-400">{statistics.overview.recentRegistrations}</span>
@@ -695,7 +702,7 @@ export function UserManagement() {
                       <div className="flex items-center gap-2">
                         <Activity className="h-4 w-4 text-purple-600 dark:text-purple-400" />
                         Active Logins
-                      </div>
+                </div>
                     </TableCell>
                     <TableCell className="py-2.5 px-4 text-right dark:text-foreground">
                       <span className="text-xl font-bold text-purple-600 dark:text-purple-400">{statistics.overview.recentActiveLogins}</span>
@@ -703,9 +710,9 @@ export function UserManagement() {
                   </TableRow>
                 </TableBody>
               </Table>
-            </div>
-          </CardContent>
-        </Card>
+              </div>
+            </CardContent>
+          </Card>
       )}
 
       {/* Main Content - All in One Line */}
@@ -715,57 +722,57 @@ export function UserManagement() {
           {/* Search */}
           <div className="flex-1 min-w-0 sm:min-w-[200px] relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground dark:text-muted-foreground z-10" />
-            <Input
-              placeholder="Search by name, email..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+                    <Input
+                      placeholder="Search by name, email..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10 w-full h-9 text-[13px] dark:bg-card dark:border-border dark:text-foreground"
-            />
-          </div>
+                    />
+                  </div>
 
           {/* Filters and Button Container */}
           <div className="flex items-center gap-2 flex-wrap">
             {/* Role Filter */}
-            <Select value={roleFilter || "all"} onValueChange={(value) => setRoleFilter(value === "all" ? "" : value)}>
+                  <Select value={roleFilter || "all"} onValueChange={(value) => setRoleFilter(value === "all" ? "" : value)}>
               <SelectTrigger className="w-full sm:w-[130px] h-9 text-[13px] dark:bg-card dark:border-border dark:text-foreground">
-                <SelectValue placeholder="Role" />
-              </SelectTrigger>
+                      <SelectValue placeholder="Role" />
+                    </SelectTrigger>
               <SelectContent className="dark:bg-card dark:border-border">
                 <SelectItem value="all" className="dark:text-foreground dark:hover:bg-muted text-[13px]">All Roles</SelectItem>
                 <SelectItem value="admin" className="dark:text-foreground dark:hover:bg-muted text-[13px]">Administrator</SelectItem>
                 <SelectItem value="staff" className="dark:text-foreground dark:hover:bg-muted text-[13px]">Staff</SelectItem>
                 <SelectItem value="assistant" className="dark:text-foreground dark:hover:bg-muted text-[13px]">Smart Assistant</SelectItem>
-              </SelectContent>
-            </Select>
+                    </SelectContent>
+                  </Select>
 
             {/* Status Filter */}
-            <Select value={statusFilter || "all"} onValueChange={(value) => setStatusFilter(value === "all" ? "" : value)}>
+                  <Select value={statusFilter || "all"} onValueChange={(value) => setStatusFilter(value === "all" ? "" : value)}>
               <SelectTrigger className="w-full sm:w-[130px] h-9 text-[13px] dark:bg-card dark:border-border dark:text-foreground">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
+                      <SelectValue placeholder="Status" />
+                    </SelectTrigger>
               <SelectContent className="dark:bg-card dark:border-border">
                 <SelectItem value="all" className="dark:text-foreground dark:hover:bg-muted text-[13px]">All Status</SelectItem>
                 <SelectItem value="active" className="dark:text-foreground dark:hover:bg-muted text-[13px]">Active</SelectItem>
                 <SelectItem value="inactive" className="dark:text-foreground dark:hover:bg-muted text-[13px]">Inactive</SelectItem>
-              </SelectContent>
-            </Select>
+                    </SelectContent>
+                  </Select>
 
             {/* Create Button */}
-            <Button
-              onClick={() => setIsCreateUserDialogOpen(true)}
+                  <Button
+                    onClick={() => setIsCreateUserDialogOpen(true)}
               className="h-9 px-3 text-[13px] bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 dark:from-blue-500 dark:to-purple-500 dark:hover:from-blue-600 dark:hover:to-purple-600 shadow-lg whitespace-nowrap"
-            >
+                  >
               <UserPlus className="h-3.5 w-3.5 mr-1.5" />
               Create User
-            </Button>
+                  </Button>
 
             {/* Tabs */}
             <TabsList className="h-9 dark:bg-muted dark:border-border ml-auto">
               <TabsTrigger value="users" className="text-[13px] px-3 dark:data-[state=active]:bg-background dark:data-[state=active]:text-foreground">👥 Users</TabsTrigger>
               <TabsTrigger value="analytics" className="text-[13px] px-3 dark:data-[state=active]:bg-background dark:data-[state=active]:text-foreground">📊 Analytics</TabsTrigger>
             </TabsList>
-          </div>
-        </div>
+                </div>
+              </div>
 
         {/* Users Tab */}
         <TabsContent value="users" className="space-y-3 mt-3">
@@ -807,139 +814,139 @@ export function UserManagement() {
                             <TableHead className="font-semibold text-[13px] min-w-[140px] dark:text-foreground">Last Login</TableHead>
                             <TableHead className="font-semibold text-[13px] min-w-[110px] dark:text-foreground">Created</TableHead>
                             <TableHead className="font-semibold text-[13px] text-center min-w-[180px] sticky right-0 bg-background dark:bg-card z-10 shadow-[2px_0_5px_rgba(0,0,0,0.1)] dark:shadow-[2px_0_5px_rgba(255,255,255,0.1)] dark:text-foreground">Actions</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                      </Table>
+                        </TableRow>
+                      </TableHeader>
+                    </Table>
                     </div>
                   </div>
                   <div className="max-h-[calc(7*48px)] overflow-y-auto table-scroll-container-vertical">
                     <div className="overflow-x-auto table-scroll-container">
                       <div className="inline-block min-w-full align-middle">
                         <Table className="w-full dark:bg-card" style={{ minWidth: 'max-content' }}>
-                          <TableBody>
-                            {users.map((user) => (
+                        <TableBody>
+                          {users.map((user) => (
                               <TableRow key={user.id} className="hover:bg-muted/50 dark:hover:bg-muted/30 transition-colors dark:border-border">
                                 <TableCell className="min-w-[180px] text-[13px] dark:text-foreground">
                                   <div className="space-y-0.5">
                                     <p className="font-semibold dark:text-foreground">
-                                      {user.first_name && user.last_name 
-                                        ? `${user.first_name} ${user.last_name}`
-                                        : 'No Name Set'
-                                      }
-                                    </p>
+                                    {user.first_name && user.last_name 
+                                      ? `${user.first_name} ${user.last_name}`
+                                      : 'No Name Set'
+                                    }
+                                  </p>
                                     <p className="text-xs text-muted-foreground dark:text-muted-foreground">{user.email}</p>
-                                    {user.phone && (
+                                  {user.phone && (
                                       <p className="text-xs text-muted-foreground dark:text-muted-foreground flex items-center gap-1">
-                                        <Phone className="h-3 w-3" />
-                                        {user.phone}
-                                      </p>
-                                    )}
-                                  </div>
-                                </TableCell>
+                                      <Phone className="h-3 w-3" />
+                                      {user.phone}
+                                    </p>
+                                  )}
+                                </div>
+                              </TableCell>
                                 <TableCell className="min-w-[140px] text-[13px] dark:text-foreground">
                                   <div className="space-y-0.5">
-                                    {user.city && user.country && (
+                                  {user.city && user.country && (
                                       <p className="text-xs flex items-center gap-1 dark:text-foreground">
                                         <MapPin className="h-3 w-3 text-muted-foreground dark:text-muted-foreground" />
-                                        {user.city}, {user.country}
-                                      </p>
-                                    )}
-                                    {user.website && (
+                                      {user.city}, {user.country}
+                                    </p>
+                                  )}
+                                  {user.website && (
                                       <p className="text-xs flex items-center gap-1">
                                         <Globe className="h-3 w-3 text-muted-foreground dark:text-muted-foreground" />
                                         <a href={user.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">
-                                          Website
-                                        </a>
-                                      </p>
-                                    )}
-                                  </div>
-                                </TableCell>
+                                        Website
+                                      </a>
+                                    </p>
+                                  )}
+                                </div>
+                              </TableCell>
                                 <TableCell className="min-w-[90px]">
                                   <Badge variant={getRoleBadgeVariant(user.role)} className="text-[11px] dark:border-border">
-                                    {user.role.toUpperCase()}
-                                  </Badge>
-                                </TableCell>
+                                  {user.role.toUpperCase()}
+                                </Badge>
+                              </TableCell>
                                 <TableCell className="min-w-[90px]">
-                                  {getStatusBadge(user)}
-                                </TableCell>
+                                {getStatusBadge(user)}
+                              </TableCell>
                                 <TableCell className="min-w-[140px] text-[13px] dark:text-foreground">
                                   <div>
                                     <p className="text-xs dark:text-foreground">{formatDateTime(user.last_login)}</p>
-                                    {user.login_attempts > 0 && (
+                                  {user.login_attempts > 0 && (
                                       <p className="text-red-600 dark:text-red-400 text-[11px]">
-                                        {user.login_attempts} failed attempts
-                                      </p>
-                                    )}
-                                  </div>
-                                </TableCell>
+                                      {user.login_attempts} failed attempts
+                                    </p>
+                                  )}
+                                </div>
+                              </TableCell>
                                 <TableCell className="min-w-[110px] text-[13px] dark:text-foreground">
                                   <p className="text-xs dark:text-foreground">{formatDate(user.user_created_at)}</p>
-                                </TableCell>
+                              </TableCell>
                                 <TableCell className="min-w-[180px] sticky right-0 bg-background dark:bg-card z-10 shadow-[2px_0_5px_rgba(0,0,0,0.1)] dark:shadow-[2px_0_5px_rgba(255,255,255,0.1)]">
-                                  <div className="flex items-center gap-1 justify-center">
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() => openUserDialog(user)}
-                                      title="Edit User"
+                                <div className="flex items-center gap-1 justify-center">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => openUserDialog(user)}
+                                    title="Edit User"
                                       className="h-7 px-2 text-[11px] dark:border-border dark:hover:bg-muted"
-                                    >
+                                  >
                                       <Edit className="h-3.5 w-3.5" />
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() => openProfileDialog(user)}
-                                      title="Edit Profile"
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => openProfileDialog(user)}
+                                    title="Edit Profile"
                                       className="h-7 px-2 text-[11px] dark:border-border dark:hover:bg-muted"
-                                    >
+                                  >
                                       <Eye className="h-3.5 w-3.5" />
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() => handleSendPasswordReset(user.id)}
-                                      title="Send Password Reset"
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleSendPasswordReset(user.id)}
+                                    title="Send Password Reset"
                                       className="h-7 px-2 text-[11px] dark:border-border dark:hover:bg-muted"
-                                    >
+                                  >
                                       <Mail className="h-3.5 w-3.5" />
-                                    </Button>
-                                    {user.status === 'active' ? (
-                                      <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() => openDeactivateDialog(user)}
-                                        title="Deactivate User"
-                                        className="h-7 px-2 text-[11px] dark:border-border dark:hover:bg-muted"
-                                      >
-                                        <ShieldX className="h-3.5 w-3.5" />
-                                      </Button>
-                                    ) : (
-                                      <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() => handleActivateUser(user.id)}
-                                        title="Activate User"
-                                        className="h-7 px-2 text-[11px] dark:border-border dark:hover:bg-muted"
-                                      >
-                                        <ShieldCheck className="h-3.5 w-3.5" />
-                                      </Button>
-                                    )}
+                                  </Button>
+                                  {user.status === 'active' ? (
                                     <Button
                                       size="sm"
                                       variant="outline"
-                                      onClick={() => handleDeleteUser(user.id)}
-                                      title="Delete User"
-                                      className="h-7 px-2 text-[11px] text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 dark:border-border dark:hover:bg-muted"
+                                      onClick={() => openDeactivateDialog(user)}
+                                      title="Deactivate User"
+                                        className="h-7 px-2 text-[11px] dark:border-border dark:hover:bg-muted"
                                     >
-                                      <Trash2 className="h-3.5 w-3.5" />
+                                        <ShieldX className="h-3.5 w-3.5" />
                                     </Button>
-                                  </div>
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
+                                  ) : (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => handleActivateUser(user.id)}
+                                      title="Activate User"
+                                        className="h-7 px-2 text-[11px] dark:border-border dark:hover:bg-muted"
+                                    >
+                                        <ShieldCheck className="h-3.5 w-3.5" />
+                                    </Button>
+                                  )}
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                      onClick={() => openDeleteDialog(user)}
+                                    title="Delete User"
+                                      className="h-7 px-2 text-[11px] text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 dark:border-border dark:hover:bg-muted"
+                                  >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
                       </div>
                     </div>
                   </div>
@@ -948,34 +955,34 @@ export function UserManagement() {
             </CardContent>
           </Card>
 
-          {/* Pagination */}
-          {pagination.totalPages > 1 && (
+              {/* Pagination */}
+              {pagination.totalPages > 1 && (
             <div className="flex items-center justify-between mt-3 px-2">
               <p className="text-xs text-muted-foreground dark:text-muted-foreground">
-                Showing {((pagination.page - 1) * pagination.limit) + 1} to {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} users
-              </p>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
-                  disabled={pagination.page === 1}
+                    Showing {((pagination.page - 1) * pagination.limit) + 1} to {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} users
+                  </p>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
+                      disabled={pagination.page === 1}
                   className="h-8 text-[12px] dark:border-border dark:hover:bg-muted"
-                >
-                  Previous
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
-                  disabled={pagination.page === pagination.totalPages}
+                    >
+                      Previous
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
+                      disabled={pagination.page === pagination.totalPages}
                   className="h-8 text-[12px] dark:border-border dark:hover:bg-muted"
-                >
-                  Next
-                </Button>
-              </div>
-            </div>
-          )}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              )}
         </TabsContent>
 
         {/* Analytics Tab */}
@@ -1304,6 +1311,79 @@ export function UserManagement() {
         </DialogContent>
       </Dialog>
 
+      {/* Delete User Dialog */}
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600 dark:text-red-400">
+              <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-full">
+                <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400" />
+              </div>
+              Delete User
+            </DialogTitle>
+          </DialogHeader>
+          
+          {userToDelete && (
+            <div className="space-y-4">
+              <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                <p className="text-sm font-semibold text-red-900 dark:text-red-200 mb-2">
+                  Are you sure you want to delete this user?
+                </p>
+                <p className="text-xs text-red-700 dark:text-red-300 mb-3">
+                  This action will permanently remove the user from the system. This action cannot be undone.
+                </p>
+                <div className="mt-3 pt-3 border-t border-red-200 dark:border-red-800">
+                  <p className="text-sm font-medium text-red-900 dark:text-red-200 mb-1">User Details:</p>
+                  <p className="text-sm text-muted-foreground dark:text-muted-foreground">
+                    <span className="font-semibold">{userToDelete.full_name}</span>
+                    <br />
+                    {userToDelete.email}
+                    {userToDelete.role && (
+                      <>
+                        <br />
+                        Role: <span className="font-medium">{userToDelete.role}</span>
+                      </>
+                    )}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-2 justify-end pt-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setIsDeleteDialogOpen(false)
+                    setUserToDelete(null)
+                  }}
+                  disabled={isLoading}
+                  className="dark:border-border dark:text-foreground"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={handleDeleteUser}
+                  disabled={isLoading}
+                  className="bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-700"
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Deleting...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Delete User
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       {/* Create User Dialog */}
       <Dialog open={isCreateUserDialogOpen} onOpenChange={setIsCreateUserDialogOpen}>
         <DialogContent className="max-w-md">
@@ -1523,6 +1603,79 @@ export function UserManagement() {
               </Button>
             </div>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete User Dialog */}
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600 dark:text-red-400">
+              <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-full">
+                <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400" />
+              </div>
+              Delete User
+            </DialogTitle>
+          </DialogHeader>
+          
+          {userToDelete && (
+            <div className="space-y-4">
+              <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                <p className="text-sm font-semibold text-red-900 dark:text-red-200 mb-2">
+                  Are you sure you want to delete this user?
+                </p>
+                <p className="text-xs text-red-700 dark:text-red-300 mb-3">
+                  This action will permanently remove the user from the system. This action cannot be undone.
+                </p>
+                <div className="mt-3 pt-3 border-t border-red-200 dark:border-red-800">
+                  <p className="text-sm font-medium text-red-900 dark:text-red-200 mb-1">User Details:</p>
+                  <p className="text-sm text-muted-foreground dark:text-muted-foreground">
+                    <span className="font-semibold">{userToDelete.full_name}</span>
+                    <br />
+                    {userToDelete.email}
+                    {userToDelete.role && (
+                      <>
+                        <br />
+                        Role: <span className="font-medium">{userToDelete.role}</span>
+                      </>
+                    )}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-2 justify-end pt-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setIsDeleteDialogOpen(false)
+                    setUserToDelete(null)
+                  }}
+                  disabled={isLoading}
+                  className="dark:border-border dark:text-foreground"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={handleDeleteUser}
+                  disabled={isLoading}
+                  className="bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-700"
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Deleting...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Delete User
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

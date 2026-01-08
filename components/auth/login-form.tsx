@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 import { Eye, EyeOff, Loader2, Mail, Lock, UserCircle, User } from "lucide-react"
 import { useAuth } from '@/lib/auth-context'
 
@@ -27,9 +28,7 @@ export function LoginForm() {
 
   // Check if user is already logged in and redirect
   useEffect(() => {
-    console.log('useEffect triggered - isAuthenticated:', isAuthenticated, 'user:', user)
     if (isAuthenticated && user) {
-      console.log('User is authenticated, redirecting to:', `/${user.role}`)
       router.push(`/${user.role}`)
     }
   }, [isAuthenticated, user, router])
@@ -40,46 +39,29 @@ export function LoginForm() {
     setError(null)
     setSuccess(null)
 
-    console.log('=== LOGIN DEBUG START ===')
-    console.log('Email:', email)
-    console.log('Password:', password ? '***' : 'empty')
-
     try {
-      console.log('Calling signIn function...')
       const result = await signIn(email, password)
-      console.log('SignIn result:', result)
 
       if (result.success) {
-        console.log('Login successful!')
-        console.log('OTP Required:', result.data?.otpRequired)
-        
         if (result.data?.otpRequired) {
-          console.log('Setting OTP required to true')
           setOtpRequired(true)
           setSuccess('Verification code sent to your email. Please check your inbox.')
         } else {
-          console.log('Direct login success - auth state should be updated')
           setSuccess('Login successful! Redirecting to dashboard...')
           // Get user role from the response data
           const userRole = result.data?.user?.role || 'staff'
-          console.log('User role from response:', userRole)
-          console.log('User data stored in AuthManager, redirecting...')
           
           // Small delay to ensure auth state is propagated
           setTimeout(() => {
-            console.log('Redirecting to:', `/${userRole}`)
             router.push(`/${userRole}`)
           }, 500)
         }
       } else {
-        console.log('Login failed:', result.error)
         setError(result.error || 'Login failed. Please try again.')
       }
     } catch (error) {
-      console.error('Error during login:', error)
       setError('An unexpected error occurred. Please try again.')
     } finally {
-      console.log('=== LOGIN DEBUG END ===')
       setIsLoading(false)
     }
   }
@@ -103,7 +85,6 @@ export function LoginForm() {
         setError(result.error || 'Invalid verification code. Please try again.')
       }
     } catch (error) {
-      console.error('Error during OTP verification:', error)
       setError('An unexpected error occurred. Please try again.')
     } finally {
       setIsLoading(false)
@@ -247,34 +228,19 @@ export function LoginForm() {
             )}
         </div>
 
-        <div className="relative">
-          <div className="absolute inset-0 flex items-center">
-            <span className="w-full border-t border-border/50" />
-          </div>
-          <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-card px-2 text-muted-foreground">Demo Credentials</span>
-          </div>
-        </div>
-
-        <div className="space-y-3 p-4 bg-muted/30 rounded-lg border border-border/30">
-          <p className="text-sm font-medium text-foreground">Quick Access:</p>
-          <div className="grid gap-2 text-xs">
-            <div className="flex justify-between items-center p-2 bg-background/50 rounded border border-border/30">
-              <span className="font-medium text-primary">Administrator</span>
-              <span className="text-muted-foreground">admin@smartvisitor.com</span>
-            </div>
-            <div className="flex justify-between items-center p-2 bg-background/50 rounded border border-border/30">
-              <span className="font-medium text-secondary">Reception</span>
-              <span className="text-muted-foreground">reception@smartvisitor.com</span>
-            </div>
-            <div className="flex justify-between items-center p-2 bg-background/50 rounded border border-border/30">
-              <span className="font-medium text-accent">Employee</span>
-              <span className="text-muted-foreground">employee@smartvisitor.com</span>
-            </div>
-          </div>
-          <p className="text-xs text-muted-foreground text-center">
-            Password: <span className="font-mono">password</span>
+        <div className="mt-6 text-center">
+          <p className="text-sm text-muted-foreground mb-3">
+            Don't have an account?
           </p>
+          <Link href="/auth/secure-signup">
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full border-primary text-primary hover:bg-primary hover:text-primary-foreground"
+            >
+              Sign Up
+            </Button>
+          </Link>
         </div>
       </CardContent>
     </Card>

@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
@@ -184,7 +184,6 @@ export default function NewBookingPage() {
   // Confirmation Dialog State
   const [isCancelConfirmDialogOpen, setIsCancelConfirmDialogOpen] = useState(false)
   const [isCreateConfirmDialogOpen, setIsCreateConfirmDialogOpen] = useState(false)
-  const [shouldSubmitForm, setShouldSubmitForm] = useState(false)
   
   const [newExternalParticipant, setNewExternalParticipant] = useState({
     fullName: "",
@@ -202,6 +201,7 @@ export default function NewBookingPage() {
   const [refreshmentTypes, setRefreshmentTypes] = useState<Array<{id: string, name: string, code: string}>>([])
   const [refreshmentItems, setRefreshmentItems] = useState<Array<{id: string, name: string, type_id: string}>>([])
   const [availableItemsForType, setAvailableItemsForType] = useState<Array<{id: string, name: string}>>([])
+  const [selectedRefreshmentItem, setSelectedRefreshmentItem] = useState<string>("")
 
   // Load refreshment types and items
   useEffect(() => {
@@ -292,10 +292,19 @@ export default function NewBookingPage() {
         
         const bookingsData: any[] = Array.isArray(bookingsResponse) ? bookingsResponse : []
         
-        // Filter out cancelled bookings - they don't block time slots
+        // Filter out cancelled bookings - they don't block time slots (treat as free time)
+        // A booking is considered cancelled if:
+        // 1. status field is 'cancelled' (case-insensitive)
+        // 2. cancelled_at field is not null/empty
         const activeBookings = bookingsData.filter((booking: any) => {
-          const status = booking.status?.toLowerCase()
-          return status !== 'cancelled'
+          const status = booking.status?.toLowerCase()?.trim()
+          const isCancelled = status === 'cancelled' || !!booking.cancelled_at
+          
+          if (isCancelled) {
+            console.log(`🚫 Excluding cancelled booking: ${booking.title} (ID: ${booking.id}, Status: ${booking.status})`)
+          }
+          
+          return !isCancelled
         })
         
         const transformedBookings: Booking[] = activeBookings.map((booking: any) => {
@@ -318,7 +327,7 @@ export default function NewBookingPage() {
           }
         })
         
-        console.log(`📋 Loaded ${transformedBookings.length} active bookings (excluded ${bookingsData.length - activeBookings.length} cancelled bookings)`)
+        console.log(`✅ Loaded ${transformedBookings.length} active bookings (excluded ${bookingsData.length - activeBookings.length} cancelled bookings)`)
         setExistingBookings(transformedBookings)
       } catch (error) {
         console.error('Failed to fetch bookings:', error)
@@ -337,7 +346,7 @@ export default function NewBookingPage() {
       const startTime = params.get('startTime')
       const endTime = params.get('endTime')
       
-      console.log('🔗 URL Parameters:', { place, date, startTime, endTime })
+      console.log('📋 URL Parameters:', { place, date, startTime, endTime })
       
       if (place || date || startTime || endTime) {
         setFormData(prev => ({
@@ -362,7 +371,9 @@ export default function NewBookingPage() {
   // Helper function to get day of week
   const getDayOfWeek = (dateString: string) => {
     const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
-    const date = new Date(dateString + 'T00:00:00')
+    // Parse date string (YYYY-MM-DD) and create date in local timezone to avoid timezone issues
+    const [year, month, day] = dateString.split('-').map(Number)
+    const date = new Date(year, month - 1, day) // month is 0-indexed in Date constructor
     return days[date.getDay()]
   }
 
@@ -460,35 +471,43 @@ export default function NewBookingPage() {
         else return `${mins}min`
       }
 
-      // Check if selected date is today
-      const today = new Date().toISOString().split('T')[0]
-      const isToday = formData.date === today
-      
-      // Get current time in minutes (add 1 minute buffer to ensure future times)
-      const now = new Date()
-      const currentMinutes = now.getHours() * 60 + now.getMinutes() + 1 // Add 1 minute buffer
-
       const openMinutes = timeToMinutes(openTime)
       const closeMinutes = timeToMinutes(closeTime)
       
-      // If today, start from current time (minimum open time)
-      const effectiveStartMinutes = isToday ? Math.max(openMinutes, currentMinutes) : openMinutes
+      // Always use the full available time range from opening time (no filtering by current time)
+      const effectiveStartMinutes = openMinutes
 
       // Get existing bookings for this date and place
-      // Filter bookings: same date, same place, and exclude cancelled bookings
-      // Note: cancelled bookings are already filtered out when fetching, but double-check here
+      // Filter bookings: same date, same place
+      // NOTE: Cancelled bookings are already excluded in the fetchBookings function above
+      // They are treated as free time slots and don't block new bookings
+      // Normalize formData.date to ensure proper comparison (handle any format issues)
+      const normalizedSelectedDate = formData.date.trim()
+      
       const relevantBookings = existingBookings.filter(booking => {
+        // Normalize booking date for comparison
+        let bookingDate = booking.date
+        if (bookingDate && typeof bookingDate === 'string') {
+          // Extract date part if it's a datetime string
+          if (bookingDate.includes('T') || bookingDate.includes(' ')) {
+            bookingDate = bookingDate.split('T')[0].split(' ')[0]
+          }
+          bookingDate = bookingDate.trim()
+        }
+        
         const placeMatches = booking.placeId ? booking.placeId === formData.place : booking.place === selectedPlace.name
-        return booking.date === formData.date && placeMatches && booking.startTime && booking.endTime
+        const dateMatches = bookingDate === normalizedSelectedDate
+        
+        return dateMatches && placeMatches && booking.startTime && booking.endTime
       }).map(booking => ({
         start: timeToMinutes(booking.startTime),
         end: timeToMinutes(booking.endTime),
         title: booking.title
       })).sort((a, b) => a.start - b.start)
       
-      console.log(`📋 Found ${relevantBookings.length} active bookings for ${formData.date} at ${selectedPlace.name} (cancelled bookings excluded)`)
+      console.log(`✅ Found ${relevantBookings.length} active bookings for ${formData.date} at ${selectedPlace.name} (cancelled bookings excluded)`)
 
-      console.log('📋 Relevant bookings for gap calculation:', relevantBookings)
+      console.log('✅ Relevant bookings for gap calculation:', relevantBookings)
 
       // Find gaps
       const gaps: {start: string, end: string, duration: string}[] = []
@@ -569,9 +588,9 @@ export default function NewBookingPage() {
       startTimes.push(minutesToTime(time))
     }
 
-    console.log(`🕐 Gap: ${gap.start} - ${gap.end} (${gapEndMinutes - gapStartMinutes} min)`)
-    console.log(`⏰ Min duration: ${minDuration} min, Interval: ${slotInterval} min`)
-    console.log(`📍 Last possible start: ${minutesToTime(lastPossibleStart)} (allows ${minDuration}min until ${gap.end})`)
+    console.log(`⏰ Gap: ${gap.start} - ${gap.end} (${gapEndMinutes - gapStartMinutes} min)`)
+    console.log(`⏱️ Min duration: ${minDuration} min, Interval: ${slotInterval} min`)
+    console.log(`⏰ Last possible start: ${minutesToTime(lastPossibleStart)} (allows ${minDuration}min until ${gap.end})`)
     console.log(`✅ Available start times:`, startTimes)
 
     setAvailableStartTimes(startTimes)
@@ -614,8 +633,8 @@ export default function NewBookingPage() {
       endTimes.push(minutesToTime(time))
     }
 
-    console.log(`🕐 Start time: ${formData.startTime}, Gap ends: ${selectedGapEnd}`)
-    console.log(`⏰ Min end: ${minutesToTime(minEndMinutes)} (${minDuration}min from start)`)
+    console.log(`⏰ Start time: ${formData.startTime}, Gap ends: ${selectedGapEnd}`)
+    console.log(`⏱️ Min end: ${minutesToTime(minEndMinutes)} (${minDuration}min from start)`)
     console.log(`✅ Available end times:`, endTimes)
 
     setAvailableEndTimes(endTimes)
@@ -839,16 +858,12 @@ export default function NewBookingPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    // If confirmation dialog should be shown, show it instead of submitting
-    if (!shouldSubmitForm) {
-      setIsCreateConfirmDialogOpen(true)
-      return
-    }
-    
-    // Reset the flag for next time
-    setShouldSubmitForm(false)
+    // Show confirmation dialog
+    setIsCreateConfirmDialogOpen(true)
+  }
 
-    // 🛡️ COMPREHENSIVE VALIDATION
+  const handleCreateBooking = async () => {
+    // ✅ COMPREHENSIVE VALIDATION
     console.log('🔍 Starting validation...')
     
     // Validate booking data
@@ -911,7 +926,7 @@ export default function NewBookingPage() {
       const bookingId = generateUUID()
       const bookingRefId = generateBookingRefId()
 
-      console.log('📝 Generated Booking Reference ID:', bookingRefId)
+      console.log('🔖 Generated Booking Reference ID:', bookingRefId)
 
       // Get current time in Sri Lanka timezone (UTC+5:30)
       // Returns UTC time that represents the current Sri Lanka local time
@@ -957,7 +972,7 @@ export default function NewBookingPage() {
       
       const currentTimestamp = getSriLankaTimestamp()
 
-      // 🛡️ Sanitize all data before sending to API
+      // ✅ Sanitize all data before sending to API
       const sanitizedBookingData = sanitizeObject({
         id: bookingId,
         booking_ref_id: bookingRefId,
@@ -1433,7 +1448,7 @@ export default function NewBookingPage() {
 
   // Refreshments management
   const addRefreshmentItem = (item: string) => {
-    if (!formData.refreshments.items.includes(item)) {
+    if (item && !formData.refreshments.items.includes(item)) {
       setFormData({
         ...formData,
         refreshments: {
@@ -1441,16 +1456,24 @@ export default function NewBookingPage() {
           items: [...formData.refreshments.items, item],
         },
       })
+      // Reset the select after adding
+      setSelectedRefreshmentItem("")
     }
   }
 
   const removeRefreshmentItem = (item: string) => {
-    setFormData({
-      ...formData,
-      refreshments: {
-        ...formData.refreshments,
-        items: formData.refreshments.items.filter((i) => i !== item),
-      },
+    console.log('removeRefreshmentItem called with:', item)
+    console.log('Current items:', formData.refreshments.items)
+    setFormData((prev) => {
+      const filtered = prev.refreshments.items.filter((i) => i !== item)
+      console.log('Filtered items:', filtered)
+      return {
+        ...prev,
+        refreshments: {
+          ...prev.refreshments,
+          items: filtered,
+        },
+      }
     })
   }
 
@@ -2026,7 +2049,7 @@ export default function NewBookingPage() {
                   </div>
                 )}
                 <p className="text-xs text-blue-700 dark:text-blue-400">
-                  💡 Search for existing members to auto-fill details and track visits
+                  🔍 Search for existing members to auto-fill details and track visits
                 </p>
               </div>
 
@@ -2278,39 +2301,70 @@ export default function NewBookingPage() {
                     {formData.refreshments.items.map((item) => (
                       <Badge key={item} variant="secondary" className="flex items-center gap-1 dark:bg-muted dark:text-foreground">
                         {item}
-                        <X className="h-3 w-3 cursor-pointer" onClick={() => removeRefreshmentItem(item)} />
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            e.preventDefault()
+                            console.log('Removing item:', item)
+                            removeRefreshmentItem(item)
+                          }}
+                          className="ml-1 hover:text-red-500 dark:hover:text-red-400 transition-colors cursor-pointer"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
                       </Badge>
                     ))}
                   </div>
                   <Select 
-                    onValueChange={(value) => addRefreshmentItem(value)}
-                    disabled={!formData.refreshments.type || availableItemsForType.length === 0}
+                    value={selectedRefreshmentItem}
+                    onValueChange={(value) => {
+                      addRefreshmentItem(value)
+                      setSelectedRefreshmentItem("")
+                    }}
+                    disabled={!formData.refreshments.type || availableItemsForType.filter(item => !formData.refreshments.items.includes(item.name)).length === 0}
                   >
                     <SelectTrigger className="dark:bg-card dark:border-border dark:text-foreground">
                       <SelectValue placeholder={
                         !formData.refreshments.type 
                           ? "Select type first" 
-                          : availableItemsForType.length === 0
-                          ? "No items available"
+                          : availableItemsForType.filter(item => !formData.refreshments.items.includes(item.name)).length === 0
+                          ? "No more items available"
                           : "Add item"
                       } />
                     </SelectTrigger>
                     <SelectContent className="dark:bg-card dark:border-border">
                       {availableItemsForType.length > 0 ? (
-                        availableItemsForType.map((item) => (
-                          <SelectItem key={item.id} value={item.name} className="dark:text-foreground dark:hover:bg-muted">
-                            {item.name}
-                          </SelectItem>
-                        ))
+                        availableItemsForType
+                          .filter(item => !formData.refreshments.items.includes(item.name))
+                          .map((item) => (
+                            <SelectItem key={item.id} value={item.name} className="dark:text-foreground dark:hover:bg-muted">
+                              {item.name}
+                            </SelectItem>
+                          ))
                       ) : (
                         <>
-                          <SelectItem value="Coffee" className="dark:text-foreground dark:hover:bg-muted">Coffee</SelectItem>
-                          <SelectItem value="Tea" className="dark:text-foreground dark:hover:bg-muted">Tea</SelectItem>
-                          <SelectItem value="Water" className="dark:text-foreground dark:hover:bg-muted">Water</SelectItem>
-                          <SelectItem value="Juice" className="dark:text-foreground dark:hover:bg-muted">Juice</SelectItem>
-                          <SelectItem value="Cookies" className="dark:text-foreground dark:hover:bg-muted">Cookies</SelectItem>
-                          <SelectItem value="Sandwiches" className="dark:text-foreground dark:hover:bg-muted">Sandwiches</SelectItem>
-                          <SelectItem value="Lunch" className="dark:text-foreground dark:hover:bg-muted">Lunch</SelectItem>
+                          {!formData.refreshments.items.includes("Coffee") && (
+                            <SelectItem value="Coffee" className="dark:text-foreground dark:hover:bg-muted">Coffee</SelectItem>
+                          )}
+                          {!formData.refreshments.items.includes("Tea") && (
+                            <SelectItem value="Tea" className="dark:text-foreground dark:hover:bg-muted">Tea</SelectItem>
+                          )}
+                          {!formData.refreshments.items.includes("Water") && (
+                            <SelectItem value="Water" className="dark:text-foreground dark:hover:bg-muted">Water</SelectItem>
+                          )}
+                          {!formData.refreshments.items.includes("Juice") && (
+                            <SelectItem value="Juice" className="dark:text-foreground dark:hover:bg-muted">Juice</SelectItem>
+                          )}
+                          {!formData.refreshments.items.includes("Cookies") && (
+                            <SelectItem value="Cookies" className="dark:text-foreground dark:hover:bg-muted">Cookies</SelectItem>
+                          )}
+                          {!formData.refreshments.items.includes("Sandwiches") && (
+                            <SelectItem value="Sandwiches" className="dark:text-foreground dark:hover:bg-muted">Sandwiches</SelectItem>
+                          )}
+                          {!formData.refreshments.items.includes("Lunch") && (
+                            <SelectItem value="Lunch" className="dark:text-foreground dark:hover:bg-muted">Lunch</SelectItem>
+                          )}
                         </>
                       )}
                     </SelectContent>
@@ -2501,21 +2555,7 @@ export default function NewBookingPage() {
             <Button
               onClick={() => {
                 setIsCreateConfirmDialogOpen(false)
-                setShouldSubmitForm(true)
-                // Trigger form submission after dialog closes
-                setTimeout(() => {
-                  const form = document.querySelector('form') as HTMLFormElement
-                  if (form) {
-                    // Create a synthetic submit event
-                    const syntheticEvent = {
-                      preventDefault: () => {},
-                      stopPropagation: () => {},
-                      target: form,
-                      currentTarget: form
-                    } as any
-                    handleSubmit(syntheticEvent)
-                  }
-                }, 150)
+                handleCreateBooking()
               }}
               disabled={isSubmitting}
               className="min-w-[100px] bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 dark:from-blue-500 dark:to-purple-500 dark:hover:from-blue-600 dark:hover:to-purple-600"
@@ -2526,7 +2566,7 @@ export default function NewBookingPage() {
                   Creating...
                 </>
               ) : (
-                'Yes, Create'
+                'Create Booking'
               )}
             </Button>
           </DialogFooter>

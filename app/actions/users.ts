@@ -25,7 +25,7 @@ async function sendCredentialsEmail(email: string, password: string): Promise<vo
         <p>Your account has been created.</p>
         <p><strong>Email:</strong> ${email}</p>
         <p><strong>Temporary Password:</strong> ${password}</p>
-        <p>Please log in at <a href="${process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'}/auth/login">here</a> and change your password immediately.</p>
+        <p>Please log in at <a href="${process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'}/login">here</a> and change your password immediately.</p>
       `,
     })
 

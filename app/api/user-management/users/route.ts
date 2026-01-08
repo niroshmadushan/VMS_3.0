@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
+// Force dynamic rendering for this API route
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
@@ -15,9 +19,6 @@ export async function GET(request: NextRequest) {
   try {
     // Check environment variables
     if (!supabaseUrl || !supabaseServiceKey) {
-      console.error('Missing Supabase environment variables')
-      console.error('NEXT_PUBLIC_SUPABASE_URL:', supabaseUrl ? 'Set' : 'Missing')
-      console.error('SUPABASE_SERVICE_ROLE_KEY:', supabaseServiceKey ? 'Set' : 'Missing')
       return NextResponse.json({ 
         error: 'Server configuration error: Missing Supabase credentials',
         details: {
@@ -34,8 +35,6 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get('search') || ''
     const role = searchParams.get('role') || ''
     const status = searchParams.get('status') || ''
-
-    console.log('User Management API - GET /users', { page, limit, search, role, status })
 
     // Calculate offset
     const offset = (page - 1) * limit
@@ -73,7 +72,6 @@ export async function GET(request: NextRequest) {
       .order('created_at', { ascending: false })
 
     if (error) {
-      console.error('Error fetching users:', error)
       return NextResponse.json({ error: 'Failed to fetch users' }, { status: 500 })
     }
 
@@ -120,7 +118,6 @@ export async function GET(request: NextRequest) {
               status: profile.is_active ? 'active' : 'inactive'
             }
           } catch (error) {
-            console.error(`Error fetching auth for user ${profile.id}:`, error)
             // Return user data without auth info if there's an error
             return {
               id: profile.id,
@@ -175,9 +172,6 @@ export async function GET(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('User management API error:', error)
-    console.error('Error details:', error instanceof Error ? error.message : 'Unknown error')
-    console.error('Stack trace:', error instanceof Error ? error.stack : 'No stack trace')
     return NextResponse.json({ 
       error: 'Internal server error',
       message: error instanceof Error ? error.message : 'Unknown error',

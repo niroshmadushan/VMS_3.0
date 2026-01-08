@@ -206,6 +206,7 @@ export default function StaffNewBookingPage() {
   const [refreshmentTypes, setRefreshmentTypes] = useState<Array<{id: string, name: string, code: string}>>([])
   const [refreshmentItems, setRefreshmentItems] = useState<Array<{id: string, name: string, type_id: string}>>([])
   const [availableItemsForType, setAvailableItemsForType] = useState<Array<{id: string, name: string}>>([])
+  const [selectedRefreshmentItem, setSelectedRefreshmentItem] = useState<string>("")
 
   // Load refreshment types and items
   useEffect(() => {
@@ -227,8 +228,7 @@ export default function StaffNewBookingPage() {
         const itemsData = Array.isArray(itemsResponse) ? itemsResponse : itemsResponse?.data || []
         setRefreshmentItems(itemsData)
       } catch (error) {
-        console.error('Error loading refreshments:', error)
-        // Fallback to default types if table doesn't exist
+        // Silent fail - fallback to default types if table doesn't exist
         setRefreshmentTypes([
           { id: '1', name: 'Beverages', code: 'beverages' },
           { id: '2', name: 'Light Snacks', code: 'light_snacks' },
@@ -252,14 +252,8 @@ export default function StaffNewBookingPage() {
           .filter(item => item.type_id === selectedType.id)
           .map(item => ({ id: item.id, name: item.name }))
         
-        console.log(`🔄 Selected refreshment type: ${selectedType.name} (${selectedType.code})`)
-        console.log(`📋 Available items for type "${selectedType.name}":`, filtered)
-        console.log(`📊 Total items found: ${filtered.length}`)
-        
         // If no items found in loaded data, try to fetch from API
         if (filtered.length === 0 && selectedType.id) {
-          console.log(`⚠️ No items found in loaded data, fetching from API for type ID: ${selectedType.id}`)
-          
           // Fetch items for this specific type from API
           placeManagementAPI.getTableData('refreshment_items', {
             is_deleted: 'false',
@@ -270,19 +264,15 @@ export default function StaffNewBookingPage() {
               .filter((item: any) => String(item.type_id) === String(selectedType.id))
               .map((item: any) => ({ id: item.id, name: item.name }))
             
-            console.log(`✅ Fetched items from API for type "${selectedType.name}":`, itemsForType)
-            console.log(`📊 API returned ${itemsForType.length} items`)
-            
             setAvailableItemsForType(itemsForType)
           }).catch((error) => {
-            console.error('❌ Error fetching items from API:', error)
+            // Silent fail - set empty array on error
             setAvailableItemsForType([])
           })
         } else {
           setAvailableItemsForType(filtered)
         }
       } else {
-        console.log(`❌ Type not found for code: ${formData.refreshments.type}`)
         setAvailableItemsForType([])
       }
     } else {
@@ -330,7 +320,7 @@ export default function StaffNewBookingPage() {
         
         setUsers(filteredUsers)
       } catch (error) {
-        console.error('Failed to fetch users:', error)
+        // Silent fail - users list will remain empty
       } finally {
         setIsLoadingUsers(false)
       }
@@ -378,10 +368,9 @@ export default function StaffNewBookingPage() {
           }
         })
         
-        console.log(`📋 Loaded ${transformedBookings.length} active bookings (excluded ${bookingsData.length - activeBookings.length} cancelled bookings)`)
         setExistingBookings(transformedBookings)
       } catch (error) {
-        console.error('Failed to fetch bookings:', error)
+        // Silent fail - bookings list will remain empty
       }
     }
     
@@ -396,8 +385,6 @@ export default function StaffNewBookingPage() {
       const date = params.get('date')
       const startTime = params.get('startTime')
       const endTime = params.get('endTime')
-      
-      console.log('🔗 URL Parameters:', { place, date, startTime, endTime })
       
       if (place || date || startTime || endTime) {
         setFormData(prev => ({
@@ -464,8 +451,7 @@ export default function StaffNewBookingPage() {
         setAvailablePlaces(availablePlacesForDate)
         
       } catch (error: any) {
-        console.error('Failed to fetch available places:', error)
-        toast.error(error.message || 'Failed to load available places', {
+        toast.error('Failed to load available places', {
           position: 'top-center',
           duration: 4000
         })
@@ -534,10 +520,6 @@ export default function StaffNewBookingPage() {
         end: timeToMinutes(booking.endTime),
         title: booking.title
       })).sort((a, b) => a.start - b.start)
-      
-      console.log(`📋 Found ${relevantBookings.length} active bookings for ${formData.date} at ${selectedPlace.name} (cancelled bookings excluded)`)
-
-      console.log('📋 Relevant bookings for gap calculation:', relevantBookings)
 
       // Find gaps
       const gaps: {start: string, end: string, duration: string}[] = []
@@ -569,7 +551,6 @@ export default function StaffNewBookingPage() {
         }
       }
 
-      console.log('✅ Available gaps:', gaps)
       setAvailableTimeGaps(gaps)
     }
 
@@ -618,11 +599,6 @@ export default function StaffNewBookingPage() {
       startTimes.push(minutesToTime(time))
     }
 
-    console.log(`🕐 Gap: ${gap.start} - ${gap.end} (${gapEndMinutes - gapStartMinutes} min)`)
-    console.log(`⏰ Min duration: ${minDuration} min, Interval: ${slotInterval} min`)
-    console.log(`📍 Last possible start: ${minutesToTime(lastPossibleStart)} (allows ${minDuration}min until ${gap.end})`)
-    console.log(`✅ Available start times:`, startTimes)
-
     setAvailableStartTimes(startTimes)
     setSelectedGapStart(gap.start)
     setSelectedGapEnd(gap.end)
@@ -663,10 +639,6 @@ export default function StaffNewBookingPage() {
       endTimes.push(minutesToTime(time))
     }
 
-    console.log(`🕐 Start time: ${formData.startTime}, Gap ends: ${selectedGapEnd}`)
-    console.log(`⏰ Min end: ${minutesToTime(minEndMinutes)} (${minDuration}min from start)`)
-    console.log(`✅ Available end times:`, endTimes)
-
     setAvailableEndTimes(endTimes)
 
   }, [formData.startTime, selectedGapEnd, availablePlaces, formData.place])
@@ -700,9 +672,6 @@ export default function StaffNewBookingPage() {
     for (let time = startMinutes; time <= lastServingTime; time += interval) {
       servingTimes.push(minutesToTime(time))
     }
-
-    console.log(`🍽️ Serving time options: ${formData.startTime} to ${minutesToTime(lastServingTime)} (15-min intervals)`)
-    console.log(`✅ Total options:`, servingTimes.length)
 
     setServingTimeOptions(servingTimes)
 
@@ -775,7 +744,6 @@ export default function StaffNewBookingPage() {
   // Send email notifications to selected participants
   const sendEmailNotifications = async (bookingData: any, bookingRefId: string) => {
     if (selectedEmailParticipants.length === 0) {
-      console.log('📧 No participants selected for email notifications')
       return
     }
 
@@ -786,18 +754,13 @@ export default function StaffNewBookingPage() {
         .map(email => email.trim())
       
       if (validEmails.length === 0) {
-        console.log('📧 No valid email addresses found')
         return
       }
-
-      console.log('📧 Sending email notifications to:', validEmails)
-      console.log('📧 Booking Reference ID:', bookingRefId)
       
       // Get authentication token
       const token = localStorage.getItem('authToken') || localStorage.getItem('jwt_token') || localStorage.getItem('token')
       
       if (!token) {
-        console.error('❌ No authentication token found')
         toast.error('Authentication required. Please log in again.', {
           position: 'top-center',
           duration: 4000,
@@ -826,10 +789,6 @@ export default function StaffNewBookingPage() {
         bookingRefId: bookingRefId // Include booking reference ID - this will be stored in booking_ref_id column in database
       }
 
-      console.log('📧 Email data prepared:', emailData)
-      console.log('📧 Booking Reference ID included:', bookingRefId)
-      console.log('📧 Total valid emails:', validEmails.length)
-
       // Call the simplified email API endpoint
       const response = await fetch('/api/booking-email/send-from-frontend', {
         method: 'POST',
@@ -841,9 +800,6 @@ export default function StaffNewBookingPage() {
       })
 
       const result = await response.json()
-
-      console.log('📧 Email API response status:', response.status)
-      console.log('📧 Email API response:', result)
 
       if (!response.ok) {
         throw new Error(result.message || result.error || 'Failed to send emails')
@@ -871,8 +827,7 @@ export default function StaffNewBookingPage() {
       }
       
     } catch (error: any) {
-      console.error('Failed to send email notifications:', error)
-      toast.error(`Failed to send email notifications: ${error.message}`, {
+      toast.error('Failed to send email notifications', {
         position: 'top-center',
         duration: 4000,
         icon: '❌'
@@ -894,8 +849,6 @@ export default function StaffNewBookingPage() {
     setShouldSubmitForm(false)
 
     // 🛡️ COMPREHENSIVE VALIDATION
-    console.log('🔍 Starting validation...')
-    
     // Validate booking data
     const bookingValidation = validateBookingData(formData)
     if (!bookingValidation.isValid) {
@@ -904,7 +857,6 @@ export default function StaffNewBookingPage() {
         duration: 4000,
         icon: '❌'
       })
-      console.error('Validation errors:', bookingValidation.errors)
       return
     }
 
@@ -917,7 +869,6 @@ export default function StaffNewBookingPage() {
           duration: 4000,
           icon: '❌'
         })
-        console.error('Participant validation errors:', participantValidation.errors)
         return
       }
     }
@@ -932,7 +883,6 @@ export default function StaffNewBookingPage() {
 
     try {
       setIsSubmitting(true)
-      console.log('✅ Validation passed, creating booking...')
 
       const generateUUID = () => {
         return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
@@ -955,8 +905,6 @@ export default function StaffNewBookingPage() {
       const selectedPlace = availablePlaces.find(p => p.id === formData.place)
       const bookingId = generateUUID()
       const bookingRefId = generateBookingRefId()
-
-      console.log('📝 Generated Booking Reference ID:', bookingRefId)
 
       // Get current time in Sri Lanka timezone (UTC+5:30)
       // Returns UTC time that represents the current Sri Lanka local time
@@ -1027,7 +975,6 @@ export default function StaffNewBookingPage() {
         updated_at: currentTimestamp
       })
 
-      console.log('✅ Data sanitized, sending to API...')
       await placeManagementAPI.insertRecord('bookings', sanitizedBookingData)
 
       // Insert participants with sanitization
@@ -1076,17 +1023,14 @@ export default function StaffNewBookingPage() {
           if (existingMember) {
             // Use existing member ID and increment visit count
             memberId = existingMember.id
-            console.log('✅ Using existing member:', existingMember.full_name, 'ID:', memberId)
             await placeManagementAPI.updateRecord('external_members', { id: memberId }, {
               visit_count: (existingMember.visit_count || 0) + 1,
               last_visit_date: getSriLankaTimestamp()
             })
-            console.log('✅ Updated visit count for existing member')
           } else {
             // Create new member record in external_members table FIRST
             // This ensures the member exists before linking to booking
             memberId = generateUUID()
-            console.log('➕ Creating new member in external_members table:', participant.fullName, 'ID:', memberId)
             
             const memberData = sanitizeObject({
               id: memberId,
@@ -1105,7 +1049,6 @@ export default function StaffNewBookingPage() {
             
             // Wait for member creation to complete
             await placeManagementAPI.insertRecord('external_members', memberData)
-            console.log('✅ Successfully created new member in external_members table')
             
             // Verify member was created (optional check)
             const verifyResponse = await placeManagementAPI.getTableData('external_members', {
@@ -1116,11 +1059,9 @@ export default function StaffNewBookingPage() {
             if (!foundMember) {
               throw new Error(`Failed to verify member creation for ${participant.fullName}`)
             }
-            console.log('✅ Verified member exists in external_members table')
           }
         } catch (error) {
-          console.error('❌ Member check/create failed:', error)
-          toast.error(`Failed to process external member ${participant.fullName}: ${error}`, {
+          toast.error(`Failed to process external member ${participant.fullName}`, {
             position: 'top-center',
             duration: 4000
           })
@@ -1130,7 +1071,6 @@ export default function StaffNewBookingPage() {
         // Wait for member to be created, then insert external participant record
         // This ensures both records are created: external_members AND external_participants
         const participantId = generateUUID()
-        console.log('➕ Creating external_participant record for member:', memberId, 'Participant ID:', participantId)
         
         const participantData = sanitizeObject({
           id: participantId,
@@ -1146,7 +1086,6 @@ export default function StaffNewBookingPage() {
         
         // Wait for participant creation to complete in external_participants table
         await placeManagementAPI.insertRecord('external_participants', participantData)
-        console.log('✅ Successfully created external_participant record in external_participants table')
 
         hasExternalParticipants = true
       }
@@ -1159,10 +1098,6 @@ export default function StaffNewBookingPage() {
       }
 
       // All database operations completed - booking, participants, and external members are all saved
-      console.log('✅ All database operations completed successfully')
-      console.log('✅ Booking ID:', bookingId)
-      console.log('✅ External members created:', formData.externalParticipants.length)
-
       // Insert refreshments with sanitization
       if (formData.refreshments.required) {
         await placeManagementAPI.insertRecord('booking_refreshments', sanitizeObject({
@@ -1189,11 +1124,6 @@ export default function StaffNewBookingPage() {
         .map(p => p.email.trim())
       setSelectedEmailParticipants(allParticipantsWithEmails)
 
-      console.log('📧 All participants with emails:', allParticipantsWithEmails)
-      console.log('📧 External participants count:', formData.externalParticipants.length)
-      console.log('📧 External participants with emails:', formData.externalParticipants.filter(p => p.email && p.email.trim() !== '').length)
-      console.log('📧 Booking Reference ID for emails:', bookingRefId)
-
       // Send email notifications to all participants (including external members)
       // bookingRefId will be included in email data and stored in booking_ref_id column in database
       await sendEmailNotifications(sanitizedBookingData, bookingRefId)
@@ -1202,8 +1132,7 @@ export default function StaffNewBookingPage() {
       router.push('/staff/bookings')
 
     } catch (error: any) {
-      console.error('Failed to create booking:', error)
-      toast.error(error.message || 'Failed to create booking', {
+      toast.error('Failed to create booking', {
         position: 'top-center',
         duration: 4000,
         icon: '❌'
@@ -1268,7 +1197,7 @@ export default function StaffNewBookingPage() {
       
       setSearchedMembers(filtered)
     } catch (error) {
-      console.error('Failed to search members:', error)
+      // Silent fail - search results will remain empty
     }
   }
 
@@ -1405,16 +1334,10 @@ export default function StaffNewBookingPage() {
           return
         }
         // Use existing member from database (this ensures data consistency)
-        console.log('✅ Found existing member in database:', existing)
-        console.log('📝 User entered:', trimmedParticipant)
-        console.log('🔄 Using database member data for consistency')
         selectExistingMember(existing)
         return
       }
-      
-      console.log('✅ No existing member found, adding as new participant with user-entered data')
     } catch (error) {
-      console.error('❌ Duplicate check failed:', error)
       // Continue to add as new if check fails
     }
 
@@ -1426,9 +1349,7 @@ export default function StaffNewBookingPage() {
       phone: trimmedParticipant.phone,
       referenceType: trimmedParticipant.referenceType,
       referenceValue: trimmedParticipant.referenceValue,
-    }
-
-    console.log('➕ Adding new external participant (not in database):', participant)
+      }
 
     setFormData({
       ...formData,
@@ -1493,7 +1414,6 @@ export default function StaffNewBookingPage() {
           toast.error('Member not found in database')
         }
       } catch (error) {
-        console.error('Error loading member:', error)
         toast.error('Failed to load member details')
       }
     } else {
@@ -1571,8 +1491,7 @@ export default function StaffNewBookingPage() {
       setIsEditMemberDialogOpen(false)
       setEditingExternalMember(null)
     } catch (error: any) {
-      console.error('Error updating member:', error)
-      toast.error(error.message || 'Failed to update member', { position: 'top-center' })
+      toast.error('Failed to update member', { position: 'top-center' })
     } finally {
       setIsUpdatingMember(false)
     }
@@ -1580,7 +1499,7 @@ export default function StaffNewBookingPage() {
 
   // Refreshments management
   const addRefreshmentItem = (item: string) => {
-    if (!formData.refreshments.items.includes(item)) {
+    if (item && !formData.refreshments.items.includes(item)) {
       setFormData({
         ...formData,
         refreshments: {
@@ -1588,16 +1507,21 @@ export default function StaffNewBookingPage() {
           items: [...formData.refreshments.items, item],
         },
       })
+      // Reset the select after adding
+      setSelectedRefreshmentItem("")
     }
   }
 
   const removeRefreshmentItem = (item: string) => {
-    setFormData({
-      ...formData,
-      refreshments: {
-        ...formData.refreshments,
-        items: formData.refreshments.items.filter((i) => i !== item),
-      },
+    setFormData((prev) => {
+      const filtered = prev.refreshments.items.filter((i) => i !== item)
+      return {
+        ...prev,
+        refreshments: {
+          ...prev.refreshments,
+          items: filtered,
+        },
+      }
     })
   }
 
@@ -2344,30 +2268,46 @@ export default function StaffNewBookingPage() {
                     {formData.refreshments.items.map((item) => (
                       <Badge key={item} variant="secondary" className="flex items-center gap-1 dark:bg-muted dark:text-foreground">
                         {item}
-                        <X className="h-3 w-3 cursor-pointer" onClick={() => removeRefreshmentItem(item)} />
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            e.preventDefault()
+                            removeRefreshmentItem(item)
+                          }}
+                          className="ml-1 hover:text-red-500 dark:hover:text-red-400 transition-colors cursor-pointer"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
                       </Badge>
                     ))}
                   </div>
                   <Select 
-                    onValueChange={(value) => addRefreshmentItem(value)}
-                    disabled={!formData.refreshments.type || availableItemsForType.length === 0}
+                    value={selectedRefreshmentItem}
+                    onValueChange={(value) => {
+                      addRefreshmentItem(value)
+                      setSelectedRefreshmentItem("")
+                    }}
+                    disabled={!formData.refreshments.type || availableItemsForType.filter(item => !formData.refreshments.items.includes(item.name)).length === 0}
                   >
                     <SelectTrigger className="dark:bg-card dark:border-border dark:text-foreground">
                       <SelectValue placeholder={
                         !formData.refreshments.type 
                           ? "Select type first" 
-                          : availableItemsForType.length === 0
-                          ? "No items available"
+                          : availableItemsForType.filter(item => !formData.refreshments.items.includes(item.name)).length === 0
+                          ? "No more items available"
                           : "Add item"
                       } />
                     </SelectTrigger>
                     <SelectContent className="dark:bg-card dark:border-border">
                       {availableItemsForType.length > 0 ? (
-                        availableItemsForType.map((item) => (
-                          <SelectItem key={item.id} value={item.name} className="dark:text-foreground dark:hover:bg-muted">
-                            {item.name}
-                          </SelectItem>
-                        ))
+                        availableItemsForType
+                          .filter(item => !formData.refreshments.items.includes(item.name))
+                          .map((item) => (
+                            <SelectItem key={item.id} value={item.name} className="dark:text-foreground dark:hover:bg-muted">
+                              {item.name}
+                            </SelectItem>
+                          ))
                       ) : (
                         <>
                           <SelectItem value="Coffee" className="dark:text-foreground dark:hover:bg-muted">Coffee</SelectItem>

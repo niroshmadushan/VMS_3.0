@@ -142,8 +142,7 @@ export function StaffExternalMembersView() {
         return true
       }
     } catch (error) {
-      console.error('Error checking duplicates in database:', error)
-      // Continue with local check if database check fails
+      // Silent fail - continue with local check if database check fails
     }
     
     // Check company + email combination if company is provided
@@ -243,8 +242,7 @@ export function StaffExternalMembersView() {
       // Reload members
       await loadMembers()
     } catch (error: any) {
-      console.error('Error saving external member:', error)
-      toast.error(error.message || 'Failed to save member. Please try again.', {
+      toast.error('Failed to save member. Please try again.', {
         position: 'top-center',
         duration: 4000
       })

@@ -940,6 +940,23 @@ export default function UpdateBookingPage() {
     try {
       setIsSubmitting(true)
 
+      // Fetch booking data to get booking_ref_id
+      let bookingData: any = null
+      try {
+        const bookingResponse = await placeManagementAPI.getTableData('bookings', {
+          is_deleted: 'false',
+          limit: 500
+        })
+        const allBookings = Array.isArray(bookingResponse) ? bookingResponse : bookingResponse?.data || []
+        bookingData = allBookings.find((b: any) => b.id === bookingId)
+        if (!bookingData) {
+          console.warn('⚠️ Booking data not found, will generate new booking_ref_id if needed')
+        }
+      } catch (error) {
+        console.error('Failed to fetch booking data:', error)
+        // Continue anyway - we'll generate booking_ref_id if needed
+      }
+
       const generateUUID = () => {
         return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
           const r = Math.random() * 16 | 0
@@ -1292,7 +1309,11 @@ export default function UpdateBookingPage() {
           booking_ref_id: currentBookingRefId
         })
         // Update local bookingData for email sending
-        bookingData = { ...bookingData, booking_ref_id: currentBookingRefId }
+        if (bookingData) {
+          bookingData = { ...bookingData, booking_ref_id: currentBookingRefId }
+        } else {
+          bookingData = { booking_ref_id: currentBookingRefId }
+        }
       }
 
       // Collect all participant emails for email notifications
@@ -1320,7 +1341,13 @@ export default function UpdateBookingPage() {
       // Send email notifications if there are participants
       if (allParticipantEmails.length > 0) {
         try {
-          await sendEmailNotifications(updatedBookingData, currentBookingRefId, allParticipantEmails)
+          // Merge updatedBookingData with bookingData to ensure all fields are available
+          const emailBookingData = {
+            ...bookingData,
+            ...updatedBookingData,
+            booking_ref_id: currentBookingRefId
+          }
+          await sendEmailNotifications(emailBookingData, currentBookingRefId, allParticipantEmails)
         } catch (emailError) {
           console.error('Failed to send email notifications:', emailError)
           // Don't fail the update if email fails
@@ -1590,7 +1617,9 @@ export default function UpdateBookingPage() {
           toast.error(`${existing.full_name} is blacklisted: ${existing.blacklist_reason}`)
           return
         }
-        toast.info(`Using existing member: ${existing.full_name}`)
+        toast(`Using existing member: ${existing.full_name}`, {
+          icon: 'ℹ️'
+        })
         selectExistingMember(existing)
         return
       }
@@ -1797,9 +1826,10 @@ export default function UpdateBookingPage() {
                       setSelectedTimeGap('')
                       setAvailableTimeGaps([])
                       
-                      toast.info('Date changed. Please reselect place and time slot.', {
+                      toast('Date changed. Please reselect place and time slot.', {
                         position: 'top-center',
-                        duration: 3000
+                        duration: 3000,
+                        icon: 'ℹ️'
                       })
                     }}
                     required
@@ -1822,9 +1852,10 @@ export default function UpdateBookingPage() {
                       })
                       setSelectedTimeGap('')
                       setAvailableTimeGaps([])
-                      toast.info('Place changed. Please reselect time slot.', {
+                      toast('Place changed. Please reselect time slot.', {
                         position: 'top-center',
-                        duration: 2000
+                        duration: 2000,
+                        icon: 'ℹ️'
                       })
                     }}
                     disabled={!formData.date || isLoadingPlaces}
