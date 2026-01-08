@@ -1,15 +1,30 @@
 import { NextResponse } from 'next/server'
-import { Resend } from 'resend'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
+// Lazy load Resend only when needed to avoid build-time errors
+async function getResend() {
+  const { Resend } = await import('resend')
+  const apiKey = process.env.RESEND_API_KEY
+  if (!apiKey) {
+    throw new Error('RESEND_API_KEY is not configured')
+  }
+  return new Resend(apiKey)
+}
 
 export async function POST(req: Request) {
-  console.log('API route /api/send-email called with method: POST')
   try {
     const { to, name, action, changes } = await req.json()
     if (!to || !name || !action) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
+
+    // Check if Resend is configured
+    if (!process.env.RESEND_API_KEY) {
+      return NextResponse.json({ 
+        error: 'Email service is not configured. Please set RESEND_API_KEY environment variable.' 
+      }, { status: 500 })
+    }
+
+    const resend = await getResend()
 
     const subject = {
       welcome: 'Welcome to the Platform',
@@ -35,13 +50,13 @@ export async function POST(req: Request) {
     })
 
     if (error) {
-      console.error('Email send error:', error)
       return NextResponse.json({ error: `Failed to send email: ${error.message}` }, { status: 500 })
     }
 
     return NextResponse.json({ message: 'Email sent successfully' }, { status: 200 })
   } catch (error) {
-    console.error('Error sending email:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ 
+      error: error instanceof Error ? error.message : 'An error occurred while sending email' 
+    }, { status: 500 })
   }
 }

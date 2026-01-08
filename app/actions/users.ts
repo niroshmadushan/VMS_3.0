@@ -3,19 +3,31 @@
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { revalidatePath } from 'next/cache'
 import crypto from 'crypto'
-import { Resend } from 'resend'
 import type { FormData as FormDataType } from 'formdata-node'  // Use 'FormData' for native if on Node 18+
 
-const resend = new Resend(process.env.RESEND_API_KEY!)
+// Lazy load Resend only when needed to avoid build-time errors
+async function getResend() {
+  const { Resend } = await import('resend')
+  const apiKey = process.env.RESEND_API_KEY
+  if (!apiKey) {
+    throw new Error('RESEND_API_KEY is not configured')
+  }
+  return new Resend(apiKey)
+}
 
 async function generatePassword(): Promise<string> {
   const password = crypto.randomBytes(8).toString('hex')
-  console.log('Generated password:', password, typeof password) // Debug
   return password
 }
 
 async function sendCredentialsEmail(email: string, password: string): Promise<void> {
   try {
+    // Check if Resend is configured
+    if (!process.env.RESEND_API_KEY) {
+      throw new Error('Email service is not configured. Please set RESEND_API_KEY environment variable.')
+    }
+
+    const resend = await getResend()
     const { data, error } = await resend.emails.send({
       from: 'noreply@vms.com',  // Verified sender
       to: [email],
@@ -30,13 +42,10 @@ async function sendCredentialsEmail(email: string, password: string): Promise<vo
     })
 
     if (error) {
-      console.error('Resend email error:', error)
       throw new Error(`Failed to send email: ${error.message}`)
     }
-    console.log(`Email sent successfully: ${data?.id}`)
   } catch (error) {
-    console.error('Error sending credentials email:', error)
-    throw new Error('Failed to send credentials email')
+    throw new Error(error instanceof Error ? error.message : 'Failed to send credentials email')
   }
 }
 
