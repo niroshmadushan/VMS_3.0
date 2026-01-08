@@ -28,9 +28,7 @@ export function LoginForm() {
 
   // Check if user is already logged in and redirect
   useEffect(() => {
-    console.log('useEffect triggered - isAuthenticated:', isAuthenticated, 'user:', user)
     if (isAuthenticated && user) {
-      console.log('User is authenticated, redirecting to:', `/${user.role}`)
       router.push(`/${user.role}`)
     }
   }, [isAuthenticated, user, router])
@@ -41,46 +39,29 @@ export function LoginForm() {
     setError(null)
     setSuccess(null)
 
-    console.log('=== LOGIN DEBUG START ===')
-    console.log('Email:', email)
-    console.log('Password:', password ? '***' : 'empty')
-
     try {
-      console.log('Calling signIn function...')
       const result = await signIn(email, password)
-      console.log('SignIn result:', result)
 
       if (result.success) {
-        console.log('Login successful!')
-        console.log('OTP Required:', result.data?.otpRequired)
-        
         if (result.data?.otpRequired) {
-          console.log('Setting OTP required to true')
           setOtpRequired(true)
           setSuccess('Verification code sent to your email. Please check your inbox.')
         } else {
-          console.log('Direct login success - auth state should be updated')
           setSuccess('Login successful! Redirecting to dashboard...')
           // Get user role from the response data
           const userRole = result.data?.user?.role || 'staff'
-          console.log('User role from response:', userRole)
-          console.log('User data stored in AuthManager, redirecting...')
           
           // Small delay to ensure auth state is propagated
           setTimeout(() => {
-            console.log('Redirecting to:', `/${userRole}`)
             router.push(`/${userRole}`)
           }, 500)
         }
       } else {
-        console.log('Login failed:', result.error)
         setError(result.error || 'Login failed. Please try again.')
       }
     } catch (error) {
-      console.error('Error during login:', error)
       setError('An unexpected error occurred. Please try again.')
     } finally {
-      console.log('=== LOGIN DEBUG END ===')
       setIsLoading(false)
     }
   }
@@ -104,7 +85,6 @@ export function LoginForm() {
         setError(result.error || 'Invalid verification code. Please try again.')
       }
     } catch (error) {
-      console.error('Error during OTP verification:', error)
       setError('An unexpected error occurred. Please try again.')
     } finally {
       setIsLoading(false)
