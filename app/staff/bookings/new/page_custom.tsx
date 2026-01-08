@@ -166,7 +166,7 @@ export default function StaffNewBookingPage() {
         const filteredUsers = usersArray.filter((u: any) => u.role === 'admin' || u.role === 'employee' || u.role === 'staff')
         setUsers(filteredUsers)
       } catch (error) {
-        console.error('Failed to fetch users:', error)
+        // Silent fail - users list will remain empty
       } finally {
         setIsLoadingUsers(false)
       }
@@ -202,7 +202,7 @@ export default function StaffNewBookingPage() {
         })
         setExistingBookings(transformedBookings)
       } catch (error) {
-        console.error('Failed to fetch bookings:', error)
+        // Silent fail - bookings list will remain empty
       }
     }
     fetchBookings()
@@ -241,8 +241,7 @@ export default function StaffNewBookingPage() {
         
         setAvailablePlaces(availablePlacesForDate)
       } catch (error: any) {
-        console.error('Failed to fetch available places:', error)
-        toast.error(error.message || 'Failed to load available places')
+        toast.error('Failed to load available places')
       } finally {
         setIsLoadingPlaces(false)
       }
@@ -561,7 +560,7 @@ export default function StaffNewBookingPage() {
             })
           }
         } catch (error) {
-          console.error('Member check/create failed:', error)
+          // Silent fail - continue with next participant
         }
 
         await placeManagementAPI.insertRecord('external_participants', {
@@ -595,8 +594,7 @@ export default function StaffNewBookingPage() {
       router.push('/staff/bookings')
 
     } catch (error: any) {
-      console.error('Failed to create booking:', error)
-      toast.error(error.message || 'Failed to create booking')
+      toast.error('Failed to create booking')
     } finally {
       setIsSubmitting(false)
     }
@@ -651,7 +649,7 @@ export default function StaffNewBookingPage() {
       
       setSearchedMembers(filtered)
     } catch (error) {
-      console.error('Failed to search members:', error)
+      // Silent fail - search results will remain empty
     }
   }
 
@@ -716,7 +714,7 @@ export default function StaffNewBookingPage() {
         return
       }
     } catch (error) {
-      console.error('Duplicate check failed:', error)
+      // Silent fail - continue to add participant
     }
 
     const participant: ExternalParticipant = {

@@ -243,12 +243,31 @@ class PlaceManagementAPI {
   // Update record(s)
   async updateRecord(tableName: string, where: Record<string, any>, data: Record<string, any>) {
     try {
+      // Validate where condition is not empty
+      if (!where || Object.keys(where).length === 0) {
+        throw new Error('WHERE conditions are required for UPDATE operations')
+      }
+      
+      // Validate where values are not empty
+      const whereEntries = Object.entries(where)
+      const hasValidWhere = whereEntries.some(([key, value]) => {
+        return value !== null && value !== undefined && value !== ''
+      })
+      
+      if (!hasValidWhere) {
+        throw new Error('WHERE conditions must contain at least one non-empty value')
+      }
+      
       console.log(`📝 Updating ${tableName} where:`, where, 'data:', data)
       
-      const response = await this.put(`/api/secure-update/${tableName}`, {
-        where,
-        data
-      })
+      const requestBody = {
+        where: where,
+        data: data
+      }
+      
+      console.log(`📤 Request body:`, JSON.stringify(requestBody, null, 2))
+      
+      const response = await this.put(`/api/secure-update/${tableName}`, requestBody)
       
       console.log(`✅ Update successful:`, response)
       
@@ -367,6 +386,13 @@ class PlaceManagementAPI {
   } = {}) {
     const filters: any[] = []
 
+    // Always exclude soft-deleted places
+    filters.push({
+      column: 'is_deleted',
+      operator: 'is_false',
+      value: false
+    })
+
     if (options.city) {
       filters.push({
         column: 'city',
@@ -419,11 +445,19 @@ class PlaceManagementAPI {
   // Get place by ID
   async getPlaceById(placeId: string) {
     try {
-      const filters = [{
-        column: 'id',
-        operator: 'equals',
-        value: placeId
-      }]
+      const filters = [
+        {
+          column: 'id',
+          operator: 'equals',
+          value: placeId
+        },
+        // Always exclude soft-deleted places
+        {
+          column: 'is_deleted',
+          operator: 'is_false',
+          value: false
+        }
+      ]
 
       const response = await this.getTableData('places', { filters })
       return response.length > 0 ? response[0] : null

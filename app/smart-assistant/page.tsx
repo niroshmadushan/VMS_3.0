@@ -16,12 +16,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { placeManagementAPI } from "@/lib/place-management-api"
-import { API_BASE_URL } from '@/lib/api-config'
 import toast from "react-hot-toast"
 import Link from "next/link"
 import { useAuth } from "@/lib/auth-context"
 import { LogOut, Moon, Sun } from "lucide-react"
 import { useTheme } from "next-themes"
+import { sanitizeInput } from "@/lib/validation"
 
 interface Meeting {
   id: string
@@ -103,64 +103,39 @@ export default function SmartAssistantPage() {
       setIsLoading(true)
       
       if (searchType === 'meetingId') {
-        console.log('🔍 Searching for Meeting ID:', meetingId.toUpperCase())
-        console.log('🔗 API Base URL:', API_BASE_URL)
-        
-        // Get all bookings (not deleted)
-        console.log('📡 Fetching bookings from database...')
-        const allBookingsResponse = await placeManagementAPI.getTableData('bookings', {
-          limit: 500
-        })
-        
-        console.log('📦 Raw response type:', typeof allBookingsResponse)
-        console.log('📦 Raw response is array:', Array.isArray(allBookingsResponse))
-        console.log('📦 Raw response:', allBookingsResponse)
-        
-        const allBookings = Array.isArray(allBookingsResponse) ? allBookingsResponse : []
-        console.log('📊 Total bookings in database:', allBookings.length)
-        
-        // Debug: Show ALL booking_ref_ids
-        if (allBookings.length > 0) {
-          console.log('📝 ALL booking_ref_ids in database:')
-          console.log('=====================================')
-          allBookings.forEach((b: any, idx: number) => {
-            const refId = b.booking_ref_id || 'NULL'
-            console.log(`  ${idx + 1}. REF_ID: "${refId}" | TITLE: "${b.title}" | DELETED: ${b.is_deleted}`)
-          })
-          console.log('=====================================')
-          
-          // Also show as a list
-          const allRefIds = allBookings
-            .map((b: any) => b.booking_ref_id)
-            .filter((id: any) => id)
-          console.log('📋 Quick List of all IDs:', allRefIds)
-        } else {
-          console.warn('⚠️ No bookings found in database!')
-          setErrorMessage('No bookings found in the database. Please create a booking first.')
+        // Sanitize and validate meeting ID input
+        const sanitizedMeetingId = sanitizeInput(meetingId.trim().toUpperCase())
+        if (!sanitizedMeetingId || sanitizedMeetingId.length > 50) {
+          setErrorMessage('Invalid Meeting ID format. Please check and try again.')
           setCurrentView('error')
           return
         }
         
-        // Search manually
+        // Get all bookings (not deleted)
+        const allBookingsResponse = await placeManagementAPI.getTableData('bookings', {
+          limit: 500
+        })
+        
+        const allBookings = Array.isArray(allBookingsResponse) ? allBookingsResponse : []
+        
+        if (allBookings.length === 0) {
+          setErrorMessage('No bookings found. Please contact the meeting organizer.')
+          setCurrentView('error')
+          return
+        }
+        
+        // Search for booking with sanitized ID
         const foundBooking = allBookings.find((b: any) => {
           const refIdMatch = b.booking_ref_id && 
-                            b.booking_ref_id.toUpperCase().trim() === meetingId.toUpperCase().trim()
+                            b.booking_ref_id.toUpperCase().trim() === sanitizedMeetingId
           const notDeleted = b.is_deleted !== 1 && b.is_deleted !== true
-          
-          console.log(`  Checking "${b.booking_ref_id}": refIdMatch=${refIdMatch}, notDeleted=${notDeleted}`)
           
           return refIdMatch && notDeleted
         })
         
-        console.log('🎯 Found booking:', foundBooking ? `Yes - ${foundBooking.title}` : 'No match')
-        
         if (!foundBooking) {
-          const availableIds = allBookings
-            .filter((b: any) => b.is_deleted !== 1)
-            .map((b: any) => b.booking_ref_id)
-            .join(', ')
-          
-          setErrorMessage(`Meeting ID "${meetingId}" not found. Available IDs: ${availableIds || 'None'}`)
+          // Security: Don't expose all available IDs - generic error message
+          setErrorMessage(`Meeting ID not found. Please check your Meeting ID and try again.`)
           setCurrentView('error')
           return
         }
@@ -195,10 +170,6 @@ export default function SmartAssistantPage() {
           p.booking_id === foundBooking.id
         )
         
-        console.log('📋 All participants fetched:', allParticipants.length)
-        console.log('📋 Participants for booking', foundBooking.id, ':', participants.length)
-        console.log('📋 Filtered participants:', participants)
-        
         setExternalVisitors(participants)
 
         setCurrentView('details')
@@ -211,7 +182,13 @@ export default function SmartAssistantPage() {
         
       } else {
         // Search by reference value
-        console.log('🔍 Searching by reference value:', referenceValue)
+        // Sanitize and validate reference value input
+        const sanitizedReferenceValue = sanitizeInput(referenceValue.trim())
+        if (!sanitizedReferenceValue || sanitizedReferenceValue.length > 100) {
+          setErrorMessage('Invalid reference value format. Please check and try again.')
+          setCurrentView('error')
+          return
+        }
         
         // Get today's date
         const today = new Date().toISOString().split('T')[0]
@@ -219,16 +196,15 @@ export default function SmartAssistantPage() {
         // First, find external participants with matching reference value for today's bookings
         const participantsResponse = await placeManagementAPI.getTableData('external_participants', {
           filters: [
-            { column: 'reference_value', operator: 'equals', value: referenceValue }
+            { column: 'reference_value', operator: 'equals', value: sanitizedReferenceValue }
           ],
           limit: 100
         })
         
         const participants = Array.isArray(participantsResponse) ? participantsResponse : []
-        console.log('📊 Found participants with reference:', participants.length)
         
         if (participants.length === 0) {
-          setErrorMessage(`No meetings found for reference "${referenceValue}". Please check your reference number.`)
+          setErrorMessage('No meetings found for this reference. Please check your reference number and try again.')
           setCurrentView('error')
           return
         }
@@ -239,16 +215,13 @@ export default function SmartAssistantPage() {
         })
         
         const allBookings = Array.isArray(allBookingsResponse) ? allBookingsResponse : []
-        console.log('📊 All bookings:', allBookings.length)
         
         // Find bookings where the participant is invited
         const participantBookingIds = new Set(participants.map(p => p.booking_id))
         const matchingBookings = allBookings.filter(b => participantBookingIds.has(b.id))
         
-        console.log('📊 Matching bookings (all dates):', matchingBookings.length)
-        
         if (matchingBookings.length === 0) {
-          setErrorMessage(`No meetings found for reference "${referenceValue}". Please check your reference number.`)
+          setErrorMessage('No meetings found for this reference. Please check your reference number and try again.')
           setCurrentView('error')
           return
         }
@@ -263,7 +236,6 @@ export default function SmartAssistantPage() {
           return normalizedDate === today
         })
         
-        console.log('📊 Matching today\'s bookings:', todayMatchingBookings.length)
         
         if (todayMatchingBookings.length === 0) {
           // Check if there are any future or past bookings
@@ -286,11 +258,11 @@ export default function SmartAssistantPage() {
           })
           
           if (futureBookings.length > 0) {
-            setErrorMessage(`Meetings found for reference "${referenceValue}" but they are scheduled for future dates. Attendance marking is only available for today's meetings.`)
+            setErrorMessage('Meetings found but they are scheduled for future dates. Attendance marking is only available for today\'s meetings.')
           } else if (pastBookings.length > 0) {
-            setErrorMessage(`Meetings found for reference "${referenceValue}" but they were scheduled for past dates. Attendance marking is only available for today's meetings.`)
+            setErrorMessage('Meetings found but they were scheduled for past dates. Attendance marking is only available for today\'s meetings.')
           } else {
-            setErrorMessage(`No meetings found for today with reference "${referenceValue}". Please check if you have any meetings scheduled for today.`)
+            setErrorMessage('No meetings found for today. Please check if you have any meetings scheduled for today.')
           }
           setCurrentView('error')
           return
@@ -312,10 +284,6 @@ export default function SmartAssistantPage() {
           p.booking_id === foundBooking.id
         )
         
-        console.log('📋 All participants fetched:', allParticipants.length)
-        console.log('📋 Participants for booking', foundBooking.id, ':', bookingParticipants.length)
-        console.log('📋 Filtered participants:', bookingParticipants)
-        
         let normalizedDate = foundBooking.booking_date
         if (normalizedDate && typeof normalizedDate === 'string' && normalizedDate.includes('T')) {
           const d = new Date(normalizedDate)
@@ -331,12 +299,12 @@ export default function SmartAssistantPage() {
         setExternalVisitors(bookingParticipants)
         setCurrentView('details')
         
-        toast.success(`Meeting found for reference "${referenceValue}"! You can mark attendance.`)
+        toast.success('Meeting found! You can mark attendance.')
       }
       
     } catch (error) {
-      console.error('Failed to find meeting:', error)
-      setErrorMessage('Failed to search for meeting. Please try again.')
+      // Generic error message - don't expose internal error details
+      setErrorMessage('Failed to search for meeting. Please try again or contact support.')
       setCurrentView('error')
     } finally {
       setIsLoading(false)
@@ -388,8 +356,8 @@ export default function SmartAssistantPage() {
       setCurrentView('success')
       
     } catch (error) {
-      console.error('Failed to submit attendance:', error)
-      toast.error('Failed to submit attendance')
+      // Generic error message - don't expose internal error details
+      toast.error('Failed to submit attendance. Please try again.')
     } finally {
       setIsLoading(false)
     }
@@ -440,7 +408,7 @@ export default function SmartAssistantPage() {
       
       setSearchedMembers(filtered)
     } catch (error) {
-      console.error('Failed to search members:', error)
+      // Silent fail - don't expose error details
       setSearchedMembers([])
     }
   }
@@ -493,8 +461,8 @@ export default function SmartAssistantPage() {
       setShowAddMemberDialog(false)
       toast.success(`Added ${member.full_name} to the meeting`)
     } catch (error: any) {
-      console.error('Failed to add member:', error)
-      toast.error(error?.message || 'Failed to add member to meeting')
+      // Generic error message - don't expose internal error details
+      toast.error('Failed to add member to meeting. Please try again.')
     } finally {
       setIsAddingMember(false)
     }
@@ -611,8 +579,8 @@ export default function SmartAssistantPage() {
       setShowAddMemberDialog(false)
       toast.success(`Added ${newMemberForm.full_name.trim()} to the meeting`)
     } catch (error: any) {
-      console.error('Failed to create and add member:', error)
-      toast.error(error?.message || 'Failed to create and add member')
+      // Generic error message - don't expose internal error details
+      toast.error('Failed to create and add member. Please try again.')
     } finally {
       setIsAddingMember(false)
     }
@@ -752,9 +720,11 @@ export default function SmartAssistantPage() {
                       placeholder="e.g., ABC123"
                       value={meetingId}
                       onChange={(e) => {
-                        // Remove any # symbols and non-alphanumeric characters, then convert to uppercase
-                        const cleanValue = e.target.value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase()
-                        setMeetingId(cleanValue)
+                        // Sanitize input: Remove any non-alphanumeric characters, then convert to uppercase
+                        const cleanValue = sanitizeInput(e.target.value).replace(/[^a-zA-Z0-9]/g, '').toUpperCase()
+                        // Limit to 50 characters for security
+                        const limitedValue = cleanValue.substring(0, 50)
+                        setMeetingId(limitedValue)
                         setErrorMessage("")
                       }}
                       className="text-lg font-mono tracking-wider uppercase p-4 text-center"
@@ -776,7 +746,10 @@ export default function SmartAssistantPage() {
                       placeholder="e.g., Passport number, ID number, etc."
                       value={referenceValue}
                       onChange={(e) => {
-                        setReferenceValue(e.target.value)
+                        // Sanitize input and limit length for security
+                        const sanitized = sanitizeInput(e.target.value)
+                        const limitedValue = sanitized.substring(0, 100)
+                        setReferenceValue(limitedValue)
                         setErrorMessage("")
                       }}
                       className="text-lg font-mono tracking-wider p-4 text-center"
@@ -1030,8 +1003,11 @@ export default function SmartAssistantPage() {
                     placeholder="Search by reference value, name, email, phone, or company..."
                     value={memberSearchTerm}
                     onChange={(e) => {
-                      setMemberSearchTerm(e.target.value)
-                      searchExternalMembers(e.target.value)
+                      // Sanitize search input
+                      const sanitized = sanitizeInput(e.target.value)
+                      const limitedValue = sanitized.substring(0, 100)
+                      setMemberSearchTerm(limitedValue)
+                      searchExternalMembers(limitedValue)
                       setShowMemberDropdown(true)
                     }}
                     onFocus={() => memberSearchTerm.length >= 2 && setShowMemberDropdown(true)}
@@ -1128,7 +1104,10 @@ export default function SmartAssistantPage() {
                   <Label>Full Name *</Label>
                   <Input
                     value={newMemberForm.full_name}
-                    onChange={(e) => setNewMemberForm({ ...newMemberForm, full_name: e.target.value })}
+                    onChange={(e) => {
+                      const sanitized = sanitizeInput(e.target.value)
+                      setNewMemberForm({ ...newMemberForm, full_name: sanitized.substring(0, 100) })
+                    }}
                     placeholder="Enter full name"
                   />
                 </div>
@@ -1137,7 +1116,10 @@ export default function SmartAssistantPage() {
                   <Input
                     type="email"
                     value={newMemberForm.email}
-                    onChange={(e) => setNewMemberForm({ ...newMemberForm, email: e.target.value })}
+                    onChange={(e) => {
+                      const sanitized = sanitizeInput(e.target.value.toLowerCase())
+                      setNewMemberForm({ ...newMemberForm, email: sanitized.substring(0, 254) })
+                    }}
                     placeholder="email@example.com"
                   />
                 </div>
@@ -1148,7 +1130,10 @@ export default function SmartAssistantPage() {
                   <Label>Phone *</Label>
                   <Input
                     value={newMemberForm.phone}
-                    onChange={(e) => setNewMemberForm({ ...newMemberForm, phone: e.target.value })}
+                    onChange={(e) => {
+                      const sanitized = sanitizeInput(e.target.value)
+                      setNewMemberForm({ ...newMemberForm, phone: sanitized.substring(0, 20) })
+                    }}
                     placeholder="+94XXXXXXXXX"
                   />
                 </div>
@@ -1156,7 +1141,10 @@ export default function SmartAssistantPage() {
                   <Label>Company Name</Label>
                   <Input
                     value={newMemberForm.company_name}
-                    onChange={(e) => setNewMemberForm({ ...newMemberForm, company_name: e.target.value })}
+                    onChange={(e) => {
+                      const sanitized = sanitizeInput(e.target.value)
+                      setNewMemberForm({ ...newMemberForm, company_name: sanitized.substring(0, 100) })
+                    }}
                     placeholder="Company name (optional)"
                   />
                 </div>
@@ -1167,7 +1155,10 @@ export default function SmartAssistantPage() {
                   <Label>Designation</Label>
                   <Input
                     value={newMemberForm.designation}
-                    onChange={(e) => setNewMemberForm({ ...newMemberForm, designation: e.target.value })}
+                    onChange={(e) => {
+                      const sanitized = sanitizeInput(e.target.value)
+                      setNewMemberForm({ ...newMemberForm, designation: sanitized.substring(0, 100) })
+                    }}
                     placeholder="Job title (optional)"
                   />
                 </div>
@@ -1195,7 +1186,10 @@ export default function SmartAssistantPage() {
                 <Label>Reference Value *</Label>
                 <Input
                   value={newMemberForm.reference_value}
-                  onChange={(e) => setNewMemberForm({ ...newMemberForm, reference_value: e.target.value })}
+                  onChange={(e) => {
+                    const sanitized = sanitizeInput(e.target.value)
+                    setNewMemberForm({ ...newMemberForm, reference_value: sanitized.substring(0, 100) })
+                  }}
                   placeholder="Enter reference number"
                 />
               </div>

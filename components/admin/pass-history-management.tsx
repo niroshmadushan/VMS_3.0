@@ -67,12 +67,14 @@ export function PassHistoryManagement() {
     try {
       setIsLoading(true)
       
-      const [assignmentsRes, passesRes, passTypesRes, bookingsRes, usersRes] = await Promise.all([
+      const [assignmentsRes, passesRes, passTypesRes, bookingsRes, usersRes, externalMembersRes, externalParticipantsRes] = await Promise.all([
         placeManagementAPI.getTableData('pass_assignments', { limit: 5000 }),
         placeManagementAPI.getTableData('passes', { limit: 5000 }),
         placeManagementAPI.getTableData('pass_types', { limit: 100 }),
         placeManagementAPI.getTableData('bookings', { limit: 1000 }),
-        placeManagementAPI.getTableData('users', { limit: 500 })
+        placeManagementAPI.getTableData('users', { limit: 500 }),
+        placeManagementAPI.getTableData('external_members', { limit: 5000 }),
+        placeManagementAPI.getTableData('external_participants', { limit: 5000 })
       ])
       
       const assignmentsList = Array.isArray(assignmentsRes) ? assignmentsRes : []
@@ -80,6 +82,8 @@ export function PassHistoryManagement() {
       const passTypes = Array.isArray(passTypesRes) ? passTypesRes : []
       const bookings = Array.isArray(bookingsRes) ? bookingsRes : []
       const users = Array.isArray(usersRes) ? usersRes : []
+      const externalMembers = Array.isArray(externalMembersRes) ? externalMembersRes : []
+      const externalParticipants = Array.isArray(externalParticipantsRes) ? externalParticipantsRes : []
       
       console.log('📊 Pass Assignments loaded:', assignmentsList.length)
       console.log('📋 Sample assignment:', assignmentsList[0])
@@ -95,7 +99,41 @@ export function PassHistoryManagement() {
         .map((assignment: any) => {
           const pass = passes.find((p: any) => p.id === assignment.pass_id)
           const passType = passTypes.find((pt: any) => pt.id === assignment.pass_type_id)
-          const booking = bookings.find((b: any) => b.id === assignment.booking_id)
+          
+          // Priority 1: Use booking_id directly from pass_assignments table
+          let booking = null
+          if (assignment.booking_id) {
+            booking = bookings.find((b: any) => b.id === assignment.booking_id)
+          }
+          
+          // Priority 2: If no booking_id in pass_assignments and holder is external, try to find booking through external_participants or external_members
+          if (!booking && assignment.holder_reference_id && (assignment.holder_type === 'external' || assignment.holder_type === 'visitor')) {
+            // First, try to find in external_participants table (holder_reference_id might be external_participant.id)
+            const externalParticipant = externalParticipants.find((ep: any) => ep.id === assignment.holder_reference_id)
+            
+            if (externalParticipant && externalParticipant.booking_id) {
+              booking = bookings.find((b: any) => b.id === externalParticipant.booking_id)
+            }
+            
+            // If not found, try external_members table (holder_reference_id might be external_member.id)
+            if (!booking) {
+              const externalMember = externalMembers.find((em: any) => em.id === assignment.holder_reference_id)
+              
+              // Get booking_id from external_member directly
+              if (externalMember && externalMember.booking_id) {
+                booking = bookings.find((b: any) => b.id === externalMember.booking_id)
+              }
+              
+              // Also check if external_member has a corresponding external_participant through member_id
+              if (!booking && externalMember) {
+                const participantByMemberId = externalParticipants.find((ep: any) => ep.member_id === externalMember.id)
+                if (participantByMemberId && participantByMemberId.booking_id) {
+                  booking = bookings.find((b: any) => b.id === participantByMemberId.booking_id)
+                }
+              }
+            }
+          }
+          
           const assignedByUser = users.find((u: any) => u.id === assignment.assigned_by)
           
           // Parse booking date
@@ -432,15 +470,6 @@ export function PassHistoryManagement() {
                     <div>
                       <p className="text-[13px] text-muted-foreground dark:text-muted-foreground">Returned</p>
                       <p className="text-xl font-bold text-purple-900 dark:text-purple-400">{totalReturned}</p>
-                    </div>
-                  </div>
-                </TableCell>
-                <TableCell className="py-2.5 px-4 border-r dark:border-border">
-                  <div className="flex items-center gap-1.5">
-                    <AlertTriangle className="h-3.5 w-3.5 text-red-600 dark:text-red-400" />
-                    <div>
-                      <p className="text-[13px] text-muted-foreground dark:text-muted-foreground">Lost/Damaged</p>
-                      <p className="text-xl font-bold text-red-900 dark:text-red-400">{totalLost}</p>
                     </div>
                   </div>
                 </TableCell>

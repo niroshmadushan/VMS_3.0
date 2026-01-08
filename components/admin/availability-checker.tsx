@@ -36,10 +36,20 @@ interface Place {
 }
 
 interface PlaceConfiguration {
+  id: string
+  place_id: string
+  available_monday: boolean
+  available_tuesday: boolean
+  available_wednesday: boolean
+  available_thursday: boolean
+  available_friday: boolean
+  available_saturday: boolean
+  available_sunday: boolean
   start_time: string
   end_time: string
   booking_slot_duration: number
   allow_bookings: boolean
+  max_bookings_per_day?: number
 }
 
 interface Booking {
@@ -60,48 +70,134 @@ interface TimeSlot {
   isAvailable: boolean
 }
 
+interface AvailablePlace extends Place {
+  configuration?: PlaceConfiguration
+}
+
 export function AvailabilityChecker() {
-  const [places, setPlaces] = useState<Place[]>([])
+  const [allPlaces, setAllPlaces] = useState<Place[]>([])
+  const [availablePlaces, setAvailablePlaces] = useState<AvailablePlace[]>([])
   const [selectedPlace, setSelectedPlace] = useState("")
-  const [selectedPlaceData, setSelectedPlaceData] = useState<Place | null>(null)
+  const [selectedPlaceData, setSelectedPlaceData] = useState<AvailablePlace | null>(null)
   const [selectedDate, setSelectedDate] = useState("")
-  const [isLoadingPlaces, setIsLoadingPlaces] = useState(true)
+  const [isLoadingPlaces, setIsLoadingPlaces] = useState(false)
   const [isChecking, setIsChecking] = useState(false)
   const [hasChecked, setHasChecked] = useState(false)
   const [placeConfig, setPlaceConfig] = useState<PlaceConfiguration | null>(null)
   const [existingBookings, setExistingBookings] = useState<Booking[]>([])
   const [availableSlots, setAvailableSlots] = useState<TimeSlot[]>([])
 
+  // Helper function to get day of week from date string
+  const getDayOfWeek = (dateString: string): string => {
+    const date = new Date(dateString)
+    const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
+    return days[date.getDay()]
+  }
+
+  // Fetch all places (active and not deleted) on mount
   useEffect(() => {
-    fetchPlaces()
+    fetchAllPlaces()
   }, [])
 
-  const fetchPlaces = async () => {
+  // Fetch available places when date is selected
+  useEffect(() => {
+    if (selectedDate) {
+      fetchAvailablePlaces(selectedDate)
+    } else {
+      setAvailablePlaces([])
+      setSelectedPlace("")
+      setSelectedPlaceData(null)
+    }
+  }, [selectedDate])
+
+  // Fetch all active, non-deleted places
+  const fetchAllPlaces = async () => {
     try {
-      setIsLoadingPlaces(true)
       const response = await placeManagementAPI.getTableData('places', {
-        is_active: 'true'
+        filters: [
+          {
+            field: 'is_active',
+            operator: '=',
+            value: 1
+          },
+          {
+            field: 'is_deleted',
+            operator: '=',
+            value: 0
+          }
+        ]
       })
-      console.log('📍 Fetched places response:', response)
       
-      // Handle both response formats: direct array or {success, data} object
       let placesData = []
       if (Array.isArray(response)) {
-        // Direct array response
         placesData = response
       } else if (response && response.success && response.data) {
-        // Object response with data property
         placesData = response.data
       } else if (response && response.data) {
-        // Object response without success flag
         placesData = response.data
       }
       
-      console.log('✅ Places data:', placesData)
-      setPlaces(placesData)
+      setAllPlaces(placesData)
     } catch (error) {
-      console.error('❌ Error fetching places:', error)
-      toast.error('Failed to load places')
+      // Silent fail - errors handled gracefully without exposing details
+    }
+  }
+
+  // Fetch places available for the selected date
+  const fetchAvailablePlaces = async (dateString: string) => {
+    try {
+      setIsLoadingPlaces(true)
+      const dayOfWeek = getDayOfWeek(dateString)
+      const dayKey = `available_${dayOfWeek}` as keyof PlaceConfiguration
+
+      // Fetch all place configurations
+      const configsResponse = await placeManagementAPI.getTableData('place_configuration', {})
+      
+      let configsData: any[] = []
+      if (Array.isArray(configsResponse)) {
+        configsData = configsResponse
+      } else if (configsResponse && configsResponse.success && configsResponse.data) {
+        configsData = configsResponse.data
+      } else if (configsResponse && configsResponse.data) {
+        configsData = configsResponse.data
+      }
+
+      // Filter places that are available on the selected day
+      const availablePlacesForDate: AvailablePlace[] = allPlaces
+        .map((place: Place) => {
+          const config = configsData.find((c: any) => c.place_id === place.id)
+          
+          if (!config) {
+            return null
+          }
+
+          // Check if bookings are allowed
+          if (!config.allow_bookings) {
+            return null
+          }
+
+          // Check if place is available on this day of week
+          if (!config[dayKey]) {
+            return null
+          }
+
+          return {
+            ...place,
+            configuration: config
+          } as AvailablePlace
+        })
+        .filter((place: AvailablePlace | null): place is AvailablePlace => place !== null)
+
+      setAvailablePlaces(availablePlacesForDate)
+      
+      if (availablePlacesForDate.length === 0) {
+        toast('No places available for the selected date', {
+          icon: 'ℹ️',
+          duration: 3000
+        })
+      }
+    } catch (error) {
+      toast.error('Failed to load available places')
     } finally {
       setIsLoadingPlaces(false)
     }
@@ -117,47 +213,23 @@ export function AvailabilityChecker() {
       setIsChecking(true)
       setHasChecked(false)
 
-      // Get selected place data
-      const place = places.find(p => p.id === selectedPlace)
-      setSelectedPlaceData(place || null)
-
-      // Fetch place configuration
-      const configResponse = await placeManagementAPI.getTableData('place_configuration', {
-        place_id: selectedPlace
-      })
-      console.log('⚙️ Config response:', configResponse)
-
-      // Handle both response formats
-      let configData = []
-      if (Array.isArray(configResponse)) {
-        configData = configResponse
-      } else if (configResponse && configResponse.success && configResponse.data) {
-        configData = configResponse.data
-      } else if (configResponse && configResponse.data) {
-        configData = configResponse.data
-      }
-
-      if (!configData || configData.length === 0) {
+      // Get selected place data (configuration already loaded)
+      const place = availablePlaces.find(p => p.id === selectedPlace)
+      if (!place || !place.configuration) {
         toast.error('Place configuration not found')
         return
       }
-
-      const config = configData[0]
-      console.log('✅ Config data:', config)
+      
+      setSelectedPlaceData(place)
+      const config = place.configuration
       setPlaceConfig(config)
 
       // Fetch existing bookings for the selected date and place
-      console.log('═══════════════════════════════════════════════════════')
-      console.log('🔍 SEARCH CRITERIA:')
-      console.log('   Selected Place ID:', selectedPlace)
-      console.log('   Selected Date:', selectedDate)
-      console.log('═══════════════════════════════════════════════════════')
-      
       const bookingsResponse = await placeManagementAPI.getTableData('bookings', {
-        is_deleted: 'false'
+        filters: [
+          { field: 'is_deleted', operator: '=', value: 0 }
+        ]
       })
-      
-      console.log('📅 Raw API Response:', bookingsResponse)
 
       // Handle both response formats
       let bookingsData = []
@@ -168,49 +240,35 @@ export function AvailabilityChecker() {
       } else if (bookingsResponse && bookingsResponse.data) {
         bookingsData = bookingsResponse.data
       }
-      
-      console.log('📊 Total bookings fetched:', bookingsData.length)
-      console.log('📋 All bookings data:', bookingsData)
 
       if (bookingsData && bookingsData.length > 0) {
-        console.log('───────────────────────────────────────────────────────')
-        console.log('🔍 STARTING FILTER PROCESS')
-        console.log('───────────────────────────────────────────────────────')
-        
         // Filter bookings by place, date and exclude cancelled
-        const filteredBookings = bookingsData.filter((booking: any, index: number) => {
-          console.log(`\n📋 Booking #${index + 1}:`)
-          console.log('   ID:', booking.id)
-          console.log('   Title:', booking.title)
-          console.log('   Place ID:', booking.place_id, '(type:', typeof booking.place_id, ')')
-          console.log('   Booking Date:', booking.booking_date, '(type:', typeof booking.booking_date, ')')
-          console.log('   Status:', booking.status)
-          console.log('   Start Time:', booking.start_time)
-          console.log('   End Time:', booking.end_time)
+        const filteredBookings = bookingsData.filter((booking: any) => {
           
-          // Check if cancelled
-          if (booking.status === 'cancelled') {
-            console.log('❌ Skipped: cancelled')
+          // Check if cancelled - treat cancelled bookings as free time
+          // A booking is considered cancelled if:
+          // 1. status field is 'cancelled' (case-insensitive)
+          // 2. cancelled_at field is not null/empty
+          const status = booking.status?.toLowerCase()?.trim()
+          const isCancelled = status === 'cancelled' || !!booking.cancelled_at
+          
+          if (isCancelled) {
+            return false
+          }
+          
+          // Also exclude deleted bookings
+          if (booking.is_deleted === 1 || booking.is_deleted === true) {
             return false
           }
 
           // Check if place matches
-          console.log('\n   🔍 PLACE CHECK:')
-          console.log('      Booking place_id:', booking.place_id)
-          console.log('      Selected place:', selectedPlace)
           const placeMatches = booking.place_id === selectedPlace
-          console.log('      Match?', placeMatches)
           
           if (!placeMatches) {
-            console.log('   ❌ RESULT: Skipped (place mismatch)')
             return false
           }
 
           // Normalize and check date (with timezone fix)
-          console.log('\n   📅 DATE CHECK:')
-          console.log('      Raw booking_date:', booking.booking_date)
-          console.log('      Selected date:', selectedDate)
-          
           let normalizedDate = ''
           if (typeof booking.booking_date === 'string') {
             if (booking.booking_date.includes('T')) {
@@ -221,15 +279,10 @@ export function AvailabilityChecker() {
               const month = String(dateObj.getMonth() + 1).padStart(2, '0')
               const day = String(dateObj.getDate()).padStart(2, '0')
               normalizedDate = `${year}-${month}-${day}`
-              console.log('      Normalized (ISO with timezone fix):', normalizedDate)
-              console.log('      Date object:', dateObj)
-              console.log('      Local date parts:', { year, month, day })
             } else if (booking.booking_date.includes(' ')) {
               normalizedDate = booking.booking_date.split(' ')[0]
-              console.log('      Normalized (DateTime):', normalizedDate)
             } else {
               normalizedDate = booking.booking_date
-              console.log('      Already normalized:', normalizedDate)
             }
           } else if (booking.booking_date instanceof Date) {
             // Date object - get local date
@@ -237,35 +290,23 @@ export function AvailabilityChecker() {
             const month = String(booking.booking_date.getMonth() + 1).padStart(2, '0')
             const day = String(booking.booking_date.getDate()).padStart(2, '0')
             normalizedDate = `${year}-${month}-${day}`
-            console.log('      Normalized (Date object with timezone fix):', normalizedDate)
           }
 
           const dateMatches = normalizedDate === selectedDate
-          console.log('      Match?', dateMatches)
           
           if (!dateMatches) {
-            console.log('   ❌ RESULT: Skipped (date mismatch)')
             return false
           }
 
-          console.log('   ✅ RESULT: INCLUDED (all checks passed)')
           return true
         })
-        
-        console.log('\n═══════════════════════════════════════════════════════')
-        console.log('✅ FILTER COMPLETE')
-        console.log('   Total filtered bookings:', filteredBookings.length)
-        console.log('   Filtered bookings:', filteredBookings)
-        console.log('═══════════════════════════════════════════════════════\n')
 
-        console.log('✅ Filtered bookings:', filteredBookings)
         setExistingBookings(filteredBookings)
 
         // Generate available slots
         generateAvailableSlots(config, filteredBookings)
       } else {
         // No bookings found
-        console.log('ℹ️ No bookings found')
         setExistingBookings([])
         generateAvailableSlots(config, [])
       }
@@ -273,7 +314,6 @@ export function AvailabilityChecker() {
       setHasChecked(true)
       toast.success('Availability checked successfully')
     } catch (error) {
-      console.error('Error checking availability:', error)
       toast.error('Failed to check availability')
     } finally {
       setIsChecking(false)
@@ -286,8 +326,13 @@ export function AvailabilityChecker() {
     const minDuration = config.booking_slot_duration || 30
 
     // Sort bookings by start time
+    // Note: Cancelled bookings are already filtered out in checkAvailability function above
+    // This is just an extra safety check
     const sortedBookings = bookings
-      .filter(b => b.status !== 'cancelled')
+      .filter(b => {
+        const status = b.status?.toLowerCase()?.trim()
+        return status !== 'cancelled' && !b.cancelled_at
+      })
       .sort((a, b) => a.start_time.localeCompare(b.start_time))
 
     const available: TimeSlot[] = []
@@ -401,84 +446,99 @@ export function AvailabilityChecker() {
     <div className="space-y-3 px-2 sm:px-4 max-w-[98vw] mx-auto dark:bg-background">
       {/* Compact Header with Search in One Line - Centered */}
       <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-3 pb-2 border-b border-border/50 dark:border-border">
-        {/* Place Select */}
-        <div className="w-full sm:w-auto sm:min-w-[200px]">
-          <Label className="text-[13px] font-semibold mb-1.5 flex items-center justify-center gap-1.5 dark:text-foreground">
-            <MapPin className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
-            Place *
-          </Label>
-          <Select value={selectedPlace} onValueChange={(value) => {
-            console.log('🏢 Place selected:', value)
-            setSelectedPlace(value)
-            const place = places.find(p => p.id === value)
-            console.log('📊 Place data found:', place)
-            setSelectedPlaceData(place || null)
-          }}>
-            <SelectTrigger className="h-9 text-[13px] dark:bg-card dark:border-border dark:text-foreground">
-              <SelectValue placeholder={isLoadingPlaces ? "Loading places..." : "Choose a place"} />
-            </SelectTrigger>
-            <SelectContent className="dark:bg-card dark:border-border">
-              {places.map(place => (
-                <SelectItem key={place.id} value={place.id} className="dark:text-foreground dark:hover:bg-muted text-[13px]">
-                  <div className="flex items-center gap-2">
-                    <Building2 className="h-3.5 w-3.5 text-gray-500 dark:text-gray-400" />
-                    <span className="font-medium dark:text-foreground">{place.name}</span>
-                    <Badge variant="outline" className="text-[11px] dark:border-border dark:text-foreground">
-                      <Users className="h-3 w-3 mr-1" />
-                      {place.capacity}
-                    </Badge>
-                  </div>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* Date Input */}
+            {/* Date Input - Must be selected first */}
         <div className="w-full sm:w-[160px]">
           <Label className="text-[13px] font-semibold mb-1.5 flex items-center justify-center gap-1.5 dark:text-foreground">
             <CalendarCheck className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
             Date *
-          </Label>
-          <Input
-            type="date"
-            value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
-            min={new Date().toISOString().split('T')[0]}
+              </Label>
+              <Input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => {
+                  setSelectedDate(e.target.value)
+                  // Reset place selection when date changes
+                  setSelectedPlace("")
+                  setSelectedPlaceData(null)
+                }}
+                min={new Date().toISOString().split('T')[0]}
             className="h-9 text-[13px] dark:bg-card dark:border-border dark:text-foreground"
-          />
-        </div>
+              />
+            </div>
 
-        {/* Action Button */}
+            {/* Place Select - Only shows places available for selected date */}
+        <div className="w-full sm:w-auto sm:min-w-[200px]">
+          <Label className="text-[13px] font-semibold mb-1.5 flex items-center justify-center gap-1.5 dark:text-foreground">
+            <MapPin className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+            Place *
+              </Label>
+              <Select 
+                value={selectedPlace} 
+                onValueChange={(value) => {
+                  setSelectedPlace(value)
+                  const place = availablePlaces.find(p => p.id === value)
+                  setSelectedPlaceData(place || null)
+                }}
+                disabled={!selectedDate || isLoadingPlaces}
+              >
+            <SelectTrigger className="h-9 text-[13px] dark:bg-card dark:border-border dark:text-foreground">
+                  <SelectValue placeholder={
+                    !selectedDate 
+                      ? "Select date first" 
+                      : isLoadingPlaces 
+                      ? "Loading places..." 
+                      : availablePlaces.length === 0
+                      ? "No places available"
+                      : "Choose a place"
+                  } />
+                </SelectTrigger>
+            <SelectContent className="dark:bg-card dark:border-border">
+                  {availablePlaces.map(place => (
+                <SelectItem key={place.id} value={place.id} className="dark:text-foreground dark:hover:bg-muted text-[13px]">
+                      <div className="flex items-center gap-2">
+                    <Building2 className="h-3.5 w-3.5 text-gray-500 dark:text-gray-400" />
+                    <span className="font-medium dark:text-foreground">{place.name}</span>
+                    <Badge variant="outline" className="text-[11px] dark:border-border dark:text-foreground">
+                          <Users className="h-3 w-3 mr-1" />
+                          {place.capacity}
+                        </Badge>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Action Button */}
         <div className="w-full sm:w-auto flex items-end justify-center">
-          <Button
-            onClick={checkAvailability}
-            disabled={!selectedPlace || !selectedDate || isChecking}
+              <Button
+                onClick={checkAvailability}
+                disabled={!selectedPlace || !selectedDate || isChecking}
             className="w-full sm:w-auto h-9 px-4 text-[13px] bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 dark:from-blue-500 dark:to-purple-500 dark:hover:from-blue-600 dark:hover:to-purple-600 shadow-lg"
-          >
-            {isChecking ? (
-              <>
+              >
+                {isChecking ? (
+                  <>
                 <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-                Analyzing...
-              </>
-            ) : (
-              <>
+                    Analyzing...
+                  </>
+                ) : (
+                  <>
                 <Search className="h-3.5 w-3.5 mr-1.5" />
                 Check
-              </>
-            )}
-          </Button>
-        </div>
-      </div>
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
 
       {/* Selected Place Info - Compact */}
-      {selectedPlaceData && (
+          {selectedPlaceData && (
         <Card className="border shadow-sm dark:bg-card dark:border-border">
           <CardContent className="p-2.5">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
-              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2">
                 <Building2 className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                <div>
+                  <div>
                   <p className="text-[11px] text-muted-foreground dark:text-muted-foreground">Place</p>
                   <p className="text-[13px] font-semibold dark:text-foreground">{selectedPlaceData.name}</p>
                 </div>
@@ -488,11 +548,11 @@ export function AvailabilityChecker() {
                 <div>
                   <p className="text-[11px] text-muted-foreground dark:text-muted-foreground">Capacity</p>
                   <p className="text-[13px] font-semibold dark:text-foreground">{selectedPlaceData.capacity}</p>
+                  </div>
                 </div>
-              </div>
-              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2">
                 <MapPin className="h-4 w-4 text-pink-600 dark:text-pink-400" />
-                <div>
+                  <div>
                   <p className="text-[11px] text-muted-foreground dark:text-muted-foreground">Type</p>
                   <p className="text-[13px] font-semibold dark:text-foreground">{selectedPlaceData.place_type}</p>
                 </div>
@@ -503,14 +563,14 @@ export function AvailabilityChecker() {
                   <div>
                     <p className="text-[11px] text-muted-foreground dark:text-muted-foreground">Hours</p>
                     <p className="text-[13px] font-semibold dark:text-foreground">
-                      {placeConfig.start_time.substring(0, 5)} - {placeConfig.end_time.substring(0, 5)}
-                    </p>
+                        {placeConfig.start_time.substring(0, 5)} - {placeConfig.end_time.substring(0, 5)}
+                      </p>
+                    </div>
                   </div>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+                )}
+              </div>
+        </CardContent>
+      </Card>
       )}
 
       {hasChecked && (
@@ -526,7 +586,7 @@ export function AvailabilityChecker() {
                         <div className="flex items-center gap-2">
                           <Calendar className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                           Total Bookings
-                        </div>
+                  </div>
                       </TableCell>
                       <TableCell className="py-2.5 px-4 text-right dark:text-foreground">
                         <span className="text-xl font-bold text-blue-600 dark:text-blue-400">{existingBookings.length}</span>
@@ -535,7 +595,7 @@ export function AvailabilityChecker() {
                         <div className="flex items-center gap-2">
                           <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
                           Available Slots
-                        </div>
+                  </div>
                       </TableCell>
                       <TableCell className="py-2.5 px-4 text-right dark:text-foreground">
                         <span className="text-xl font-bold text-green-600 dark:text-green-400">{availableSlots.length}</span>
@@ -544,7 +604,7 @@ export function AvailabilityChecker() {
                         <div className="flex items-center gap-2">
                           <TrendingUp className="h-4 w-4 text-orange-600 dark:text-orange-400" />
                           Utilization
-                        </div>
+                </div>
                       </TableCell>
                       <TableCell className="py-2.5 px-4 text-right dark:text-foreground">
                         <span className="text-xl font-bold text-orange-600 dark:text-orange-400">{calculateUtilization()}%</span>
@@ -553,7 +613,7 @@ export function AvailabilityChecker() {
                         <div className="flex items-center gap-2">
                           <Timer className="h-4 w-4 text-purple-600 dark:text-purple-400" />
                           Free Hours
-                        </div>
+                  </div>
                       </TableCell>
                       <TableCell className="py-2.5 px-4 text-right dark:text-foreground">
                         <span className="text-xl font-bold text-purple-600 dark:text-purple-400">
@@ -563,9 +623,9 @@ export function AvailabilityChecker() {
                     </TableRow>
                   </TableBody>
                 </Table>
-              </div>
-            </CardContent>
-          </Card>
+                </div>
+              </CardContent>
+            </Card>
 
           {/* Available Time Slots - Compact */}
           {availableSlots.length > 0 && (
@@ -586,12 +646,12 @@ export function AvailabilityChecker() {
                       <div className="flex items-center justify-between mb-1.5">
                         <Badge className="bg-green-600 dark:bg-green-500 text-white font-semibold text-[10px] px-1.5 py-0.5">
                           <Timer className="h-2.5 w-2.5 mr-1" />
-                          {slot.duration}
-                        </Badge>
+                            {slot.duration}
+                          </Badge>
                         <div className="w-1.5 h-1.5 bg-green-500 dark:bg-green-400 rounded-full animate-pulse"></div>
-                      </div>
+                          </div>
                       <div className="text-sm font-bold text-green-900 dark:text-green-200">
-                        {slot.start} - {slot.end}
+                          {slot.start} - {slot.end}
                       </div>
                     </div>
                   ))}
@@ -629,9 +689,9 @@ export function AvailabilityChecker() {
                               <p className="text-[11px] text-gray-600 dark:text-gray-400">
                                 {booking.start_time.substring(0, 5)} - {booking.end_time.substring(0, 5)}
                               </p>
-                              {booking.booking_ref_id && (
+                            {booking.booking_ref_id && (
                                 <p className="text-[11px] text-gray-600 dark:text-gray-400">• Ref: {booking.booking_ref_id}</p>
-                              )}
+                            )}
                             </div>
                           </div>
                         </div>

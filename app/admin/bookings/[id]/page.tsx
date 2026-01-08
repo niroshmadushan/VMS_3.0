@@ -513,3 +513,11 @@ export default function BookingDetailPage() {
     </RouteProtection>
   )
 }
+
+
+
+
+
+
+
+

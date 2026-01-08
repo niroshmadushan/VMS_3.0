@@ -127,7 +127,7 @@ export function AdminOverview() {
         setStatistics(result.data)
       }
     } catch (error) {
-      console.error('Error loading statistics:', error)
+      // Silent fail - statistics will remain null
     }
   }
 
@@ -141,7 +141,7 @@ export function AdminOverview() {
         setRecentActivity(result.data.activities || [])
       }
     } catch (error) {
-      console.error('Error loading recent activity:', error)
+      // Silent fail - recent activity will remain empty
     }
   }
 
@@ -149,7 +149,6 @@ export function AdminOverview() {
     try {
       // Get today's date in YYYY-MM-DD format
       const today = new Date().toISOString().split('T')[0]
-      console.log('📅 Loading today\'s schedule for date:', today)
       
       // Fetch all bookings (not deleted)
       const bookingsResponse = await placeManagementAPI.getTableData('bookings', {
@@ -162,7 +161,6 @@ export function AdminOverview() {
       })
       
       const allBookings = Array.isArray(bookingsResponse) ? bookingsResponse : []
-      console.log('📊 Total bookings fetched:', allBookings.length)
       
       // Filter bookings for today
       const todaysBookings = allBookings.filter((booking: any) => {
@@ -191,8 +189,6 @@ export function AdminOverview() {
         
         return bookingDate === today
       })
-      
-      console.log('✅ Today\'s bookings found:', todaysBookings.length)
       
       // Fetch participants count for each booking
       const participantsResponse = await placeManagementAPI.getTableData('booking_participants', {
@@ -245,10 +241,8 @@ export function AdminOverview() {
         }
       })
       
-      console.log('✅ Schedule items created:', scheduleItems.length)
       setSchedule(scheduleItems)
     } catch (error) {
-      console.error('❌ Error loading schedule:', error)
       toast.error('Failed to load today\'s schedule', {
         position: 'top-center',
         duration: 3000,
@@ -267,7 +261,7 @@ export function AdminOverview() {
         setAlerts(result.data.alerts || [])
       }
     } catch (error) {
-      console.error('Error loading alerts:', error)
+      // Silent fail - alerts will remain empty
     }
   }
 

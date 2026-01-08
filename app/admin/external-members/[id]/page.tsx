@@ -60,7 +60,7 @@ export default function ExternalMemberDetailsPage() {
           return user?.role || null
         }
       } catch (error) {
-        console.error('Error getting user role:', error)
+        // Silent fail - default to null if role cannot be retrieved
       }
     }
     return null
@@ -102,30 +102,71 @@ export default function ExternalMemberDetailsPage() {
     try {
       setIsLoadingBookings(true)
       
-      const participantsResponse = await placeManagementAPI.getTableData('external_participants', { limit: 500 })
-      const participants = Array.isArray(participantsResponse) ? 
-        participantsResponse.filter((p: any) => 
-          p.member_id === memberId && 
-          (p.is_deleted === false || p.is_deleted === 0)
-        ) : []
+      // First, get the member data to use for matching
+      const memberResponse = await placeManagementAPI.getTableData('external_members', { limit: 500 })
+      const members = Array.isArray(memberResponse) ? memberResponse : []
+      const memberData = members.find((m: any) => m.id === memberId && !m.is_deleted)
       
-      const bookingIds = participants.map((p: any) => p.booking_id)
+      if (!memberData) {
+        setBookings([])
+        return
+      }
+      
+      // Get all external participants
+      const participantsResponse = await placeManagementAPI.getTableData('external_participants', { limit: 1000 })
+      const allParticipants = Array.isArray(participantsResponse) ? participantsResponse : []
+      
+      // Filter participants by:
+      // 1. member_id matches (primary method)
+      // 2. OR email matches (fallback for older records without member_id)
+      // 3. OR phone matches (fallback for older records without member_id)
+      const memberEmail = memberData.email?.toLowerCase().trim() || ''
+      const memberPhone = memberData.phone?.trim() || ''
+      
+      const participants = allParticipants.filter((p: any) => {
+        if (p.is_deleted === true || p.is_deleted === 1) return false
+        
+        // Primary: match by member_id
+        if (p.member_id === memberId) return true
+        
+        // Fallback: match by email (case-insensitive)
+        if (memberEmail && p.email) {
+          const participantEmail = p.email.toLowerCase().trim()
+          if (participantEmail === memberEmail) return true
+        }
+        
+        // Fallback: match by phone
+        if (memberPhone && p.phone) {
+          const participantPhone = p.phone.trim()
+          if (participantPhone === memberPhone) return true
+        }
+        
+        return false
+      })
+      
+      const bookingIds = participants.map((p: any) => p.booking_id).filter((id: any) => id) // Remove any null/undefined
       
       if (bookingIds.length === 0) {
         setBookings([])
         return
       }
       
-      const bookingsResponse = await placeManagementAPI.getTableData('bookings', { limit: 500 })
+      // Get all bookings (remove limit or increase it significantly)
+      const bookingsResponse = await placeManagementAPI.getTableData('bookings', { limit: 1000 })
       const allBookings = Array.isArray(bookingsResponse) ? bookingsResponse : []
       
-      // Filter out missing bookings (is_missing_booking = 1 or true)
+      // Filter bookings that match this member's booking IDs
+      // Do NOT filter out missing bookings - show ALL bookings for admin
       const memberBookingsList = allBookings
-        .filter((b: any) => 
-          bookingIds.includes(b.id) && 
-          (b.is_deleted === false || b.is_deleted === 0) &&
-          (b.is_missing_booking === 0 || b.is_missing_booking === false || b.is_missing_booking === null || b.is_missing_booking === undefined)
-        )
+        .filter((b: any) => {
+          // Must be in the booking IDs list
+          if (!bookingIds.includes(b.id)) return false
+          
+          // Must not be deleted
+          if (b.is_deleted === true || b.is_deleted === 1) return false
+          
+          return true
+        })
         .map((b: any) => ({
           id: b.id,
           title: b.title,
@@ -136,12 +177,17 @@ export default function ExternalMemberDetailsPage() {
           status: b.status,
           bookingRefId: b.booking_ref_id
         }))
-        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+        .sort((a, b) => {
+          // Sort by date, most recent first
+          const dateA = new Date(a.date).getTime()
+          const dateB = new Date(b.date).getTime()
+          return dateB - dateA
+        })
       
       setBookings(memberBookingsList)
     } catch (error) {
-      console.error('Failed to load member bookings:', error)
       toast.error('Failed to load booking history')
+      setBookings([])
     } finally {
       setIsLoadingBookings(false)
     }
@@ -192,7 +238,7 @@ export default function ExternalMemberDetailsPage() {
       
       setMissingBookings(missingBookingsList)
     } catch (error) {
-      console.error('Failed to load missing bookings:', error)
+      // Silent fail - missing bookings are optional
     } finally {
       setIsLoadingMissingBookings(false)
     }

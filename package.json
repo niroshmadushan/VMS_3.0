@@ -4,9 +4,9 @@
   "private": true,
   "scripts": {
     "build": "next build",
-    "dev": "next dev",
+    "dev": "next dev -p 6001",
     "lint": "next lint",
-    "start": "next start",
+    "start": "next start -p 6001",
     "merge:production": "node scripts/merge-to-production.js",
     "build:production": "node scripts/build-production.js",
     "workflow": "node scripts/dev-workflow.js"
@@ -57,6 +57,7 @@
     "geist": "latest",
     "input-otp": "latest",
     "lucide-react": "^0.454.0",
+    "mysql2": "^3.16.0",
     "next": "14.2.16",
     "next-themes": "latest",
     "react": "^18",

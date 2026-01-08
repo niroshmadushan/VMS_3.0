@@ -91,15 +91,10 @@ export function AdminSettings() {
       const apiBase = API_BASE_URL
       
       if (!token) {
-        console.error('❌ No authToken found in localStorage')
         toast.error('Session not found. Please refresh the page.')
         setIsLoading(false)
         return
       }
-
-      console.log('📋 Loading profile with authToken...')
-      console.log('🔑 Token exists:', !!token)
-      console.log('🔑 Token preview:', token.substring(0, 30) + '...')
 
       // Get my profile (ONLY requires JWT token)
       const response = await fetch(`${apiBase}/api/my-profile`, {
@@ -109,23 +104,16 @@ export function AdminSettings() {
         }
       })
 
-      console.log('📥 Response status:', response.status)
-      console.log('📥 Response ok:', response.ok)
-
       if (!response.ok) {
-        const errorText = await response.text()
-        console.error('❌ API Error:', errorText)
         toast.error('Failed to load profile')
         setIsLoading(false)
         return
       }
 
       const result = await response.json()
-      console.log('📥 API result:', result)
 
       if (result.success && result.data) {
         const profileData = result.data
-        console.log('📦 Profile data:', profileData)
         
         setProfile(profileData)
         setFormData({
@@ -135,14 +123,11 @@ export function AdminSettings() {
           email: profileData.email || '',
           phone: profileData.phone || ''
         })
-        console.log('✅ Profile loaded successfully')
       } else {
-        console.error('❌ Invalid response format:', result)
         toast.error('Invalid profile data received')
       }
 
     } catch (error) {
-      console.error('❌ Error loading profile:', error)
       toast.error('Failed to load profile')
     } finally {
       setIsLoading(false)
@@ -167,8 +152,6 @@ export function AdminSettings() {
         toast.error('Email is required')
         return
       }
-
-      console.log('💾 Saving profile:', formData)
 
       const token = localStorage.getItem('authToken')
       const apiBase = API_BASE_URL
@@ -198,12 +181,9 @@ export function AdminSettings() {
       }
 
       const profileResult = await profileResponse.json()
-      console.log('✅ Profile updated:', profileResult)
 
       // If email changed, send OTP to new email
       if (emailChanged) {
-        console.log('📧 Email changed, sending OTP...')
-        
         const emailResponse = await fetch(`${apiBase}/api/my-profile/email`, {
           method: 'PUT',
           headers: {
@@ -220,7 +200,6 @@ export function AdminSettings() {
         }
 
         const emailResult = await emailResponse.json()
-        console.log('✅ OTP sent:', emailResult)
         
         if (emailResult.success) {
           // Show OTP verification dialog
@@ -252,14 +231,13 @@ export function AdminSettings() {
           userData.email = formData.email.trim()
           localStorage.setItem('userData', JSON.stringify(userData))
         } catch (e) {
-          console.error('Error updating userData:', e)
+          // Silent fail - localStorage update is not critical
         }
       }
 
       setIsEditing(false)
 
     } catch (error) {
-      console.error('❌ Error saving profile:', error)
       toast.error('Failed to update profile')
     } finally {
       setIsSaving(false)
@@ -274,8 +252,6 @@ export function AdminSettings() {
         toast.error('Please enter the 6-digit code')
         return
       }
-
-      console.log('🔐 Verifying OTP for email:', pendingEmail)
 
       const token = localStorage.getItem('authToken')
       const apiBase = API_BASE_URL
@@ -297,7 +273,6 @@ export function AdminSettings() {
       }
 
       const result = await response.json()
-      console.log('✅ OTP verification result:', result)
 
       if (result.success) {
         toast.success('Email updated and verified successfully!')
@@ -319,7 +294,7 @@ export function AdminSettings() {
             userData.email = pendingEmail
             localStorage.setItem('userData', JSON.stringify(userData))
           } catch (e) {
-            console.error('Error updating userData:', e)
+            // Silent fail - localStorage update is not critical
           }
         }
 
@@ -336,7 +311,6 @@ export function AdminSettings() {
       }
 
     } catch (error) {
-      console.error('❌ Error verifying OTP:', error)
       toast.error('Failed to verify OTP')
     } finally {
       setIsVerifyingOtp(false)
@@ -362,8 +336,6 @@ export function AdminSettings() {
     if (!profile) return
 
     try {
-      console.log('🔑 Requesting password reset for:', profile.email)
-
       const token = localStorage.getItem('authToken')
       const apiBase = API_BASE_URL
 
@@ -380,7 +352,6 @@ export function AdminSettings() {
       }
 
       const result = await response.json()
-      console.log('✅ Password reset result:', result)
       
       if (result.success) {
         toast.success(`Password reset email sent to ${result.data?.email || profile.email}!`)
@@ -389,7 +360,6 @@ export function AdminSettings() {
       }
 
     } catch (error) {
-      console.error('❌ Error sending password reset:', error)
       toast.error('Failed to send password reset email')
     }
   }
@@ -493,16 +463,38 @@ export function AdminSettings() {
       </Card>
 
       {/* Tabs for Settings Sections */}
-      <Tabs defaultValue="profile" className="space-y-2">
-        <TabsList className="grid w-full grid-cols-3 h-8 dark:bg-muted dark:border-border">
-          <TabsTrigger value="profile" className="text-[12px] dark:data-[state=active]:bg-background dark:data-[state=active]:text-foreground">👤 Profile</TabsTrigger>
-          <TabsTrigger value="security" className="text-[12px] dark:data-[state=active]:bg-background dark:data-[state=active]:text-foreground">🔒 Security</TabsTrigger>
-          <TabsTrigger value="preferences" className="text-[12px] dark:data-[state=active]:bg-background dark:data-[state=active]:text-foreground">⚙️ Preferences</TabsTrigger>
-        </TabsList>
+      <Tabs defaultValue="profile" className="space-y-2 w-full">
+        <div className="flex justify-center">
+          <TabsList className="inline-flex h-8 items-center justify-center rounded-lg bg-muted/50 dark:bg-muted p-1 border border-border/50 dark:border-border shadow-sm">
+            <TabsTrigger 
+              value="profile" 
+              className="data-[state=active]:bg-background dark:data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:text-primary dark:data-[state=active]:text-primary px-2.5 py-1 text-[12px] h-7"
+            >
+              <User className="h-3 w-3 mr-1" />
+              Profile
+            </TabsTrigger>
+            <TabsTrigger 
+              value="security" 
+              className="data-[state=active]:bg-background dark:data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:text-primary dark:data-[state=active]:text-primary px-2.5 py-1 text-[12px] h-7"
+            >
+              <Shield className="h-3 w-3 mr-1" />
+              Security
+            </TabsTrigger>
+            <TabsTrigger 
+              value="preferences" 
+              className="data-[state=active]:bg-background dark:data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:text-primary dark:data-[state=active]:text-primary px-2.5 py-1 text-[12px] h-7"
+            >
+              <Palette className="h-3 w-3 mr-1" />
+              Preferences
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         {/* Profile Tab */}
-        <TabsContent value="profile" className="space-y-2">
-          <Card className="border shadow-md dark:bg-card dark:border-border">
+        <TabsContent value="profile" className="space-y-2 w-full">
+          <div className="flex justify-center">
+            <div className="w-full max-w-[50%] space-y-2">
+              <Card className="border shadow-md dark:bg-card dark:border-border">
             <CardHeader className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/20 dark:to-purple-950/20 dark:bg-card border-b dark:border-border/50 pb-2 pt-2.5">
               <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2 text-[13px] font-semibold dark:text-foreground">
@@ -510,7 +502,7 @@ export function AdminSettings() {
               Profile Information
             </CardTitle>
                 {!isEditing && (
-                  <Button onClick={() => setIsEditing(true)} className="gap-1.5 h-8 px-2.5 text-[12px] bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 dark:from-blue-500 dark:to-purple-500 dark:hover:from-blue-600 dark:hover:to-purple-600" size="sm">
+                  <Button onClick={() => setIsEditing(true)} className="gap-1.5 h-7 px-3 text-[11px] bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 dark:from-blue-500 dark:to-purple-500 dark:hover:from-blue-600 dark:hover:to-purple-600" size="sm">
                     <Edit className="h-3 w-3" />
                     Edit
                   </Button>
@@ -597,21 +589,21 @@ export function AdminSettings() {
                 {isEditing && (
                   <>
                     <Separator className="dark:bg-border my-1" />
-                    <div className="flex gap-1.5">
+                    <div className="flex gap-1.5 justify-end">
                       <Button
                         onClick={handleSaveProfile}
                         disabled={isSaving}
-                        className="flex-1 gap-1 h-8 px-2 text-[12px] bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 dark:from-blue-500 dark:to-purple-500 dark:hover:from-blue-600 dark:hover:to-purple-600"
+                        className="w-auto gap-1.5 h-7 px-3 text-[11px] bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 dark:from-blue-500 dark:to-purple-500 dark:hover:from-blue-600 dark:hover:to-purple-600"
                         size="sm"
                       >
                         {isSaving ? (
                           <>
-                            <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                            <Loader2 className="h-3 w-3 animate-spin" />
                             Saving...
                           </>
                         ) : (
                           <>
-                            <Save className="h-2.5 w-2.5" />
+                            <Save className="h-3 w-3" />
                             Save Changes
                           </>
                         )}
@@ -620,10 +612,10 @@ export function AdminSettings() {
                         onClick={handleCancelEdit}
                         disabled={isSaving}
                         variant="outline"
-                        className="flex-1 gap-1 h-8 px-2 text-[12px] dark:border-border dark:text-foreground dark:hover:bg-muted"
+                        className="w-auto gap-1.5 h-7 px-3 text-[11px] dark:border-border dark:text-foreground dark:hover:bg-muted"
                         size="sm"
                       >
-                        <X className="h-2.5 w-2.5" />
+                        <X className="h-3 w-3" />
                         Cancel
                       </Button>
                     </div>
@@ -633,8 +625,8 @@ export function AdminSettings() {
           </CardContent>
         </Card>
 
-          {/* Account Information Card */}
-          <Card className="border shadow-md dark:bg-card dark:border-border">
+              {/* Account Information Card */}
+              <Card className="border shadow-md dark:bg-card dark:border-border">
             <CardHeader className="bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-950/20 dark:to-blue-950/20 dark:bg-card border-b dark:border-border/50 pb-1.5 pt-2">
             <CardTitle className="flex items-center gap-1.5 text-[13px] font-semibold dark:text-foreground">
                 <Shield className="h-3 w-3 text-green-600 dark:text-green-400" />
@@ -693,51 +685,61 @@ export function AdminSettings() {
             </div>
           </CardContent>
         </Card>
+            </div>
+          </div>
         </TabsContent>
 
         {/* Security Tab */}
-        <TabsContent value="security" className="space-y-2">
-          <Card className="border shadow-md dark:bg-card dark:border-border">
-            <CardHeader className="bg-gradient-to-r from-red-50 to-orange-50 dark:from-red-950/20 dark:to-orange-950/20 dark:bg-card border-b dark:border-border/50 pb-1.5 pt-2">
-              <CardTitle className="flex items-center gap-1.5 text-[13px] font-semibold dark:text-foreground">
-                <Key className="h-3 w-3 text-red-600 dark:text-red-400" />
-                Password Management
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="pt-2 pb-2 dark:bg-card">
-              <div className="space-y-2">
-                <div className="p-2 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-                  <p className="text-[11px] text-blue-900 dark:text-blue-300 mb-0.5">
-                    <strong>Password Reset:</strong> Click the button below to receive a password reset link via email.
-                  </p>
-                  <p className="text-[11px] text-blue-700 dark:text-blue-400">
-                    You will receive an email with instructions to reset your password securely.
-                  </p>
-      </div>
+        <TabsContent value="security" className="space-y-2 w-full">
+          <div className="flex justify-center">
+            <div className="w-full max-w-[50%]">
+              <Card className="border shadow-md dark:bg-card dark:border-border">
+                <CardHeader className="bg-gradient-to-r from-red-50 to-orange-50 dark:from-red-950/20 dark:to-orange-950/20 dark:bg-card border-b dark:border-border/50 pb-1.5 pt-2">
+                  <CardTitle className="flex items-center gap-1.5 text-[13px] font-semibold dark:text-foreground">
+                    <Key className="h-3 w-3 text-red-600 dark:text-red-400" />
+                    Password Management
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-2 pb-2 dark:bg-card">
+                  <div className="space-y-2">
+                    <div className="p-2 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                      <p className="text-[11px] text-blue-900 dark:text-blue-300 mb-0.5">
+                        <strong>Password Reset:</strong> Click the button below to receive a password reset link via email.
+                      </p>
+                      <p className="text-[11px] text-blue-700 dark:text-blue-400">
+                        You will receive an email with instructions to reset your password securely.
+                      </p>
+                    </div>
 
-                <Button 
-                  onClick={handlePasswordReset}
-                  className="w-full gap-1 h-8 px-2 bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-700 text-[12px]"
-                  size="sm"
-                >
-                  <Key className="h-2.5 w-2.5" />
-                  Send Password Reset Email
-                </Button>
+                    <div className="flex justify-end">
+                      <Button 
+                        onClick={handlePasswordReset}
+                        className="w-auto gap-1.5 h-7 px-3 bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-700 text-[11px]"
+                        size="sm"
+                      >
+                        <Key className="h-3 w-3" />
+                        Send Password Reset Email
+                      </Button>
+                    </div>
 
-                <div className="p-2 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-                  <p className="text-[11px] text-yellow-800 dark:text-yellow-300">
-                    <strong>Note:</strong> For security reasons, you cannot change your password directly here. 
-                    A secure reset link will be sent to your registered email address.
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+                    <div className="p-2 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                      <p className="text-[11px] text-yellow-800 dark:text-yellow-300">
+                        <strong>Note:</strong> For security reasons, you cannot change your password directly here. 
+                        A secure reset link will be sent to your registered email address.
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
         </TabsContent>
 
         {/* Preferences Tab */}
-        <TabsContent value="preferences" className="space-y-2">
-          <Card className="border shadow-md dark:bg-card dark:border-border">
+        <TabsContent value="preferences" className="space-y-2 w-full">
+          <div className="flex justify-center">
+            <div className="w-full max-w-[50%]">
+              <Card className="border shadow-md dark:bg-card dark:border-border">
             <CardHeader className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-950/20 dark:to-pink-950/20 dark:bg-card border-b dark:border-border/50 pb-1.5 pt-2">
           <CardTitle className="flex items-center gap-1.5 text-[13px] font-semibold dark:text-foreground">
                 <Palette className="h-3 w-3 text-purple-600 dark:text-purple-400" />
@@ -841,6 +843,8 @@ export function AdminSettings() {
           </div>
         </CardContent>
       </Card>
+            </div>
+          </div>
         </TabsContent>
       </Tabs>
 

@@ -193,12 +193,31 @@ export function VisitorPassManagement() {
       const visitorsList: TodaysVisitor[] = []
       
       relevantBookings.forEach((booking: any) => {
-        const bookingParticipants = participants.filter((p: any) => 
-          p.booking_id === booking.id && 
-          (p.is_deleted === false || p.is_deleted === 0) && 
-          // Show visitors with any active participation status (confirmed, checked_in, attended, invited)
-          ['confirmed', 'checked_in', 'attended', 'invited'].includes(p.participation_status)
-        )
+        // Filter to show ONLY users with participation_status = 'confirmed' (have marked attendance)
+        const bookingParticipants = participants.filter((p: any) => {
+          // Basic filters
+          if (p.booking_id !== booking.id) return false
+          if (p.is_deleted === true || p.is_deleted === 1) return false
+          
+          // ONLY show users with participation_status = 'confirmed'
+          // This means they have marked attendance through Smart Assistant
+          if (p.participation_status === 'confirmed') {
+            console.log(`✅ INCLUDED - ${p.full_name}: participation_status = 'confirmed'`, {
+              participation_status: p.participation_status,
+              check_in_time: p.check_in_time,
+              checked_in_at: p.checked_in_at
+            })
+            return true
+          }
+          
+          // EXCLUDE all others (invited, pending, checked_in, attended, null, etc.)
+          console.log(`❌ EXCLUDED - ${p.full_name}: participation_status = '${p.participation_status}' (not 'confirmed')`, {
+            participation_status: p.participation_status || 'null/undefined',
+            check_in_time: p.check_in_time || 'null',
+            checked_in_at: p.checked_in_at || 'null'
+          })
+          return false
+        })
         
         bookingParticipants.forEach((participant: any) => {
           // Try to find linked member, but also allow participants without member_id
@@ -1023,11 +1042,11 @@ export function VisitorPassManagement() {
             </Badge>
           </div>
           <p className="text-[11px] text-muted-foreground dark:text-muted-foreground mt-1">
-            Showing today, upcoming bookings, and past bookings with unreturned passes
+            Showing only visitors with confirmed attendance status (marked via Smart Assistant)
           </p>
-          <div className="mt-1.5 p-2 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded text-[11px]">
-            <p className="text-amber-800 dark:text-amber-300">
-              <strong>Note:</strong> Only visitors who have confirmed their attendance are eligible for pass assignment.
+          <div className="mt-1.5 p-2 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded text-[11px]">
+            <p className="text-green-800 dark:text-green-300">
+              <strong>Note:</strong> This page shows only visitors with <strong>participation_status = 'confirmed'</strong>. These are visitors who have marked their attendance through the Smart Assistant.
             </p>
           </div>
         </CardHeader>

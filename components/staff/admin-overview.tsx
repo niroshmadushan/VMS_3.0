@@ -126,7 +126,8 @@ export function AdminOverview() {
         setStatistics(result.data)
       }
     } catch (error) {
-      console.error('Error loading statistics:', error)
+      // Silent fail - errors handled gracefully without exposing details
+      // Statistics will remain null/previous state on error
     }
   }
 
@@ -140,7 +141,8 @@ export function AdminOverview() {
         setRecentActivity(result.data.activities || [])
       }
     } catch (error) {
-      console.error('Error loading recent activity:', error)
+      // Silent fail - errors handled gracefully without exposing details
+      // Activity will remain empty/previous state on error
     }
   }
 
@@ -154,7 +156,8 @@ export function AdminOverview() {
         setSchedule(result.data.schedule || [])
       }
     } catch (error) {
-      console.error('Error loading schedule:', error)
+      // Silent fail - errors handled gracefully without exposing details
+      // Schedule will remain empty/previous state on error
     }
   }
 
@@ -168,7 +171,8 @@ export function AdminOverview() {
         setAlerts(result.data.alerts || [])
       }
     } catch (error) {
-      console.error('Error loading alerts:', error)
+      // Silent fail - errors handled gracefully without exposing details
+      // Alerts will remain empty/previous state on error
     }
   }
 

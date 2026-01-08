@@ -9,6 +9,7 @@ import { Calendar, Clock, MapPin, Users, Trash2, Utensils, AlertTriangle } from 
 import { placeManagementAPI } from "@/lib/place-management-api"
 import toast from "react-hot-toast"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { useAuth } from "@/lib/auth-context"
 
 interface Booking {
   id: string
@@ -21,6 +22,9 @@ interface Booking {
   startTime: string
   endTime: string
   responsiblePerson?: { name: string; email: string }
+  responsiblePersonEmail?: string
+  createdBy?: string
+  created_by?: string
   selectedEmployees: any[]
   externalParticipants: any[]
   refreshments?: { required: boolean; type: string; servingTime?: string }
@@ -29,6 +33,7 @@ interface Booking {
 }
 
 export function TimelineView() {
+  const { user } = useAuth()
   const [bookings, setBookings] = useState<Booking[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [currentTime, setCurrentTime] = useState(new Date())
@@ -55,7 +60,6 @@ export function TimelineView() {
     try {
       setIsLoading(true)
       const today = new Date().toISOString().split('T')[0]
-      console.log('📅 Fetching today\'s bookings for date:', today)
       
       const [bookingsData, participantsData, externalData, refreshmentsData] = await Promise.all([
         placeManagementAPI.getTableData('bookings', { 
@@ -67,21 +71,10 @@ export function TimelineView() {
         placeManagementAPI.getTableData('booking_refreshments', { limit: 200 })
       ])
 
-      console.log('📊 Fetched data:', {
-        bookings: bookingsData.length,
-        participants: participantsData.length,
-        externals: externalData.length
-      })
-
       const allBookings = Array.isArray(bookingsData) ? bookingsData : []
       const allParticipants = Array.isArray(participantsData) ? participantsData : []
       const allExternals = Array.isArray(externalData) ? externalData : []
       const allRefreshments = Array.isArray(refreshmentsData) ? refreshmentsData : []
-
-      console.log('🔍 All bookings from database:', allBookings.length)
-      allBookings.forEach((b, idx) => {
-        console.log(`  ${idx + 1}. "${b.title}" - booking_date:`, b.booking_date, `(type: ${typeof b.booking_date})`)
-      })
 
       const formattedBookings: Booking[] = allBookings
         .map(b => {
@@ -112,7 +105,6 @@ export function TimelineView() {
           }
           
           const isToday = bookingDate === today
-          console.log(`  📅 "${b.title}" - Normalized: ${bookingDate} vs Today: ${today} = ${isToday ? '✅ MATCH' : '❌ NO MATCH'}`)
           
           return { booking: b, bookingDate, isToday }
         })
@@ -134,6 +126,9 @@ export function TimelineView() {
             startTime: b.start_time?.substring(0, 5) || '',
             endTime: b.end_time?.substring(0, 5) || '',
             status: b.status === 'in_progress' ? 'ongoing' : b.status,
+            createdBy: b.created_by,
+            created_by: b.created_by,
+            responsiblePersonEmail: b.responsible_person_email,
             selectedEmployees: [],
             externalParticipants: [],
             totalParticipantsCount: participants.length + externals.length,
@@ -146,19 +141,13 @@ export function TimelineView() {
         })
         .sort((a, b) => a.startTime.localeCompare(b.startTime))
 
-      console.log('✅ Today\'s bookings found:', formattedBookings.length)
-      formattedBookings.forEach(b => {
-        console.log(`  📌 ${b.startTime} - ${b.endTime}: ${b.title} (${b.status})`)
-      })
-
       setBookings(formattedBookings)
       setIsLoading(false)
     } catch (error) {
-      console.error('❌ Failed to fetch bookings:', error)
-      toast.error('Failed to load bookings', {
+      // Generic error message - don't expose internal error details
+      toast.error('Failed to load bookings. Please try again.', {
         position: 'top-center',
-        duration: 4000,
-        icon: '❌'
+        duration: 4000
       })
       setIsLoading(false)
     }
@@ -195,9 +184,41 @@ export function TimelineView() {
     }
   }
 
+  // Check if current user can cancel this booking
+  const canCancelBooking = (booking: Booking): boolean => {
+    if (!user) return false
+    
+    // Check if user created the booking
+    const userCreatedBooking = booking.createdBy === user.id || booking.created_by === user.id
+    
+    // Check if user is the responsible person (by email)
+    const userEmail = user.email?.toLowerCase().trim() || ''
+    const responsibleEmail = booking.responsiblePersonEmail?.toLowerCase().trim() || 
+                            booking.responsiblePerson?.email?.toLowerCase().trim() || ''
+    const isResponsiblePerson = userEmail && responsibleEmail && userEmail === responsibleEmail
+    
+    return userCreatedBooking || isResponsiblePerson
+  }
+
   const handleCancel = (booking: Booking) => {
     if (booking.status === "completed" || booking.status === "cancelled") {
       toast.error(`Cannot cancel ${booking.status} bookings`, { position: 'top-center', duration: 3000, icon: '🚫' })
+      return
+    }
+
+    // Check if user can cancel this booking
+    if (!canCancelBooking(booking)) {
+      toast.error('You can only cancel bookings that you created or where you are the responsible person', {
+        position: 'top-center',
+        duration: 3000,
+        icon: '🚫'
+      })
+      return
+    }
+
+    // Validate booking ID exists
+    if (!booking.id || booking.id.trim() === '') {
+      toast.error('Invalid booking. Cannot cancel booking.', { position: 'top-center', duration: 3000 })
       return
     }
 
@@ -205,12 +226,21 @@ export function TimelineView() {
     setConfirmMessage(`Are you sure you want to cancel "${booking.title}"? This action cannot be undone.`)
     setConfirmAction(() => async () => {
       try {
-        await placeManagementAPI.updateRecord('bookings', booking.id, { status: 'cancelled' })
-        toast.success('Booking cancelled successfully', { position: 'top-center', duration: 3000, icon: '✅' })
+        // Ensure where condition is properly formatted
+        const whereCondition = { id: String(booking.id).trim() }
+        const updateData = { status: 'cancelled' }
+        
+        if (!whereCondition.id || whereCondition.id === '') {
+          throw new Error('Booking ID is required for cancellation')
+        }
+        
+        await placeManagementAPI.updateRecord('bookings', whereCondition, updateData)
+        toast.success('Booking cancelled successfully', { position: 'top-center', duration: 3000 })
         fetchBookings()
         setIsConfirmDialogOpen(false)
-      } catch (error) {
-        toast.error('Failed to cancel booking', { position: 'top-center', duration: 4000, icon: '❌' })
+      } catch (error: any) {
+        // Generic error message - don't expose internal error details
+        toast.error('Failed to cancel booking. Please try again.', { position: 'top-center', duration: 4000 })
       }
     })
     setIsConfirmDialogOpen(true)
@@ -479,7 +509,7 @@ export function TimelineView() {
                           </div>
                           
                           {/* Actions - Compact */}
-                          {!isCancelled && (booking.status === "upcoming" || booking.status === "ongoing") && (
+                          {!isCancelled && (booking.status === "upcoming" || booking.status === "ongoing") && canCancelBooking(booking) && (
                             <div className="flex gap-2 mt-2 pt-2 border-t dark:border-border/50">
                               <Button
                                 variant="outline"

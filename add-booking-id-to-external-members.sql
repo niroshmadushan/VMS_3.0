@@ -9,3 +9,11 @@ ADD COLUMN `checked_out_at` DATETIME NULL AFTER `checked_in_at`,
 ADD COLUMN `visitor_pass_id` VARCHAR(100) NULL AFTER `checked_out_at`,
 ADD INDEX `idx_booking_id` (`booking_id`);
 
+
+
+
+
+
+
+
+

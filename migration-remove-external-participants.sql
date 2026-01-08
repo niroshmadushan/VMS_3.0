@@ -164,3 +164,11 @@ WHERE ep.member_id IS NULL
 -- WHERE bem.member_id IS NOT NULL
 -- GROUP BY b.id, b.title;
 
+
+
+
+
+
+
+
+

@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 import { Eye, EyeOff, Loader2, Mail, Lock, UserCircle, User } from "lucide-react"
 import { useAuth } from '@/lib/auth-context'
 
@@ -275,6 +276,21 @@ export function LoginForm() {
           <p className="text-xs text-muted-foreground text-center">
             Password: <span className="font-mono">password</span>
           </p>
+        </div>
+
+        <div className="mt-6 text-center">
+          <p className="text-sm text-muted-foreground mb-3">
+            Don't have an account?
+          </p>
+          <Link href="/auth/secure-signup">
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full border-primary text-primary hover:bg-primary hover:text-primary-foreground"
+            >
+              Sign Up
+            </Button>
+          </Link>
         </div>
       </CardContent>
     </Card>

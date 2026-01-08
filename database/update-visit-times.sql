@@ -325,3 +325,11 @@ ORDER BY b.`booking_date` DESC, emvt.`in_time` DESC;
 -- 7. Adjust date/time values as needed
 -- 8. Always test UPDATE queries on a backup first
 -- ============================================
+
+
+
+
+
+
+
+
