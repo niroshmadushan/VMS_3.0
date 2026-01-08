@@ -248,36 +248,6 @@ export function LoginForm() {
             )}
         </div>
 
-        <div className="relative">
-          <div className="absolute inset-0 flex items-center">
-            <span className="w-full border-t border-border/50" />
-          </div>
-          <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-card px-2 text-muted-foreground">Demo Credentials</span>
-          </div>
-        </div>
-
-        <div className="space-y-3 p-4 bg-muted/30 rounded-lg border border-border/30">
-          <p className="text-sm font-medium text-foreground">Quick Access:</p>
-          <div className="grid gap-2 text-xs">
-            <div className="flex justify-between items-center p-2 bg-background/50 rounded border border-border/30">
-              <span className="font-medium text-primary">Administrator</span>
-              <span className="text-muted-foreground">admin@smartvisitor.com</span>
-            </div>
-            <div className="flex justify-between items-center p-2 bg-background/50 rounded border border-border/30">
-              <span className="font-medium text-secondary">Reception</span>
-              <span className="text-muted-foreground">reception@smartvisitor.com</span>
-            </div>
-            <div className="flex justify-between items-center p-2 bg-background/50 rounded border border-border/30">
-              <span className="font-medium text-accent">Employee</span>
-              <span className="text-muted-foreground">employee@smartvisitor.com</span>
-            </div>
-          </div>
-          <p className="text-xs text-muted-foreground text-center">
-            Password: <span className="font-mono">password</span>
-          </p>
-        </div>
-
         <div className="mt-6 text-center">
           <p className="text-sm text-muted-foreground mb-3">
             Don't have an account?
