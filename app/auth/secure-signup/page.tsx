@@ -34,8 +34,7 @@ export default function SecureSignupPage() {
       password: formData.password,
       firstName: formData.firstName,
       lastName: formData.lastName,
-      secretCode: formData.secretCode,
-      role: 'user'
+      secretCode: formData.secretCode
     })
 
     // Add confirm password validation
@@ -60,24 +59,29 @@ export default function SecureSignupPage() {
     setErrors({})
 
     try {
+      // Note: role field is NOT sent - backend automatically assigns 'user' role
+      // To create admin/staff accounts, use User Management API after signup
       const result = await secureSignupAPI.signup({
         email: formData.email,
         password: formData.password,
         firstName: formData.firstName,
         lastName: formData.lastName,
-        secretCode: formData.secretCode,
-        role: 'user'
+        secretCode: formData.secretCode
+        // role field is intentionally excluded
       })
 
       if (result.success) {
-        toast.success(result.message || 'Account created successfully! Please check your email to verify your account.')
+        // Success response (201 Created) - user must verify email
+        const successMessage = result.message || 'Account created successfully. Please check your email for verification.'
+        toast.success(successMessage)
         router.push('/login?message=signup-success')
       } else {
         // Handle validation errors from API
         if (result.errors && Array.isArray(result.errors)) {
           const validationErrors: Record<string, string> = {}
           result.errors.forEach((error: any) => {
-            const field = error.param || error.field || 'submit'
+            // API returns 'path' field for the field name (e.g., 'password', 'email')
+            const field = error.path || error.param || error.field || 'submit'
             validationErrors[field] = error.msg || error.message || result.message
           })
           setErrors(validationErrors)
@@ -88,7 +92,6 @@ export default function SecureSignupPage() {
         }
       }
     } catch (error: any) {
-      console.error('Signup error:', error)
       const errorMessage = error.message || 'An error occurred during signup. Please try again.'
       toast.error(errorMessage)
       setErrors({ submit: errorMessage })
@@ -227,7 +230,7 @@ export default function SecureSignupPage() {
                 <Input
                   id="password"
                   type={showPassword ? "text" : "password"}
-                  placeholder="Enter password (min 12 characters)"
+                  placeholder="Enter password (min 8 characters)"
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                   className={`pl-10 pr-10 h-11 bg-background/50 dark:bg-card dark:border-border dark:text-foreground ${
@@ -247,7 +250,7 @@ export default function SecureSignupPage() {
                 <p className="text-xs text-red-500">{errors.password}</p>
               )}
               <p className="text-xs text-muted-foreground">
-                Must be at least 12 characters with uppercase, lowercase, number, and special character
+                Must be at least 8 characters with uppercase, lowercase, number, and special character
               </p>
             </div>
 
@@ -314,6 +317,7 @@ export default function SecureSignupPage() {
     </div>
   )
 }
+
 
 
 

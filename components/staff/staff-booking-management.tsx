@@ -14,6 +14,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination"
 import { Plus, Edit, Trash2, Calendar, Clock, MapPin, Users, X, Search, AlertTriangle, Loader2, Utensils, Mail, Send, Info, Lock, CheckCircle } from "lucide-react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { placeManagementAPI } from "@/lib/place-management-api"
@@ -27,7 +36,7 @@ const generateUUID = (): string => {
     return crypto.randomUUID()
   }
   // Fallback UUID v4 generator
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
     const r = Math.random() * 16 | 0
     const v = c === 'x' ? r : (r & 0x3 | 0x8)
     return v.toString(16)
@@ -356,16 +365,14 @@ export function StaffBookingManagement() {
   const [filteredBookings, setFilteredBookings] = useState<Booking[]>([])
   const [isLoadingBookings, setIsLoadingBookings] = useState(true)
   const [bookingsError, setBookingsError] = useState<string | null>(null)
-  
+
   // Filter state
-  const [filterStatus, setFilterStatus] = useState<string>("all")
-  const [filterPlace, setFilterPlace] = useState<string>("all")
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [placeFilter, setPlaceFilter] = useState<string>("all")
   const [filterDateFrom, setFilterDateFrom] = useState<string>("")
   const [filterDateTo, setFilterDateTo] = useState<string>("")
   const [searchTerm, setSearchTerm] = useState<string>("")
-  
+
   // Confirmation dialog state
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false)
   const [confirmAction, setConfirmAction] = useState<(() => void) | null>(null)
@@ -379,7 +386,7 @@ export function StaffBookingManagement() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingBooking, setEditingBooking] = useState<Booking | null>(null)
   const [activeTab, setActiveTab] = useState("list")
-  
+
   // Email notification state
   const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false)
   const [selectedBookingForEmail, setSelectedBookingForEmail] = useState<Booking | null>(null)
@@ -391,27 +398,27 @@ export function StaffBookingManagement() {
   const [bookingParticipants, setBookingParticipants] = useState<BookingParticipant[]>([])
   const [isLoadingParticipants, setIsLoadingParticipants] = useState(false)
   const [emailType, setEmailType] = useState<'booking_details'>('booking_details')
-  
+
   // Available Places State
   const [availablePlaces, setAvailablePlaces] = useState<AvailablePlace[]>([])
   const [isLoadingPlaces, setIsLoadingPlaces] = useState(false)
   const [placesError, setPlacesError] = useState<string | null>(null)
   const [selectedDate, setSelectedDate] = useState<string>('')
-  
+
   // Available Time Slots State (old fixed slot system - keeping for reference)
   const [availableTimeSlots, setAvailableTimeSlots] = useState<string[]>([])
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<string>("")
-  
+
   // Flexible Time Selection State
   const [availableStartTimes, setAvailableStartTimes] = useState<string[]>([])
   const [availableEndTimes, setAvailableEndTimes] = useState<string[]>([])
   const [minBookingDuration, setMinBookingDuration] = useState<number>(30) // Default 30 minutes
   const [currentPlaceConfig, setCurrentPlaceConfig] = useState<PlaceConfiguration | null>(null)
-  
+
   // Available Time Gaps (complete ranges)
-  const [availableTimeGaps, setAvailableTimeGaps] = useState<{start: string, end: string, duration: string}[]>([])
+  const [availableTimeGaps, setAvailableTimeGaps] = useState<{ start: string, end: string, duration: string }[]>([])
   const [selectedTimeGap, setSelectedTimeGap] = useState<string>("")
-  
+
   // Users (Admin & Employee) State
   const [users, setUsers] = useState<UserProfile[]>([])
   const [isLoadingUsers, setIsLoadingUsers] = useState(false)
@@ -441,6 +448,10 @@ export function StaffBookingManagement() {
   const [responsibleSearch, setResponsibleSearch] = useState("")
   const [showResponsibleDropdown, setShowResponsibleDropdown] = useState(false)
 
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 10
+
   const [newExternalParticipant, setNewExternalParticipant] = useState({
     fullName: "",
     email: "",
@@ -448,6 +459,20 @@ export function StaffBookingManagement() {
     referenceType: "NIC" as "NIC" | "Passport" | "Employee ID",
     referenceValue: "",
   })
+
+  const [filteredEmployees, setFilteredEmployees] = useState<Employee[]>([])
+
+  // Real-time clock for timeline view
+  const [currentTime, setCurrentTime] = useState(new Date())
+
+  useEffect(() => {
+    // Update time every second
+    const timer = setInterval(() => {
+      setCurrentTime(new Date())
+    }, 1000)
+
+    return () => clearInterval(timer)
+  }, [])
 
   // Load users on component mount
   useEffect(() => {
@@ -458,20 +483,20 @@ export function StaffBookingManagement() {
   const fetchUsers = async () => {
     try {
       setIsLoadingUsers(true)
-      
+
       // Fetch all users and filter by role on frontend
       // This ensures compatibility with all API versions
       const allUsersResponse = await placeManagementAPI.getTableData('userprofile', {
         limit: 500
       })
-      
+
       // Filter for admin and employee roles only
-      const filteredUsers = allUsersResponse.filter((user: any) => 
+      const filteredUsers = allUsersResponse.filter((user: any) =>
         user.role === 'admin' || user.role === 'employee'
       )
-      
+
       setUsers(filteredUsers)
-      
+
       if (filteredUsers.length === 0) {
         toast('No admin or employee users found in the system', {
           position: 'top-center',
@@ -502,41 +527,41 @@ export function StaffBookingManagement() {
     try {
       setIsLoadingPlaces(true)
       setPlacesError(null)
-      
+
       const dayOfWeek = getDayOfWeek(dateString)
-      
+
       // Step 1: Get all active places
       const allPlaces = await placeManagementAPI.getPlaces({
         isActive: true,
         limit: 100
       })
-      
+
       // Step 2: Get configurations for all places
       const configurationsResponse = await placeManagementAPI.getTableData('place_configuration', {
         limit: 100
       })
-      
+
       // Step 3: Filter places based on date availability and booking settings
       const availablePlacesForDate = allPlaces
         .map((place: Place) => {
           // Find configuration for this place
           const config = configurationsResponse.find((c: any) => c.place_id === place.id)
-          
+
           if (!config) {
             return null
           }
-          
+
           // Check if bookings are allowed
           if (!config.allow_bookings) {
             return null
           }
-          
+
           // Check if place is available on this day of week
           const dayKey = `available_${dayOfWeek}` as keyof PlaceConfiguration
           if (!config[dayKey]) {
             return null
           }
-          
+
           return {
             ...place,
             configuration: config,
@@ -545,9 +570,9 @@ export function StaffBookingManagement() {
           }
         })
         .filter((place: AvailablePlace | null): place is AvailablePlace => place !== null)
-      
+
       setAvailablePlaces(availablePlacesForDate)
-      
+
       if (availablePlacesForDate.length === 0) {
         toast('No places available for the selected date', {
           position: 'top-center',
@@ -555,7 +580,7 @@ export function StaffBookingManagement() {
           icon: '📅'
         })
       }
-      
+
     } catch (error: any) {
       const errorMessage = 'Failed to load available places'
       setPlacesError(errorMessage)
@@ -574,7 +599,7 @@ export function StaffBookingManagement() {
     try {
       setIsLoadingBookings(true)
       setBookingsError(null)
-      
+
       // Fetch all bookings (not deleted)
       const bookingsResponse = await placeManagementAPI.getTableData('bookings', {
         filters: [
@@ -584,21 +609,21 @@ export function StaffBookingManagement() {
         sortOrder: 'desc',
         limit: 100
       })
-      
+
       let bookingsData: any[] = Array.isArray(bookingsResponse) ? bookingsResponse : []
-      
+
       // Filter out missing bookings (is_missing_booking = 1 or true)
-      bookingsData = bookingsData.filter((b: any) => 
+      bookingsData = bookingsData.filter((b: any) =>
         (b.is_missing_booking === 0 || b.is_missing_booking === false || b.is_missing_booking === null || b.is_missing_booking === undefined)
       )
-      
+
       // Fetch ALL cancellations once at the start (more reliable than filtering per booking)
       let allCancellations: any[] = []
       try {
         const allCancellationsResponse = await placeManagementAPI.getTableData('booking_cancellations', {
           limit: 1000 // Get all cancellations
         })
-        
+
         // Handle different response formats
         if (Array.isArray(allCancellationsResponse)) {
           allCancellations = allCancellationsResponse
@@ -610,7 +635,7 @@ export function StaffBookingManagement() {
       } catch (error) {
         // Silent fail - cancellations list will remain empty
       }
-      
+
       // Transform database records to Booking interface
       const transformedBookings: Booking[] = await Promise.all(
         bookingsData.map(async (booking: any) => {
@@ -619,26 +644,26 @@ export function StaffBookingManagement() {
             limit: 50
           })
           let participants: any[] = Array.isArray(participantsResponse) ? participantsResponse : []
-          
+
           // Client-side filter by booking_id and is_deleted
-          participants = participants.filter((p: any) => 
+          participants = participants.filter((p: any) =>
             p.booking_id === booking.id && (p.is_deleted === false || p.is_deleted === 0)
           )
-          
+
           // CLIENT-SIDE FILTER: Ensure we only use participants for THIS booking
           participants = participants.filter(p => p.booking_id === booking.id)
-          
+
           // Fetch external participants
           const externalParticipantsResponse = await placeManagementAPI.getTableData('external_participants', {
             limit: 50
           })
           let externalParticipants: any[] = Array.isArray(externalParticipantsResponse) ? externalParticipantsResponse : []
-          
+
           // CLIENT-SIDE FILTER: Ensure we only use participants for THIS booking AND not deleted
-          externalParticipants = externalParticipants.filter((p: any) => 
+          externalParticipants = externalParticipants.filter((p: any) =>
             p.booking_id === booking.id && (p.is_deleted === false || p.is_deleted === 0)
           )
-          
+
           // Fetch refreshments
           const refreshmentsResponse = await placeManagementAPI.getTableData('booking_refreshments', {
             filters: [
@@ -647,28 +672,28 @@ export function StaffBookingManagement() {
             limit: 1
           })
           const refreshments: any[] = Array.isArray(refreshmentsResponse) ? refreshmentsResponse : []
-          
+
           // Find cancellation data from pre-fetched list (client-side matching)
           let cancellationData: BookingCancellation | undefined = undefined
           const isCancelledStatus = booking.status?.toLowerCase() === 'cancelled' || booking.status === 'cancelled' || booking.status === 'Cancelled'
           if (isCancelledStatus) {
             // Find matching cancellation (try multiple field name variations)
             const matchingCancellation = allCancellations.find((c: any) => {
-              const bookingIdMatch = c.booking_id === booking.id || 
-                                    c.bookingId === booking.id ||
-                                    String(c.booking_id || '').toLowerCase() === String(booking.id || '').toLowerCase() ||
-                                    String(c.bookingId || '').toLowerCase() === String(booking.id || '').toLowerCase()
-              
+              const bookingIdMatch = c.booking_id === booking.id ||
+                c.bookingId === booking.id ||
+                String(c.booking_id || '').toLowerCase() === String(booking.id || '').toLowerCase() ||
+                String(c.bookingId || '').toLowerCase() === String(booking.id || '').toLowerCase()
+
               return bookingIdMatch
             })
-            
+
             if (matchingCancellation) {
-              const reason = matchingCancellation.cancellation_reason || 
-                           matchingCancellation.cancellationReason ||
-                           matchingCancellation['cancellation_reason'] ||
-                           matchingCancellation.reason ||
-                           ''
-              
+              const reason = matchingCancellation.cancellation_reason ||
+                matchingCancellation.cancellationReason ||
+                matchingCancellation['cancellation_reason'] ||
+                matchingCancellation.reason ||
+                ''
+
               cancellationData = {
                 id: matchingCancellation.id,
                 booking_id: matchingCancellation.booking_id || matchingCancellation.bookingId || booking.id,
@@ -679,7 +704,7 @@ export function StaffBookingManagement() {
               }
             }
           }
-          
+
           // Transform participants
           const selectedEmployees: Employee[] = participants.map((p: any) => ({
             id: p.employee_id,
@@ -689,7 +714,7 @@ export function StaffBookingManagement() {
             role: p.employee_role || '',
             phone: p.employee_phone || ''
           }))
-          
+
           // Transform external participants
           const externalParticipantsList: ExternalParticipant[] = externalParticipants.map((p: any) => ({
             id: p.id,
@@ -699,11 +724,11 @@ export function StaffBookingManagement() {
             referenceType: p.reference_type,
             referenceValue: p.reference_value
           }))
-          
+
           // Parse refreshments
           // Check refreshments_required field from bookings table first
           const refreshmentsRequired = booking.refreshments_required === 1 || booking.refreshments_required === true
-          
+
           let refreshmentDetails: RefreshmentDetails = {
             required: false,
             type: '',
@@ -712,7 +737,7 @@ export function StaffBookingManagement() {
             specialRequests: '',
             estimatedCount: 0
           }
-          
+
           // Only set refreshments as required if:
           // 1. refreshments_required is 1/true in bookings table
           // 2. AND there's a record in booking_refreshments table
@@ -727,7 +752,7 @@ export function StaffBookingManagement() {
               estimatedCount: r.estimated_count || 0
             }
           }
-          
+
           // Create responsible person object
           const responsiblePerson: Employee | null = booking.responsible_person_id ? {
             id: booking.responsible_person_id,
@@ -737,12 +762,12 @@ export function StaffBookingManagement() {
             role: '',
             phone: ''
           } : null
-          
+
           // Normalize date format to YYYY-MM-DD
           // IMPORTANT: Database stores dates, but API may convert to UTC timestamps
           // We need to convert back to LOCAL date
           let normalizedDate = booking.booking_date
-          
+
           if (normalizedDate) {
             // If it's already in simple YYYY-MM-DD format (no time), keep it
             if (typeof normalizedDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(normalizedDate)) {
@@ -770,7 +795,7 @@ export function StaffBookingManagement() {
               normalizedDate = `${year}-${month}-${day}`
             }
           }
-          
+
           return {
             id: booking.id,
             bookingRefId: booking.booking_ref_id, // 6-character reference
@@ -796,9 +821,9 @@ export function StaffBookingManagement() {
           }
         })
       )
-      
+
       setBookings(transformedBookings)
-      
+
     } catch (error: any) {
       const errorMessage = 'Failed to load bookings'
       setBookingsError(errorMessage)
@@ -815,40 +840,40 @@ export function StaffBookingManagement() {
   // Fetch bookings on mount
   useEffect(() => {
     fetchBookings()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Generate available time gaps (complete ranges between bookings)
   const generateAvailableTimeGaps = (placeId: string, date: string) => {
     const selectedPlace = availablePlaces.find(p => p.id === placeId)
-    
+
     if (!selectedPlace || !selectedPlace.configuration) {
       setAvailableTimeGaps([])
       setCurrentPlaceConfig(null)
       return
     }
-    
+
     const config = selectedPlace.configuration
     setCurrentPlaceConfig(config)
-    
+
     const minDuration = config.booking_slot_duration || 30
     setMinBookingDuration(minDuration)
-    
+
     const openTime = config.start_time.substring(0, 5) // HH:MM
     const closeTime = config.end_time.substring(0, 5)
-    
+
     // Helper functions
     const timeToMinutes = (time: string) => {
       const [hours, minutes] = time.split(':').map(Number)
       return hours * 60 + minutes
     }
-    
+
     const minutesToTime = (minutes: number) => {
       const hours = Math.floor(minutes / 60)
       const mins = minutes % 60
       return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`
     }
-    
+
     const formatDuration = (minutes: number) => {
       const hours = Math.floor(minutes / 60)
       const mins = minutes % 60
@@ -860,48 +885,48 @@ export function StaffBookingManagement() {
         return `${mins}min`
       }
     }
-    
+
     const openMinutes = timeToMinutes(openTime)
     const closeMinutes = timeToMinutes(closeTime)
-    
+
     // Get existing bookings for this date and place, sorted by start time
     const existingBookings = bookings.filter(booking => {
       // Match by place ID if available, fallback to place name
       const placeMatches = booking.placeId ? booking.placeId === placeId : booking.place === selectedPlace.name
-      
+
       if (booking.date !== date) {
         return false
       }
-      
+
       if (!placeMatches) {
         return false
       }
-      
+
       if (booking.status === 'cancelled') {
         return false
       }
-      
+
       if (editingBooking && booking.id === editingBooking.id) {
         return false
       }
-      
+
       return true
     }).map(booking => ({
       start: timeToMinutes(booking.startTime),
       end: timeToMinutes(booking.endTime),
       title: booking.title
     })).sort((a, b) => a.start - b.start)
-    
+
     // Find gaps between bookings
-    const gaps: {start: string, end: string, duration: string}[] = []
-    
+    const gaps: { start: string, end: string, duration: string }[] = []
+
     let currentTime = openMinutes
-    
+
     for (const booking of existingBookings) {
       // Check if there's a gap before this booking
       if (currentTime < booking.start) {
         const gapDuration = booking.start - currentTime
-        
+
         // Only add gap if it meets minimum duration
         if (gapDuration >= minDuration) {
           gaps.push({
@@ -911,15 +936,15 @@ export function StaffBookingManagement() {
           })
         }
       }
-      
+
       // Move current time to end of this booking
       currentTime = Math.max(currentTime, booking.end)
     }
-    
+
     // Check if there's a gap after the last booking until closing
     if (currentTime < closeMinutes) {
       const gapDuration = closeMinutes - currentTime
-      
+
       if (gapDuration >= minDuration) {
         gaps.push({
           start: minutesToTime(currentTime),
@@ -928,47 +953,47 @@ export function StaffBookingManagement() {
         })
       }
     }
-    
+
     setAvailableTimeGaps(gaps)
   }
 
   // Generate available start times (flexible booking) - OLD SYSTEM
   const generateAvailableStartTimes = (placeId: string, date: string) => {
     const selectedPlace = availablePlaces.find(p => p.id === placeId)
-    
+
     if (!selectedPlace || !selectedPlace.configuration) {
       setAvailableStartTimes([])
       setCurrentPlaceConfig(null)
       return
     }
-    
+
     const config = selectedPlace.configuration
     setCurrentPlaceConfig(config)
-    
+
     // Use slot duration as both interval and minimum duration
     const slotInterval = config.booking_slot_duration || 30
     const minDuration = config.booking_slot_duration || 30 // Minimum duration = slot duration
     setMinBookingDuration(minDuration)
-    
+
     // Parse operating hours
     const openTime = config.start_time.substring(0, 5) // HH:MM
     const closeTime = config.end_time.substring(0, 5)
-    
+
     // Helper functions
     const timeToMinutes = (time: string) => {
       const [hours, minutes] = time.split(':').map(Number)
       return hours * 60 + minutes
     }
-    
+
     const minutesToTime = (minutes: number) => {
       const hours = Math.floor(minutes / 60)
       const mins = minutes % 60
       return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`
     }
-    
+
     const openMinutes = timeToMinutes(openTime)
     const closeMinutes = timeToMinutes(closeTime)
-    
+
     // Get existing bookings for this date and place
     const existingBookings = bookings.filter(booking => {
       if (booking.date !== date || booking.place !== selectedPlace.name) return false
@@ -979,64 +1004,64 @@ export function StaffBookingManagement() {
       start: timeToMinutes(booking.startTime),
       end: timeToMinutes(booking.endTime)
     })).sort((a, b) => a.start - b.start)
-    
+
     // Generate all possible time points with the interval
     const allTimes: string[] = []
     for (let time = openMinutes; time < closeMinutes; time += slotInterval) {
       allTimes.push(minutesToTime(time))
     }
-    
+
     // Filter start times that have at least minDuration available
     const availableStarts = allTimes.filter(time => {
       const startMin = timeToMinutes(time)
       const minEndMin = startMin + minDuration
-      
+
       // Check if minimum duration fits before closing
       if (minEndMin > closeMinutes) {
         return false
       }
-      
+
       // Check if there's any booking that would prevent minimum duration
       const hasConflict = existingBookings.some(booking => {
         // If booking starts before our minimum end time and ends after our start time
         return booking.start < minEndMin && booking.end > startMin
       })
-      
+
       return !hasConflict
     })
-    
+
     setAvailableStartTimes(availableStarts)
   }
-  
+
   // Generate available end times based on selected start time
   const generateAvailableEndTimes = (placeId: string, date: string, startTime: string) => {
     const selectedPlace = availablePlaces.find(p => p.id === placeId)
-    
+
     if (!selectedPlace || !selectedPlace.configuration) {
       setAvailableEndTimes([])
       return
     }
-    
+
     const config = selectedPlace.configuration
     const slotInterval = config.booking_slot_duration || 30
     const closeTime = config.end_time.substring(0, 5)
-    
+
     // Helper functions
     const timeToMinutes = (time: string) => {
       const [hours, minutes] = time.split(':').map(Number)
       return hours * 60 + minutes
     }
-    
+
     const minutesToTime = (minutes: number) => {
       const hours = Math.floor(minutes / 60)
       const mins = minutes % 60
       return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`
     }
-    
+
     const startMinutes = timeToMinutes(startTime)
     const closeMinutes = timeToMinutes(closeTime)
     const minEndMinutes = startMinutes + minBookingDuration
-    
+
     // Get existing bookings
     const existingBookings = bookings.filter(booking => {
       if (booking.date !== date || booking.place !== selectedPlace.name) return false
@@ -1047,11 +1072,11 @@ export function StaffBookingManagement() {
       start: timeToMinutes(booking.startTime),
       end: timeToMinutes(booking.endTime)
     })).sort((a, b) => a.start - b.start)
-    
+
     // Find the next booking after our start time
     const nextBooking = existingBookings.find(booking => booking.start >= startMinutes)
     const maxEndMinutes = nextBooking ? nextBooking.start : closeMinutes
-    
+
     // Generate available end times
     const availableEnds: string[] = []
     for (let time = minEndMinutes; time <= maxEndMinutes; time += slotInterval) {
@@ -1059,91 +1084,91 @@ export function StaffBookingManagement() {
         availableEnds.push(minutesToTime(time))
       }
     }
-    
+
     setAvailableEndTimes(availableEnds)
   }
 
   // Generate time slots based on place configuration (OLD SYSTEM - DEPRECATED)
   const generateTimeSlots = (placeId: string, date: string) => {
     const selectedPlace = availablePlaces.find(p => p.id === placeId)
-    
+
     if (!selectedPlace || !selectedPlace.configuration) {
       setAvailableTimeSlots([])
       return
     }
-    
+
     const config = selectedPlace.configuration
     const slotDuration = config.booking_slot_duration || 60 // Default 60 minutes
-    
+
     // Parse operating hours
     const startTime = config.start_time.substring(0, 5) // HH:MM:SS -> HH:MM
     const endTime = config.end_time.substring(0, 5)
-    
+
     // Convert time to minutes
     const timeToMinutes = (time: string) => {
       const [hours, minutes] = time.split(':').map(Number)
       return hours * 60 + minutes
     }
-    
+
     // Convert minutes to time
     const minutesToTime = (minutes: number) => {
       const hours = Math.floor(minutes / 60)
       const mins = minutes % 60
       return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`
     }
-    
+
     const startMinutes = timeToMinutes(startTime)
     const endMinutes = timeToMinutes(endTime)
-    
+
     // Generate all possible slots
     const allSlots: string[] = []
     for (let time = startMinutes; time < endMinutes; time += slotDuration) {
       const slotStart = minutesToTime(time)
       const slotEnd = minutesToTime(time + slotDuration)
-      
+
       // Don't add slot if it exceeds end time
       if (time + slotDuration <= endMinutes) {
         allSlots.push(`${slotStart} - ${slotEnd}`)
       }
     }
-    
+
     // Filter out booked slots
     const availableSlots = allSlots.filter(slot => {
       const [slotStart, slotEnd] = slot.split(' - ')
-      
+
       // Check if this slot overlaps with any existing booking
       const hasConflict = bookings.some(booking => {
         if (booking.date !== date || booking.place !== selectedPlace.name) {
           return false
         }
-        
+
         if (booking.status === 'cancelled') {
           return false
         }
-        
+
         // Skip current booking if editing
         if (editingBooking && booking.id === editingBooking.id) {
           return false
         }
-        
+
         const bookingStart = booking.startTime
         const bookingEnd = booking.endTime
-        
+
         // Check for overlap
         const overlap = (
           (slotStart >= bookingStart && slotStart < bookingEnd) ||
           (slotEnd > bookingStart && slotEnd <= bookingEnd) ||
           (slotStart <= bookingStart && slotEnd >= bookingEnd)
         )
-        
+
         // Check for overlap
-        
+
         return overlap
       })
-      
+
       return !hasConflict
     })
-    
+
     setAvailableTimeSlots(availableSlots)
   }
 
@@ -1152,9 +1177,9 @@ export function StaffBookingManagement() {
     if (formData.date) {
       fetchAvailablePlaces(formData.date)
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formData.date])
-  
+
   // Generate time gaps when place is selected
   useEffect(() => {
     if (formData.place && formData.date) {
@@ -1164,7 +1189,7 @@ export function StaffBookingManagement() {
       setSelectedTimeGap("")
       setFormData(prev => ({ ...prev, startTime: '', endTime: '' }))
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formData.place, formData.date, bookings])
 
   // Populate form when editingBooking changes
@@ -1316,7 +1341,7 @@ export function StaffBookingManagement() {
   const checkAvailability = (date: string, placeId: string, startTime: string, endTime: string, excludeId?: string) => {
     // Find the selected place configuration
     const selectedPlace = availablePlaces.find(p => p.id === placeId)
-    
+
     if (!selectedPlace || !selectedPlace.configuration) {
       toast.error("Place configuration not found. Please select a valid place.", {
         position: 'top-center',
@@ -1325,13 +1350,13 @@ export function StaffBookingManagement() {
       })
       return false
     }
-    
+
     const config = selectedPlace.configuration
-    
+
     // Step 1: Check if booking time is within place operating hours
     const placeStartTime = config.start_time.substring(0, 5) // HH:MM:SS -> HH:MM
     const placeEndTime = config.end_time.substring(0, 5)
-    
+
     if (startTime < placeStartTime || endTime > placeEndTime) {
       toast.error(`Booking time must be within operating hours: ${placeStartTime} - ${placeEndTime}`, {
         position: 'top-center',
@@ -1340,7 +1365,7 @@ export function StaffBookingManagement() {
       })
       return false
     }
-    
+
     // Step 2: Check if start time is before end time
     if (startTime >= endTime) {
       toast.error("End time must be after start time", {
@@ -1350,19 +1375,19 @@ export function StaffBookingManagement() {
       })
       return false
     }
-    
+
     // Step 3: Check for overlapping bookings on the same date and place
     const conflictingBookings = bookings.filter((booking) => {
       // Skip if this is the booking being edited
       if (excludeId && booking.id === excludeId) {
         return false
       }
-      
+
       // Only check bookings on the same date and same place
       if (booking.date !== date || booking.place !== selectedPlace.name) {
         return false
       }
-      
+
       // Skip cancelled bookings
       if (booking.status === "cancelled") {
         return false
@@ -1379,7 +1404,7 @@ export function StaffBookingManagement() {
         (newEnd > bookingStart && newEnd <= bookingEnd) ||
         (newStart <= bookingStart && newEnd >= bookingEnd)
       )
-      
+
       return hasOverlap
     })
 
@@ -1392,7 +1417,7 @@ export function StaffBookingManagement() {
       })
       return false
     }
-    
+
     return true
   }
 
@@ -1412,7 +1437,7 @@ export function StaffBookingManagement() {
     try {
       // Generate UUID for booking
       const generateUUID = () => {
-        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
           const r = Math.random() * 16 | 0
           const v = c === 'x' ? r : (r & 0x3 | 0x8)
           return v.toString(16)
@@ -1422,7 +1447,7 @@ export function StaffBookingManagement() {
       // Get selected place details
       const selectedPlace = availablePlaces.find(p => p.id === formData.place)
 
-    if (editingBooking) {
+      if (editingBooking) {
         // UPDATE existing booking
         const updateData = {
           title: formData.title,
@@ -1449,22 +1474,22 @@ export function StaffBookingManagement() {
               second: '2-digit',
               hour12: false
             }).formatToParts(now)
-            
+
             const year = parseInt(sriLankaTime.find(p => p.type === 'year')?.value || '0')
             const month = parseInt(sriLankaTime.find(p => p.type === 'month')?.value || '0')
             const day = parseInt(sriLankaTime.find(p => p.type === 'day')?.value || '0')
             const hour = parseInt(sriLankaTime.find(p => p.type === 'hour')?.value || '0')
             const minute = parseInt(sriLankaTime.find(p => p.type === 'minute')?.value || '0')
             const second = parseInt(sriLankaTime.find(p => p.type === 'second')?.value || '0')
-            
+
             // Create a Date object representing Sri Lanka local time
             const sriLankaDate = new Date(year, month - 1, day, hour, minute, second)
-            
+
             // Calculate UTC time that represents this Sri Lanka local time
             // Sri Lanka is UTC+5:30, so subtract 5 hours 30 minutes to get UTC
             const offsetMs = (5 * 60 + 30) * 60 * 1000
             const utcDate = new Date(sriLankaDate.getTime() - offsetMs)
-            
+
             // Format as MySQL DATETIME: YYYY-MM-DD HH:MM:SS (UTC)
             const utcYear = utcDate.getUTCFullYear()
             const utcMonth = String(utcDate.getUTCMonth() + 1).padStart(2, '0')
@@ -1472,13 +1497,13 @@ export function StaffBookingManagement() {
             const utcHour = String(utcDate.getUTCHours()).padStart(2, '0')
             const utcMinute = String(utcDate.getUTCMinutes()).padStart(2, '0')
             const utcSecond = String(utcDate.getUTCSeconds()).padStart(2, '0')
-            
+
             return `${utcYear}-${utcMonth}-${utcDay} ${utcHour}:${utcMinute}:${utcSecond}`
           })()
         }
 
-        await placeManagementAPI.updateRecord('bookings', 
-          { id: editingBooking.id }, 
+        await placeManagementAPI.updateRecord('bookings',
+          { id: editingBooking.id },
           updateData
         )
 
@@ -1490,7 +1515,7 @@ export function StaffBookingManagement() {
 
         // Refresh bookings list from database
         await fetchBookings()
-    } else {
+      } else {
         // INSERT new booking
         // Get current time in Sri Lanka timezone (UTC+5:30)
         // Returns UTC time that represents the current Sri Lanka local time
@@ -1506,22 +1531,22 @@ export function StaffBookingManagement() {
             second: '2-digit',
             hour12: false
           }).formatToParts(now)
-          
+
           const year = parseInt(sriLankaTime.find(p => p.type === 'year')?.value || '0')
           const month = parseInt(sriLankaTime.find(p => p.type === 'month')?.value || '0')
           const day = parseInt(sriLankaTime.find(p => p.type === 'day')?.value || '0')
           const hour = parseInt(sriLankaTime.find(p => p.type === 'hour')?.value || '0')
           const minute = parseInt(sriLankaTime.find(p => p.type === 'minute')?.value || '0')
           const second = parseInt(sriLankaTime.find(p => p.type === 'second')?.value || '0')
-          
+
           // Create a Date object representing Sri Lanka local time
           const sriLankaDate = new Date(year, month - 1, day, hour, minute, second)
-          
+
           // Calculate UTC time that represents this Sri Lanka local time
           // Sri Lanka is UTC+5:30, so subtract 5 hours 30 minutes to get UTC
           const offsetMs = (5 * 60 + 30) * 60 * 1000 // 5:30 in milliseconds
           const utcDate = new Date(sriLankaDate.getTime() - offsetMs)
-          
+
           // Format as MySQL DATETIME: YYYY-MM-DD HH:MM:SS (UTC)
           const utcYear = utcDate.getUTCFullYear()
           const utcMonth = String(utcDate.getUTCMonth() + 1).padStart(2, '0')
@@ -1529,13 +1554,13 @@ export function StaffBookingManagement() {
           const utcHour = String(utcDate.getUTCHours()).padStart(2, '0')
           const utcMinute = String(utcDate.getUTCMinutes()).padStart(2, '0')
           const utcSecond = String(utcDate.getUTCSeconds()).padStart(2, '0')
-          
+
           return `${utcYear}-${utcMonth}-${utcDay} ${utcHour}:${utcMinute}:${utcSecond}`
         }
-        
+
         const bookingId = generateUUID()
         const currentTimestamp = getSriLankaTimestamp()
-        
+
         const newBookingData = {
           id: bookingId,
           title: formData.title,
@@ -1614,10 +1639,10 @@ export function StaffBookingManagement() {
 
         // Refresh bookings list from database
         await fetchBookings()
-    }
+      }
 
-    setIsDialogOpen(false)
-    resetForm()
+      setIsDialogOpen(false)
+      resetForm()
     } catch (error: any) {
       // Silent fail - error handled by toast
       toast.error(error.message || 'Failed to save booking', {
@@ -1633,7 +1658,7 @@ export function StaffBookingManagement() {
     const responsiblePersonEmail = booking.responsiblePerson?.email || ''
     const currentUserEmail = user?.email || ''
     const isResponsiblePerson = responsiblePersonEmail.toLowerCase().trim() === currentUserEmail.toLowerCase().trim()
-    
+
     if (!booking.responsiblePerson || !isResponsiblePerson) {
       toast.error('You can only edit bookings where you are the responsible person', {
         position: 'top-center',
@@ -1642,7 +1667,7 @@ export function StaffBookingManagement() {
       })
       return
     }
-    
+
     // Check if booking is completed or cancelled
     if (booking.status === "completed") {
       toast.error("Cannot edit completed bookings", {
@@ -1652,7 +1677,7 @@ export function StaffBookingManagement() {
       })
       return
     }
-    
+
     if (booking.status === "cancelled") {
       toast.error("Cannot edit cancelled bookings", {
         position: 'top-center',
@@ -1676,12 +1701,12 @@ export function StaffBookingManagement() {
     // Staff can only cancel bookings where they are the responsible person (checked by email)
     const booking = bookings.find(b => b.id === id)
     if (!booking) return
-    
+
     // Check by email instead of ID
     const responsiblePersonEmail = booking.responsiblePerson?.email || ''
     const currentUserEmail = user?.email || ''
     const isResponsiblePerson = responsiblePersonEmail.toLowerCase().trim() === currentUserEmail.toLowerCase().trim()
-    
+
     if (!booking.responsiblePerson || !isResponsiblePerson) {
       toast.error('You can only cancel bookings where you are the responsible person', {
         position: 'top-center',
@@ -1690,7 +1715,7 @@ export function StaffBookingManagement() {
       })
       return
     }
-    
+
     // Open cancellation reason dialog
     setBookingToCancel(id)
     setCancellationReason("")
@@ -1702,16 +1727,16 @@ export function StaffBookingManagement() {
     if (booking.cancellation) {
       const cancellationWithReason = {
         ...booking.cancellation,
-        cancellation_reason: booking.cancellation.cancellation_reason || 
-                           booking.cancellation['cancellation_reason'] ||
-                           ''
+        cancellation_reason: booking.cancellation.cancellation_reason ||
+          booking.cancellation['cancellation_reason'] ||
+          ''
       }
-      
+
       setSelectedCancellation(cancellationWithReason)
       setIsCancellationReasonDialogOpen(true)
       return
     }
-    
+
     // If cancellation data is not loaded, try to fetch it
     try {
       const cancellationResponse = await placeManagementAPI.getTableData('booking_cancellations', {
@@ -1722,7 +1747,7 @@ export function StaffBookingManagement() {
         sortBy: 'cancelled_at',
         sortOrder: 'desc'
       })
-      
+
       // Handle different response formats
       let cancellations: any[] = []
       if (Array.isArray(cancellationResponse)) {
@@ -1732,15 +1757,15 @@ export function StaffBookingManagement() {
       } else if (cancellationResponse && cancellationResponse.success && Array.isArray(cancellationResponse.data)) {
         cancellations = cancellationResponse.data
       }
-      
+
       if (cancellations.length > 0) {
         const cancellation = cancellations[0]
-        const reason = cancellation.cancellation_reason || 
-                     cancellation['cancellation_reason'] ||
-                     cancellation.cancellationReason ||
-                     cancellation.reason ||
-                     ''
-        
+        const reason = cancellation.cancellation_reason ||
+          cancellation['cancellation_reason'] ||
+          cancellation.cancellationReason ||
+          cancellation.reason ||
+          ''
+
         const cancellationData: BookingCancellation = {
           id: cancellation.id,
           booking_id: cancellation.booking_id || cancellation.bookingId || booking.id,
@@ -1749,7 +1774,7 @@ export function StaffBookingManagement() {
           cancellation_type: cancellation.cancellation_type || cancellation.cancellationType || 'user_cancelled',
           cancelled_at: cancellation.cancelled_at || cancellation.cancelledAt
         }
-        
+
         setSelectedCancellation(cancellationData)
         setIsCancellationReasonDialogOpen(true)
       } else {
@@ -1770,7 +1795,7 @@ export function StaffBookingManagement() {
 
   const handleConfirmCancellation = async () => {
     if (!bookingToCancel) return
-    
+
     if (!cancellationReason.trim()) {
       toast.error('Please provide a reason for cancellation', {
         position: 'top-center',
@@ -1803,22 +1828,22 @@ export function StaffBookingManagement() {
           second: '2-digit',
           hour12: false
         }).formatToParts(now)
-        
+
         const year = parseInt(sriLankaTime.find(p => p.type === 'year')?.value || '0')
         const month = parseInt(sriLankaTime.find(p => p.type === 'month')?.value || '0')
         const day = parseInt(sriLankaTime.find(p => p.type === 'day')?.value || '0')
         const hour = parseInt(sriLankaTime.find(p => p.type === 'hour')?.value || '0')
         const minute = parseInt(sriLankaTime.find(p => p.type === 'minute')?.value || '0')
         const second = parseInt(sriLankaTime.find(p => p.type === 'second')?.value || '0')
-        
+
         // Create a Date object representing Sri Lanka local time
         const sriLankaDate = new Date(year, month - 1, day, hour, minute, second)
-        
+
         // Calculate UTC time that represents this Sri Lanka local time
         // Sri Lanka is UTC+5:30, so subtract 5 hours 30 minutes to get UTC
         const offsetMs = (5 * 60 + 30) * 60 * 1000
         const utcDate = new Date(sriLankaDate.getTime() - offsetMs)
-        
+
         // Format as MySQL DATETIME: YYYY-MM-DD HH:MM:SS (UTC)
         const utcYear = utcDate.getUTCFullYear()
         const utcMonth = String(utcDate.getUTCMonth() + 1).padStart(2, '0')
@@ -1826,16 +1851,16 @@ export function StaffBookingManagement() {
         const utcHour = String(utcDate.getUTCHours()).padStart(2, '0')
         const utcMinute = String(utcDate.getUTCMinutes()).padStart(2, '0')
         const utcSecond = String(utcDate.getUTCSeconds()).padStart(2, '0')
-        
+
         return `${utcYear}-${utcMonth}-${utcDay} ${utcHour}:${utcMinute}:${utcSecond}`
       }
-      
+
       const currentTimestamp = getSriLankaTimestamp()
 
       // Update booking status
-      await placeManagementAPI.updateRecord('bookings', 
-        { id: bookingToCancel }, 
-        { 
+      await placeManagementAPI.updateRecord('bookings',
+        { id: bookingToCancel },
+        {
           status: 'cancelled',
           cancelled_at: currentTimestamp,
           updated_at: currentTimestamp
@@ -1853,16 +1878,16 @@ export function StaffBookingManagement() {
       }
 
       await placeManagementAPI.insertRecord('booking_cancellations', cancellationData)
-      
+
       // Refresh bookings to get the cancellation reason
       await fetchBookings()
-      
+
       toast.success('Booking cancelled successfully', {
         position: 'top-center',
         duration: 3000,
         icon: '✅'
       })
-      
+
       setIsCancellationDialog(false)
       setCancellationReason("")
       setBookingToCancel(null)
@@ -1952,17 +1977,17 @@ export function StaffBookingManagement() {
   // Format time to HH:MM (removes seconds and handles timestamps)
   const formatTime = (time: string) => {
     if (!time) return ''
-    
+
     // If it's already in HH:MM format, return as is
     if (time.length === 5 && time.includes(':')) {
       return time
     }
-    
+
     // If it's in HH:MM:SS format, remove seconds
     if (time.includes(':')) {
       return time.substring(0, 5)
     }
-    
+
     // If it's a full timestamp, extract time
     try {
       const date = new Date(time)
@@ -1974,28 +1999,28 @@ export function StaffBookingManagement() {
     } catch (e) {
       // Silent fail - return original time string
     }
-    
+
     return time
   }
 
   // Format date to readable format (YYYY-MM-DD to readable)
   const formatDate = (date: string) => {
     if (!date) return ''
-    
+
     try {
       const d = new Date(date)
       if (!isNaN(d.getTime())) {
         // Format as: Jan 15, 2024 or use toLocaleDateString
-        return d.toLocaleDateString('en-US', { 
-          year: 'numeric', 
-          month: 'short', 
-          day: 'numeric' 
+        return d.toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric'
         })
       }
     } catch (e) {
       // Silent fail - return original date string
     }
-    
+
     return date
   }
 
@@ -2013,13 +2038,13 @@ export function StaffBookingManagement() {
     }
 
     // Status filter
-    if (filterStatus !== "all") {
-      filtered = filtered.filter(b => b.status === filterStatus)
+    if (statusFilter !== "all") {
+      filtered = filtered.filter(b => b.status === statusFilter)
     }
 
     // Place filter
-    if (filterPlace !== "all") {
-      filtered = filtered.filter(b => b.placeId === filterPlace || b.place === filterPlace)
+    if (placeFilter !== "all") {
+      filtered = filtered.filter(b => b.placeId === placeFilter || b.place === placeFilter)
     }
 
     // Date range filter
@@ -2031,27 +2056,38 @@ export function StaffBookingManagement() {
     }
 
     setFilteredBookings(filtered)
-  }, [bookings, searchTerm, filterStatus, filterPlace, filterDateFrom, filterDateTo])
+    setCurrentPage(1) // Reset to first page on filter change
+  }, [bookings, searchTerm, statusFilter, placeFilter, filterDateFrom, filterDateTo])
+
+  // Pagination Logic
+  const indexOfLastItem = currentPage * itemsPerPage
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage
+  const paginatedBookings = filteredBookings.slice(indexOfFirstItem, indexOfLastItem)
+  const totalPages = Math.ceil(filteredBookings.length / itemsPerPage)
+
+  const handlePageChange = (pageNumber: number) => {
+    setCurrentPage(pageNumber)
+  }
 
   // Get today's bookings sorted by start time
   const todaysBookings = bookings
     .filter((booking) => {
-    const today = new Date().toISOString().split("T")[0]
-    return booking.date === today && booking.status !== "cancelled"
-  })
+      const today = new Date().toISOString().split("T")[0]
+      return booking.date === today && booking.status !== "cancelled"
+    })
     .sort((a, b) => {
       // Sort by start time
       const timeA = a.startTime.split(':').map(Number)
       const timeB = b.startTime.split(':').map(Number)
       return (timeA[0] * 60 + timeA[1]) - (timeB[0] * 60 + timeB[1])
     })
-  
+
   // Check if a booking is currently ongoing
   const isBookingOngoing = (booking: Booking) => {
     const now = new Date()
     const today = now.toISOString().split('T')[0]
     if (booking.date !== today) return false
-    
+
     const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`
     return currentTime >= booking.startTime && currentTime < booking.endTime
   }
@@ -2062,7 +2098,7 @@ export function StaffBookingManagement() {
     setSelectedEmailParticipants([])
     setEmailType('booking_details')
     setIsEmailDialogOpen(true)
-    
+
     // Load participants for this booking
     await loadBookingParticipants(booking.id)
   }
@@ -2070,14 +2106,14 @@ export function StaffBookingManagement() {
   const loadBookingParticipants = async (bookingId: string) => {
     try {
       setIsLoadingParticipants(true)
-      
+
       // Use the NEW Booking Email API to get participants
       // Get token from localStorage (check both possible keys) - same as OTP email sending
-      const token = localStorage.getItem('authToken') || 
-                    localStorage.getItem('jwt_token') || 
-                    localStorage.getItem('token') || 
-                    ''
-      
+      const token = localStorage.getItem('authToken') ||
+        localStorage.getItem('jwt_token') ||
+        localStorage.getItem('token') ||
+        ''
+
       if (!token) {
         toast.error('Authentication required. Please log in again.', {
           position: 'top-center',
@@ -2086,11 +2122,11 @@ export function StaffBookingManagement() {
         setBookingParticipants([])
         return
       }
-      
+
       // Get required headers from environment (same as OTP email sending)
       const appId = process.env.NEXT_PUBLIC_APP_ID || 'default_app_id'
       const serviceKey = process.env.NEXT_PUBLIC_SERVICE_KEY || 'default_service_key'
-      
+
       // Use same headers as OTP email sending
       const response = await fetch(`/api/booking-email/${bookingId}/participants`, {
         headers: {
@@ -2100,7 +2136,7 @@ export function StaffBookingManagement() {
           'Authorization': `Bearer ${token}`
         }
       })
-      
+
       // Check if response is unauthorized
       if (response.status === 401) {
         toast.error('Authentication failed. Please log in again.', {
@@ -2110,7 +2146,7 @@ export function StaffBookingManagement() {
         setBookingParticipants([])
         return
       }
-      
+
       // Check if response is not OK
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
@@ -2121,9 +2157,9 @@ export function StaffBookingManagement() {
         // Keep participants from booking data if API fails
         return
       }
-      
+
       const result = await response.json()
-      
+
       if (result.success) {
         const participants: BookingParticipant[] = result.data.participants.map((p: any) => ({
           id: p.id,
@@ -2134,12 +2170,12 @@ export function StaffBookingManagement() {
           member_type: p.member_type,
           has_email: p.email ? 1 : 0
         }))
-        
+
         setBookingParticipants(participants)
       } else {
         setBookingParticipants([])
       }
-      
+
     } catch (error: any) {
       setBookingParticipants([])
       toast.error('Failed to load participants')
@@ -2151,29 +2187,29 @@ export function StaffBookingManagement() {
   // Create participants from booking data (original working version)
   const createParticipantsFromBooking = (booking: Booking): BookingParticipant[] => {
     const participants: BookingParticipant[] = []
-    
+
     // Add responsible person
     if (booking.responsiblePerson) {
-      
+
       // Handle both string and object formats for responsiblePerson
       let responsiblePersonName = ''
       let responsiblePersonEmail = ''
-      
+
       if (typeof booking.responsiblePerson === 'string') {
         responsiblePersonName = booking.responsiblePerson
         responsiblePersonEmail = booking.responsiblePersonEmail || ''
       } else if (typeof booking.responsiblePerson === 'object' && booking.responsiblePerson !== null) {
         // Extract name from object
-        responsiblePersonName = booking.responsiblePerson.name || 
-                               booking.responsiblePerson.full_name || 
-                               booking.responsiblePerson.fullName ||
-                               'Responsible Person'
+        responsiblePersonName = booking.responsiblePerson.name ||
+          booking.responsiblePerson.full_name ||
+          booking.responsiblePerson.fullName ||
+          'Responsible Person'
         // Extract email from object or use separate field
-        responsiblePersonEmail = booking.responsiblePerson.email || 
-                                booking.responsiblePersonEmail || 
-                                ''
+        responsiblePersonEmail = booking.responsiblePerson.email ||
+          booking.responsiblePersonEmail ||
+          ''
       }
-      
+
       participants.push({
         id: `responsible-${booking.id}`,
         full_name: responsiblePersonName,
@@ -2184,7 +2220,7 @@ export function StaffBookingManagement() {
         has_email: responsiblePersonEmail ? 1 : 0
       })
     }
-    
+
     // Add internal participants (employees)
     if (booking.selectedEmployees && Array.isArray(booking.selectedEmployees)) {
       booking.selectedEmployees.forEach((employee, index) => {
@@ -2199,7 +2235,7 @@ export function StaffBookingManagement() {
         })
       })
     }
-    
+
     // Add external participants
     if (booking.externalParticipants && Array.isArray(booking.externalParticipants)) {
       booking.externalParticipants.forEach((participant, index) => {
@@ -2214,7 +2250,7 @@ export function StaffBookingManagement() {
         })
       })
     }
-    
+
     return participants
   }
 
@@ -2268,7 +2304,7 @@ export function StaffBookingManagement() {
         } else {
           toast.success(`Reminder emails sent to ${emailsSent} participants`)
         }
-        
+
         // Close dialog
         setIsEmailDialogOpen(false)
         setSelectedBookingForEmail(null)
@@ -2277,7 +2313,7 @@ export function StaffBookingManagement() {
       } else {
         toast.error(result.message || 'Failed to send reminder emails')
       }
-      
+
     } catch (error: any) {
       toast.error('Failed to send reminder emails')
     } finally {
@@ -2299,10 +2335,10 @@ export function StaffBookingManagement() {
   }) => {
     try {
       // Get token from localStorage (check all possible keys)
-      const token = localStorage.getItem('authToken') || 
-                    localStorage.getItem('jwt_token') || 
-                    localStorage.getItem('token') || 
-                    ''
+      const token = localStorage.getItem('authToken') ||
+        localStorage.getItem('jwt_token') ||
+        localStorage.getItem('token') ||
+        ''
 
       if (!token) {
         toast.error('Authentication required. Please log in again.', {
@@ -2322,7 +2358,7 @@ export function StaffBookingManagement() {
       const requestBody = JSON.stringify(bookingData)
 
       const requestStartTime = Date.now()
-      
+
       const response = await fetch(apiUrl, {
         method: requestMethod,
         headers: requestHeaders,
@@ -2344,7 +2380,7 @@ export function StaffBookingManagement() {
           })
           return null
         }
-        
+
         if (response.status === 401) {
           toast.error(errorData.message || 'Authentication failed. Please log in again.', {
             position: 'top-center',
@@ -2387,13 +2423,13 @@ export function StaffBookingManagement() {
 
     try {
       setIsSendingEmails(true)
-      
+
       // Get token from localStorage (check all possible keys)
-      const token = localStorage.getItem('authToken') || 
-                    localStorage.getItem('jwt_token') || 
-                    localStorage.getItem('token') || 
-                    ''
-      
+      const token = localStorage.getItem('authToken') ||
+        localStorage.getItem('jwt_token') ||
+        localStorage.getItem('token') ||
+        ''
+
       if (!token) {
         toast.error('Authentication required. Please log in again.', {
           position: 'top-center',
@@ -2401,7 +2437,7 @@ export function StaffBookingManagement() {
         })
         return
       }
-      
+
       if (!selectedEmailParticipants || selectedEmailParticipants.length === 0) {
         toast.error('Please select at least one participant to send emails to', {
           position: 'top-center',
@@ -2409,15 +2445,15 @@ export function StaffBookingManagement() {
         })
         return
       }
-      
+
       // Get selected participants with valid emails (NEW APPROACH - extract emails directly)
-      const selectedParticipantsWithEmails = bookingParticipants.filter(p => 
-        selectedEmailParticipants.includes(p.id) && 
-        p.email && 
+      const selectedParticipantsWithEmails = bookingParticipants.filter(p =>
+        selectedEmailParticipants.includes(p.id) &&
+        p.email &&
         p.email.trim() !== '' &&
         p.has_email === 1
       )
-      
+
       if (selectedParticipantsWithEmails.length === 0) {
         toast.error('No participants with valid emails found. Please select participants with email addresses.', {
           position: 'top-center',
@@ -2425,12 +2461,12 @@ export function StaffBookingManagement() {
         })
         return
       }
-      
+
       // Extract participant emails
       const participantEmails = selectedParticipantsWithEmails
         .map(p => p.email)
         .filter((email): email is string => !!email && email.trim() !== '')
-      
+
       // Format time - ensure it has seconds (HH:MM:SS)
       const formatTime = (time: string): string => {
         if (!time) return ''
@@ -2441,7 +2477,7 @@ export function StaffBookingManagement() {
         // If already in HH:MM:SS format, return as is
         return time
       }
-      
+
       // Format date - ensure YYYY-MM-DD format
       const formatDate = (date: string): string => {
         if (!date) return ''
@@ -2460,7 +2496,7 @@ export function StaffBookingManagement() {
           return date
         }
       }
-      
+
       // Prepare booking data for NEW SIMPLIFIED API (no booking ID needed!)
       const bookingData = {
         meetingName: selectedBookingForEmail.title || 'Meeting',
@@ -2474,12 +2510,12 @@ export function StaffBookingManagement() {
         customMessage: '',
         bookingRefId: selectedBookingForEmail.bookingRefId || '' // Include booking reference ID
       }
-      
+
       // Use the new simplified API function
       const result = await sendBookingEmailFromFrontend(bookingData)
-      
+
       if (result && result.success) {
-        
+
         // Show success alert popup
         if (result.data?.emailsFailed && result.data.emailsFailed > 0) {
           setEmailAlertMessage(`Emails sent to ${result.data.emailsSent} participants, ${result.data.emailsFailed} failed`)
@@ -2488,7 +2524,7 @@ export function StaffBookingManagement() {
         }
         setEmailAlertType("success")
         setIsEmailAlertDialogOpen(true)
-        
+
         // Close email dialog
         setIsEmailDialogOpen(false)
         setSelectedBookingForEmail(null)
@@ -2500,7 +2536,7 @@ export function StaffBookingManagement() {
         setEmailAlertType("error")
         setIsEmailAlertDialogOpen(true)
       }
-      
+
     } catch (error: any) {
       // Show error alert popup
       setEmailAlertMessage('Failed to send email notifications')
@@ -2511,19 +2547,7 @@ export function StaffBookingManagement() {
     }
   }
 
-  const [filteredEmployees, setFilteredEmployees] = useState<Employee[]>([])
-  
-  // Real-time clock for timeline view
-  const [currentTime, setCurrentTime] = useState(new Date())
-  
-  useEffect(() => {
-    // Update time every second
-    const timer = setInterval(() => {
-      setCurrentTime(new Date())
-    }, 1000)
-    
-    return () => clearInterval(timer)
-  }, [])
+
 
   return (
     <div className="space-y-3 px-2 sm:px-4 max-w-[98vw] mx-auto dark:bg-background">
@@ -2542,631 +2566,630 @@ export function StaffBookingManagement() {
 
         {/* Filters and Button Container */}
         <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
-        {/* Status Filter */}
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          {/* Status Filter */}
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-full sm:w-[150px]">
-            <SelectValue placeholder="All Status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="upcoming">Upcoming</SelectItem>
-            <SelectItem value="ongoing">Ongoing</SelectItem>
-            <SelectItem value="completed">Completed</SelectItem>
-            <SelectItem value="cancelled">Cancelled</SelectItem>
-          </SelectContent>
-        </Select>
+              <SelectValue placeholder="All Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Status</SelectItem>
+              <SelectItem value="upcoming">Upcoming</SelectItem>
+              <SelectItem value="ongoing">Ongoing</SelectItem>
+              <SelectItem value="completed">Completed</SelectItem>
+              <SelectItem value="cancelled">Cancelled</SelectItem>
+            </SelectContent>
+          </Select>
 
-        {/* Place Filter */}
-        <Select value={placeFilter} onValueChange={setPlaceFilter}>
+          {/* Place Filter */}
+          <Select value={placeFilter} onValueChange={setPlaceFilter}>
             <SelectTrigger className="w-full sm:w-[180px]">
-            <SelectValue placeholder="All Places" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Places</SelectItem>
-            {Array.from(new Set(bookings.map(b => b.place))).map(place => (
-              <SelectItem key={place} value={place}>{place}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+              <SelectValue placeholder="All Places" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Places</SelectItem>
+              {Array.from(new Set(bookings.map(b => b.place))).map(place => (
+                <SelectItem key={place} value={place}>{place}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
-        {/* Date Range Filter */}
-        <div className="flex items-center gap-2">
-          <Input
-            type="date"
-            placeholder="From Date"
-            value={filterDateFrom}
-            onChange={(e) => setFilterDateFrom(e.target.value)}
-            className="w-full sm:w-[140px]"
-          />
-          <span className="text-muted-foreground hidden sm:inline">to</span>
-          <Input
-            type="date"
-            placeholder="To Date"
-            value={filterDateTo}
-            onChange={(e) => setFilterDateTo(e.target.value)}
-            className="w-full sm:w-[140px]"
-            min={filterDateFrom || undefined}
-          />
-        </div>
+          {/* Date Range Filter */}
+          <div className="flex items-center gap-2">
+            <Input
+              type="date"
+              placeholder="From Date"
+              value={filterDateFrom}
+              onChange={(e) => setFilterDateFrom(e.target.value)}
+              className="w-full sm:w-[140px]"
+            />
+            <span className="text-muted-foreground hidden sm:inline">to</span>
+            <Input
+              type="date"
+              placeholder="To Date"
+              value={filterDateTo}
+              onChange={(e) => setFilterDateTo(e.target.value)}
+              className="w-full sm:w-[140px]"
+              min={filterDateFrom || undefined}
+            />
+          </div>
 
-        {/* New Booking Button */}
-        <Button 
+          {/* New Booking Button */}
+          <Button
             onClick={() => window.location.href = '/staff/bookings/new'}
             className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-lg w-full sm:w-auto whitespace-nowrap"
-        >
-          <Plus className="h-4 w-4" />
+          >
+            <Plus className="h-4 w-4" />
             <span className="hidden sm:inline">New Booking</span>
             <span className="sm:hidden">New</span>
-        </Button>
+          </Button>
         </div>
       </div>
 
       {/* Hidden dialog - kept for edit functionality */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-w-[95vw] w-full max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>{editingBooking ? "Edit Booking" : "Create New Booking"}</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="title">Booking Title *</Label>
-                  <Input
-                    id="title"
-                    value={formData.title}
-                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="date">Date *</Label>
-                  <Input
-                    id="date"
-                    type="date"
-                    value={formData.date}
-                    onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                    required
-                  />
-                </div>
-              </div>
-
+          <DialogHeader>
+            <DialogTitle>{editingBooking ? "Edit Booking" : "Create New Booking"}</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="description">Description</Label>
-                <Textarea
-                  id="description"
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  rows={3}
+                <Label htmlFor="title">Booking Title *</Label>
+                <Input
+                  id="title"
+                  value={formData.title}
+                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                  required
                 />
               </div>
-
-              <div className="grid grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="place">Place *</Label>
-                  <Select 
-                    value={formData.place} 
-                    onValueChange={(value) => setFormData({ ...formData, place: value })}
-                    disabled={!formData.date || isLoadingPlaces}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder={
-                        !formData.date 
-                          ? "Select date first" 
-                          : isLoadingPlaces 
-                            ? "Loading places..." 
-                            : availablePlaces.length === 0 
-                              ? "No places available" 
-                              : "Select place"
-                      } />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {isLoadingPlaces ? (
-                        <div className="flex items-center justify-center p-4">
-                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                          <span>Loading available places...</span>
-                        </div>
-                      ) : availablePlaces.length === 0 ? (
-                        <div className="p-4 text-center text-muted-foreground">
-                          <AlertTriangle className="h-4 w-4 mx-auto mb-2" />
-                          <p className="text-sm">No places available for this date</p>
-                        </div>
-                      ) : (
-                        availablePlaces.map((place) => (
-                          <SelectItem key={place.id} value={place.id}>
-                            <div className="flex flex-col">
-                              <span className="font-medium">{place.name}</span>
-                              <span className="text-xs text-muted-foreground">
-                                {place.operatingHours} • Capacity: {place.capacity}
-                              </span>
-                            </div>
-                        </SelectItem>
-                        ))
-                      )}
-                    </SelectContent>
-                  </Select>
-                  {formData.date && !isLoadingPlaces && availablePlaces.length > 0 && (
-                    <p className="text-xs text-green-600">
-                      ✅ {availablePlaces.length} place(s) available for {getDayOfWeek(formData.date)}
-                    </p>
-                  )}
-                </div>
-                <div className="col-span-2 space-y-2">
-                  <Label htmlFor="timeSlot">Available Time Slots *</Label>
-                  <Select
-                    value={selectedTimeGap}
-                    onValueChange={(value) => {
-                      setSelectedTimeGap(value)
-                      // Extract start and end time from selected gap
-                      const gap = availableTimeGaps.find(g => `${g.start} - ${g.end}` === value)
-                      if (gap) {
-                        setFormData({
-                          ...formData,
-                          startTime: gap.start,
-                          endTime: gap.end
-                        })
-                      }
-                    }}
-                    disabled={!formData.date || !formData.place}
-                  >
-                    <SelectTrigger className="h-auto py-3">
-                      <SelectValue placeholder={
-                        !formData.date ? "Select date first" :
-                        !formData.place ? "Select place first" :
-                        availableTimeGaps.length === 0 ? "No available time slots" :
-                        "Select an available time slot"
-                      } />
-                    </SelectTrigger>
-                    <SelectContent className="max-h-[400px] w-full min-w-[500px]">
-                      {availableTimeGaps.length === 0 ? (
-                        <div className="p-4 text-center text-sm text-muted-foreground">
-                          {!formData.date || !formData.place ? 
-                            "Select date and place first" :
-                            "No available time slots for this date and place"
-                          }
-                </div>
-                      ) : (
-                        availableTimeGaps.map((gap) => (
-                          <SelectItem 
-                            key={`${gap.start}-${gap.end}`} 
-                            value={`${gap.start} - ${gap.end}`}
-                            className="py-3 cursor-pointer"
-                          >
-                            <div className="flex items-center justify-between w-full gap-8">
-                              <span className="font-semibold text-base">{gap.start} - {gap.end}</span>
-                              <span className="text-sm text-green-600 font-medium">Duration: {gap.duration}</span>
-                            </div>
-                          </SelectItem>
-                        ))
-                      )}
-                    </SelectContent>
-                  </Select>
-                  {availableTimeGaps.length > 0 && (
-                    <p className="text-xs text-green-600">
-                      ✅ {availableTimeGaps.length} time slot(s) available (min. {minBookingDuration >= 60 ? `${minBookingDuration / 60}h` : `${minBookingDuration}min`})
-                    </p>
-                  )}
-                  {selectedTimeGap && (
-                    <div className="p-4 bg-green-50 border-2 border-green-300 rounded-lg">
-                      <div className="flex items-center gap-2 mb-2">
-                        <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                        <p className="text-sm font-semibold text-green-900">Selected Time Slot</p>
-                      </div>
-                      <p className="text-lg font-bold text-green-800 mb-1">
-                        {selectedTimeGap}
-                      </p>
-                      <p className="text-xs text-green-700">
-                        Start: {formData.startTime} | End: {formData.endTime}
-                      </p>
-                    </div>
-                  )}
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="date">Date *</Label>
+                <Input
+                  id="date"
+                  type="date"
+                  value={formData.date}
+                  onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                  required
+                />
               </div>
+            </div>
 
-              <div className="space-y-4">
-                <Label>Employee Participants</Label>
+            <div className="space-y-2">
+              <Label htmlFor="description">Description</Label>
+              <Textarea
+                id="description"
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                rows={3}
+              />
+            </div>
 
-                {/* Selected Employees Display */}
-                {formData.selectedEmployees.length > 0 && (
-                  <div className="space-y-2">
-                    <p className="text-sm text-muted-foreground">
-                      Selected Employees ({formData.selectedEmployees.length})
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      {formData.selectedEmployees.map((employee) => (
-                        <Badge key={employee.id} variant="secondary" className="flex items-center gap-2 px-3 py-1">
-                          <div className="flex flex-col items-start">
-                            <span className="font-medium">{employee.name}</span>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="place">Place *</Label>
+                <Select
+                  value={formData.place}
+                  onValueChange={(value) => setFormData({ ...formData, place: value })}
+                  disabled={!formData.date || isLoadingPlaces}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={
+                      !formData.date
+                        ? "Select date first"
+                        : isLoadingPlaces
+                          ? "Loading places..."
+                          : availablePlaces.length === 0
+                            ? "No places available"
+                            : "Select place"
+                    } />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {isLoadingPlaces ? (
+                      <div className="flex items-center justify-center p-4">
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        <span>Loading available places...</span>
+                      </div>
+                    ) : availablePlaces.length === 0 ? (
+                      <div className="p-4 text-center text-muted-foreground">
+                        <AlertTriangle className="h-4 w-4 mx-auto mb-2" />
+                        <p className="text-sm">No places available for this date</p>
+                      </div>
+                    ) : (
+                      availablePlaces.map((place) => (
+                        <SelectItem key={place.id} value={place.id}>
+                          <div className="flex flex-col">
+                            <span className="font-medium">{place.name}</span>
                             <span className="text-xs text-muted-foreground">
-                              {employee.department} • {employee.role}
+                              {place.operatingHours} • Capacity: {place.capacity}
                             </span>
                           </div>
-                          <X
-                            className="h-3 w-3 cursor-pointer hover:text-destructive"
-                            onClick={() => removeEmployee(employee.id)}
-                          />
-                        </Badge>
-                      ))}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+                {formData.date && !isLoadingPlaces && availablePlaces.length > 0 && (
+                  <p className="text-xs text-green-600">
+                    ✅ {availablePlaces.length} place(s) available for {getDayOfWeek(formData.date)}
+                  </p>
+                )}
+              </div>
+              <div className="col-span-2 space-y-2">
+                <Label htmlFor="timeSlot">Available Time Slots *</Label>
+                <Select
+                  value={selectedTimeGap}
+                  onValueChange={(value) => {
+                    setSelectedTimeGap(value)
+                    // Extract start and end time from selected gap
+                    const gap = availableTimeGaps.find(g => `${g.start} - ${g.end}` === value)
+                    if (gap) {
+                      setFormData({
+                        ...formData,
+                        startTime: gap.start,
+                        endTime: gap.end
+                      })
+                    }
+                  }}
+                  disabled={!formData.date || !formData.place}
+                >
+                  <SelectTrigger className="h-auto py-3">
+                    <SelectValue placeholder={
+                      !formData.date ? "Select date first" :
+                        !formData.place ? "Select place first" :
+                          availableTimeGaps.length === 0 ? "No available time slots" :
+                            "Select an available time slot"
+                    } />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-[400px] w-full min-w-[500px]">
+                    {availableTimeGaps.length === 0 ? (
+                      <div className="p-4 text-center text-sm text-muted-foreground">
+                        {!formData.date || !formData.place ?
+                          "Select date and place first" :
+                          "No available time slots for this date and place"
+                        }
+                      </div>
+                    ) : (
+                      availableTimeGaps.map((gap) => (
+                        <SelectItem
+                          key={`${gap.start}-${gap.end}`}
+                          value={`${gap.start} - ${gap.end}`}
+                          className="py-3 cursor-pointer"
+                        >
+                          <div className="flex items-center justify-between w-full gap-8">
+                            <span className="font-semibold text-base">{gap.start} - {gap.end}</span>
+                            <span className="text-sm text-green-600 font-medium">Duration: {gap.duration}</span>
+                          </div>
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+                {availableTimeGaps.length > 0 && (
+                  <p className="text-xs text-green-600">
+                    ✅ {availableTimeGaps.length} time slot(s) available (min. {minBookingDuration >= 60 ? `${minBookingDuration / 60}h` : `${minBookingDuration}min`})
+                  </p>
+                )}
+                {selectedTimeGap && (
+                  <div className="p-4 bg-green-50 border-2 border-green-300 rounded-lg">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                      <p className="text-sm font-semibold text-green-900">Selected Time Slot</p>
                     </div>
+                    <p className="text-lg font-bold text-green-800 mb-1">
+                      {selectedTimeGap}
+                    </p>
+                    <p className="text-xs text-green-700">
+                      Start: {formData.startTime} | End: {formData.endTime}
+                    </p>
                   </div>
                 )}
+              </div>
+            </div>
 
-                {/* Smart Search Input */}
-                <div className="relative">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Search employees by name, department, or role..."
-                      value={employeeSearch}
-                      onChange={(e) => handleEmployeeSearch(e.target.value)}
-                      onFocus={() => {
-                        if (filteredEmployees.length > 0) {
-                          setShowEmployeeDropdown(true)
-                        }
-                      }}
-                      className="pl-10 pr-10"
-                    />
-                    {employeeSearch && (
-                      <X
-                        className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground cursor-pointer hover:text-foreground"
-                        onClick={() => {
-                          setEmployeeSearch("")
-                          setShowEmployeeDropdown(false)
-                          setFilteredEmployees([])
-                        }}
-                      />
-                    )}
+            <div className="space-y-4">
+              <Label>Employee Participants</Label>
+
+              {/* Selected Employees Display */}
+              {formData.selectedEmployees.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">
+                    Selected Employees ({formData.selectedEmployees.length})
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {formData.selectedEmployees.map((employee) => (
+                      <Badge key={employee.id} variant="secondary" className="flex items-center gap-2 px-3 py-1">
+                        <div className="flex flex-col items-start">
+                          <span className="font-medium">{employee.name}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {employee.department} • {employee.role}
+                          </span>
+                        </div>
+                        <X
+                          className="h-3 w-3 cursor-pointer hover:text-destructive"
+                          onClick={() => removeEmployee(employee.id)}
+                        />
+                      </Badge>
+                    ))}
                   </div>
+                </div>
+              )}
 
-                  {/* Dropdown Results */}
-                  {showEmployeeDropdown && filteredEmployees.length > 0 && (
-                    <div className="absolute z-50 w-full mt-1 bg-background border border-border rounded-md shadow-lg max-h-60 overflow-y-auto">
-                      {filteredEmployees.map((employee) => {
-                        const isSelected = formData.selectedEmployees.find((emp) => emp.id === employee.id)
-                        return (
-                          <div
-                            key={employee.id}
-                            className={`p-3 cursor-pointer hover:bg-muted transition-colors ${
-                              isSelected ? "bg-muted opacity-50" : ""
-                            }`}
-                            onClick={() => !isSelected && selectEmployee(employee)}
-                          >
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <p className="font-medium text-sm">{employee.name}</p>
-                                <p className="text-xs text-muted-foreground">
-                                  {employee.department} • {employee.role}
-                                </p>
-                                <p className="text-xs text-muted-foreground">{employee.email}</p>
-                              </div>
-                              {isSelected && (
-                                <Badge variant="outline" className="text-xs">
-                                  Selected
-                                </Badge>
-                              )}
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
+              {/* Smart Search Input */}
+              <div className="relative">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search employees by name, department, or role..."
+                    value={employeeSearch}
+                    onChange={(e) => handleEmployeeSearch(e.target.value)}
+                    onFocus={() => {
+                      if (filteredEmployees.length > 0) {
+                        setShowEmployeeDropdown(true)
+                      }
+                    }}
+                    className="pl-10 pr-10"
+                  />
+                  {employeeSearch && (
+                    <X
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground cursor-pointer hover:text-foreground"
+                      onClick={() => {
+                        setEmployeeSearch("")
+                        setShowEmployeeDropdown(false)
+                        setFilteredEmployees([])
+                      }}
+                    />
                   )}
                 </div>
 
-                {employeeSearch && filteredEmployees.length === 0 && (
-                  <p className="text-sm text-muted-foreground">No employees found matching "{employeeSearch}"</p>
-                )}
-              </div>
-
-              <div className="space-y-4">
-                <div className="flex items-center gap-2">
-                <Label>Responsible Person *</Label>
-                              <Badge variant="outline" className="text-xs">
-                    <Lock className="h-3 w-3 mr-1" />
-                    Locked
-                              </Badge>
-                            </div>
-                <p className="text-xs text-muted-foreground mb-2">
-                  You are the responsible person for this booking and cannot be changed
-                </p>
-                {formData.responsiblePerson ? (
-                  <div className="p-3 bg-primary/5 border-2 border-primary/20 rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <Avatar className="h-10 w-10 border-2 border-primary">
-                        <AvatarFallback className="bg-primary text-primary-foreground font-semibold text-sm">
-                          {formData.responsiblePerson.name
-                            .split(" ")
-                            .map((n) => n[0])
-                            .join("")
-                            .substring(0, 2)
-                            .toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <p className="text-sm font-semibold">{formData.responsiblePerson.name}</p>
-                          <Lock className="h-3 w-3 text-muted-foreground" />
-                      </div>
-                        <p className="text-xs text-muted-foreground">{formData.responsiblePerson.email}</p>
-                        <Badge variant="outline" className="mt-1 text-xs">{formData.responsiblePerson.role}</Badge>
-                    </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="p-3 bg-muted/50 border-2 border-dashed rounded-lg text-center">
-                    <p className="text-sm text-muted-foreground">No responsible person set</p>
-                  </div>
-                )}
-              </div>
-
-              <div className="space-y-4">
-                <Label>External Participants</Label>
-
-                {formData.externalParticipants.length > 0 && (
-                  <div className="space-y-2">
-                    {formData.externalParticipants.map((participant) => (
-                      <div key={participant.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                        <div>
-                          <p className="font-medium">{participant.fullName}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {participant.email} • {participant.phone} • {participant.referenceType}:{" "}
-                            {participant.referenceValue}
-                          </p>
-                        </div>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => removeExternalParticipant(participant.id)}
+                {/* Dropdown Results */}
+                {showEmployeeDropdown && filteredEmployees.length > 0 && (
+                  <div className="absolute z-50 w-full mt-1 bg-background border border-border rounded-md shadow-lg max-h-60 overflow-y-auto">
+                    {filteredEmployees.map((employee) => {
+                      const isSelected = formData.selectedEmployees.find((emp) => emp.id === employee.id)
+                      return (
+                        <div
+                          key={employee.id}
+                          className={`p-3 cursor-pointer hover:bg-muted transition-colors ${isSelected ? "bg-muted opacity-50" : ""
+                            }`}
+                          onClick={() => !isSelected && selectEmployee(employee)}
                         >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))}
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="font-medium text-sm">{employee.name}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {employee.department} • {employee.role}
+                              </p>
+                              <p className="text-xs text-muted-foreground">{employee.email}</p>
+                            </div>
+                            {isSelected && (
+                              <Badge variant="outline" className="text-xs">
+                                Selected
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
                   </div>
                 )}
+              </div>
 
+              {employeeSearch && filteredEmployees.length === 0 && (
+                <p className="text-sm text-muted-foreground">No employees found matching "{employeeSearch}"</p>
+              )}
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <Label>Responsible Person *</Label>
+                <Badge variant="outline" className="text-xs">
+                  <Lock className="h-3 w-3 mr-1" />
+                  Locked
+                </Badge>
+              </div>
+              <p className="text-xs text-muted-foreground mb-2">
+                You are the responsible person for this booking and cannot be changed
+              </p>
+              {formData.responsiblePerson ? (
+                <div className="p-3 bg-primary/5 border-2 border-primary/20 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-10 w-10 border-2 border-primary">
+                      <AvatarFallback className="bg-primary text-primary-foreground font-semibold text-sm">
+                        {formData.responsiblePerson.name
+                          .split(" ")
+                          .map((n) => n[0])
+                          .join("")
+                          .substring(0, 2)
+                          .toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <p className="text-sm font-semibold">{formData.responsiblePerson.name}</p>
+                        <Lock className="h-3 w-3 text-muted-foreground" />
+                      </div>
+                      <p className="text-xs text-muted-foreground">{formData.responsiblePerson.email}</p>
+                      <Badge variant="outline" className="mt-1 text-xs">{formData.responsiblePerson.role}</Badge>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-3 bg-muted/50 border-2 border-dashed rounded-lg text-center">
+                  <p className="text-sm text-muted-foreground">No responsible person set</p>
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-4">
+              <Label>External Participants</Label>
+
+              {formData.externalParticipants.length > 0 && (
+                <div className="space-y-2">
+                  {formData.externalParticipants.map((participant) => (
+                    <div key={participant.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                      <div>
+                        <p className="font-medium">{participant.fullName}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {participant.email} • {participant.phone} • {participant.referenceType}:{" "}
+                          {participant.referenceValue}
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => removeExternalParticipant(participant.id)}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-sm">Add External Participant</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="extFullName">Full Name *</Label>
+                      <Input
+                        id="extFullName"
+                        value={newExternalParticipant.fullName}
+                        onChange={(e) =>
+                          setNewExternalParticipant({ ...newExternalParticipant, fullName: e.target.value })
+                        }
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="extEmail">Email</Label>
+                      <Input
+                        id="extEmail"
+                        type="email"
+                        value={newExternalParticipant.email}
+                        onChange={(e) =>
+                          setNewExternalParticipant({ ...newExternalParticipant, email: e.target.value })
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="extPhone">Phone *</Label>
+                      <Input
+                        id="extPhone"
+                        type="tel"
+                        value={newExternalParticipant.phone}
+                        onChange={(e) =>
+                          setNewExternalParticipant({ ...newExternalParticipant, phone: e.target.value })
+                        }
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="extRefType">Reference Type *</Label>
+                      <Select
+                        value={newExternalParticipant.referenceType}
+                        onValueChange={(value: any) =>
+                          setNewExternalParticipant({ ...newExternalParticipant, referenceType: value })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="NIC">NIC</SelectItem>
+                          <SelectItem value="Passport">Passport</SelectItem>
+                          <SelectItem value="Employee ID">Employee ID</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="extRefValue">Reference Value *</Label>
+                      <Input
+                        id="extRefValue"
+                        value={newExternalParticipant.referenceValue}
+                        onChange={(e) =>
+                          setNewExternalParticipant({ ...newExternalParticipant, referenceValue: e.target.value })
+                        }
+                      />
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={addExternalParticipant}
+                    className="w-full bg-transparent"
+                  >
+                    Add Participant
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="refreshmentsRequired"
+                  checked={formData.refreshments.required}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      refreshments: {
+                        ...formData.refreshments,
+                        required: e.target.checked,
+                      },
+                    })
+                  }
+                  className="rounded border-input"
+                />
+                <Label htmlFor="refreshmentsRequired" className="text-base font-medium">
+                  Refreshments Required
+                </Label>
+              </div>
+
+              {formData.refreshments.required && (
                 <Card>
                   <CardHeader>
-                    <CardTitle className="text-sm">Add External Participant</CardTitle>
+                    <CardTitle className="text-sm">Refreshment Details</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label htmlFor="extFullName">Full Name *</Label>
-                        <Input
-                          id="extFullName"
-                          value={newExternalParticipant.fullName}
-                          onChange={(e) =>
-                            setNewExternalParticipant({ ...newExternalParticipant, fullName: e.target.value })
-                          }
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="extEmail">Email</Label>
-                        <Input
-                          id="extEmail"
-                          type="email"
-                          value={newExternalParticipant.email}
-                          onChange={(e) =>
-                            setNewExternalParticipant({ ...newExternalParticipant, email: e.target.value })
-                          }
-                        />
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-3 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="extPhone">Phone *</Label>
-                        <Input
-                          id="extPhone"
-                          type="tel"
-                          value={newExternalParticipant.phone}
-                          onChange={(e) =>
-                            setNewExternalParticipant({ ...newExternalParticipant, phone: e.target.value })
-                          }
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="extRefType">Reference Type *</Label>
+                        <Label htmlFor="refreshmentType">Refreshment Type</Label>
                         <Select
-                          value={newExternalParticipant.referenceType}
-                          onValueChange={(value: any) =>
-                            setNewExternalParticipant({ ...newExternalParticipant, referenceType: value })
+                          value={formData.refreshments.type}
+                          onValueChange={(value) =>
+                            setFormData({
+                              ...formData,
+                              refreshments: {
+                                ...formData.refreshments,
+                                type: value,
+                              },
+                            })
                           }
                         >
                           <SelectTrigger>
-                            <SelectValue />
+                            <SelectValue placeholder="Select type" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="NIC">NIC</SelectItem>
-                            <SelectItem value="Passport">Passport</SelectItem>
-                            <SelectItem value="Employee ID">Employee ID</SelectItem>
+                            <SelectItem value="Light Refreshments">Light Refreshments</SelectItem>
+                            <SelectItem value="Full Catering">Full Catering</SelectItem>
+                            <SelectItem value="Beverages Only">Beverages Only</SelectItem>
+                            <SelectItem value="Custom">Custom</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="extRefValue">Reference Value *</Label>
+                        <Label htmlFor="servingTime">Serving Time</Label>
                         <Input
-                          id="extRefValue"
-                          value={newExternalParticipant.referenceValue}
-                          onChange={(e) =>
-                            setNewExternalParticipant({ ...newExternalParticipant, referenceValue: e.target.value })
-                          }
-                        />
-                      </div>
-                    </div>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={addExternalParticipant}
-                      className="w-full bg-transparent"
-                    >
-                      Add Participant
-                    </Button>
-                  </CardContent>
-                </Card>
-              </div>
-
-              <div className="space-y-4">
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    id="refreshmentsRequired"
-                    checked={formData.refreshments.required}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        refreshments: {
-                          ...formData.refreshments,
-                          required: e.target.checked,
-                        },
-                      })
-                    }
-                    className="rounded border-input"
-                  />
-                  <Label htmlFor="refreshmentsRequired" className="text-base font-medium">
-                    Refreshments Required
-                  </Label>
-                </div>
-
-                {formData.refreshments.required && (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-sm">Refreshment Details</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="refreshmentType">Refreshment Type</Label>
-                          <Select
-                            value={formData.refreshments.type}
-                            onValueChange={(value) =>
-                              setFormData({
-                                ...formData,
-                                refreshments: {
-                                  ...formData.refreshments,
-                                  type: value,
-                                },
-                              })
-                            }
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select type" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="Light Refreshments">Light Refreshments</SelectItem>
-                              <SelectItem value="Full Catering">Full Catering</SelectItem>
-                              <SelectItem value="Beverages Only">Beverages Only</SelectItem>
-                              <SelectItem value="Custom">Custom</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="servingTime">Serving Time</Label>
-                          <Input
-                            id="servingTime"
-                            type="time"
-                            value={formData.refreshments.servingTime}
-                            onChange={(e) =>
-                              setFormData({
-                                ...formData,
-                                refreshments: {
-                                  ...formData.refreshments,
-                                  servingTime: e.target.value,
-                                },
-                              })
-                            }
-                          />
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label>Refreshment Items</Label>
-                        <div className="flex flex-wrap gap-2 mb-2">
-                          {formData.refreshments.items.map((item) => (
-                            <Badge key={item} variant="secondary" className="flex items-center gap-1">
-                              {item}
-                              <X className="h-3 w-3 cursor-pointer" onClick={() => removeRefreshmentItem(item)} />
-                            </Badge>
-                          ))}
-                        </div>
-                        <div className="flex gap-2">
-                          <Select onValueChange={(value) => addRefreshmentItem(value)}>
-                            <SelectTrigger className="flex-1">
-                              <SelectValue placeholder="Add refreshment item" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="Coffee">Coffee</SelectItem>
-                              <SelectItem value="Tea">Tea</SelectItem>
-                              <SelectItem value="Water">Water</SelectItem>
-                              <SelectItem value="Juice">Juice</SelectItem>
-                              <SelectItem value="Cookies">Cookies</SelectItem>
-                              <SelectItem value="Sandwiches">Sandwiches</SelectItem>
-                              <SelectItem value="Lunch">Lunch</SelectItem>
-                              <SelectItem value="Breakfast">Breakfast</SelectItem>
-                              <SelectItem value="Dessert">Dessert</SelectItem>
-                              <SelectItem value="Fruits">Fruits</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="estimatedCount">Estimated Count</Label>
-                          <Input
-                            id="estimatedCount"
-                            type="number"
-                            min="1"
-                            value={formData.refreshments.estimatedCount}
-                            onChange={(e) =>
-                              setFormData({
-                                ...formData,
-                                refreshments: {
-                                  ...formData.refreshments,
-                                  estimatedCount: Number.parseInt(e.target.value) || 0,
-                                },
-                              })
-                            }
-                          />
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="specialRequests">Special Requests</Label>
-                        <Textarea
-                          id="specialRequests"
-                          value={formData.refreshments.specialRequests}
+                          id="servingTime"
+                          type="time"
+                          value={formData.refreshments.servingTime}
                           onChange={(e) =>
                             setFormData({
                               ...formData,
                               refreshments: {
                                 ...formData.refreshments,
-                                specialRequests: e.target.value,
+                                servingTime: e.target.value,
                               },
                             })
                           }
-                          placeholder="Dietary restrictions, allergies, special requirements..."
-                          rows={2}
                         />
                       </div>
-                    </CardContent>
-                  </Card>
-                )}
-              </div>
+                    </div>
 
-              <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
-                  Cancel
-                </Button>
-                <Button type="submit">{editingBooking ? "Update" : "Create"} Booking</Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
+                    <div className="space-y-2">
+                      <Label>Refreshment Items</Label>
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        {formData.refreshments.items.map((item) => (
+                          <Badge key={item} variant="secondary" className="flex items-center gap-1">
+                            {item}
+                            <X className="h-3 w-3 cursor-pointer" onClick={() => removeRefreshmentItem(item)} />
+                          </Badge>
+                        ))}
+                      </div>
+                      <div className="flex gap-2">
+                        <Select onValueChange={(value) => addRefreshmentItem(value)}>
+                          <SelectTrigger className="flex-1">
+                            <SelectValue placeholder="Add refreshment item" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Coffee">Coffee</SelectItem>
+                            <SelectItem value="Tea">Tea</SelectItem>
+                            <SelectItem value="Water">Water</SelectItem>
+                            <SelectItem value="Juice">Juice</SelectItem>
+                            <SelectItem value="Cookies">Cookies</SelectItem>
+                            <SelectItem value="Sandwiches">Sandwiches</SelectItem>
+                            <SelectItem value="Lunch">Lunch</SelectItem>
+                            <SelectItem value="Breakfast">Breakfast</SelectItem>
+                            <SelectItem value="Dessert">Dessert</SelectItem>
+                            <SelectItem value="Fruits">Fruits</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="estimatedCount">Estimated Count</Label>
+                        <Input
+                          id="estimatedCount"
+                          type="number"
+                          min="1"
+                          value={formData.refreshments.estimatedCount}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              refreshments: {
+                                ...formData.refreshments,
+                                estimatedCount: Number.parseInt(e.target.value) || 0,
+                              },
+                            })
+                          }
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="specialRequests">Special Requests</Label>
+                      <Textarea
+                        id="specialRequests"
+                        value={formData.refreshments.specialRequests}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            refreshments: {
+                              ...formData.refreshments,
+                              specialRequests: e.target.value,
+                            },
+                          })
+                        }
+                        placeholder="Dietary restrictions, allergies, special requirements..."
+                        rows={2}
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit">{editingBooking ? "Update" : "Create"} Booking</Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {/* Compact Results Summary */}
       <div className="flex items-center justify-between px-2">
         <div className="text-sm text-muted-foreground">
-          Showing <strong className="text-foreground">{filteredBookings.length}</strong> of <strong className="text-foreground">{bookings.length}</strong> bookings
+          Showing <strong className="text-foreground">{Math.min(indexOfFirstItem + 1, filteredBookings.length)}-{Math.min(indexOfLastItem, filteredBookings.length)}</strong> of <strong className="text-foreground">{filteredBookings.length}</strong> bookings
           {(searchTerm || statusFilter !== "all" || placeFilter !== "all" || filterDateFrom || filterDateTo) && (
             <Badge variant="secondary" className="ml-2">Filters active</Badge>
           )}
@@ -3226,220 +3249,288 @@ export function StaffBookingManagement() {
                   </p>
                 </div>
               ) : (
-              <div className="border rounded-lg overflow-hidden dark:border-border">
-                <div className="overflow-x-auto">
-                  <div className="max-h-[calc(7*60px)] overflow-y-auto table-scroll-container-vertical">
-                    <Table>
-                      <TableHeader className="sticky top-0 z-10 bg-background dark:bg-card">
-                        <TableRow>
-                          <TableHead className="w-[100px] text-[12px]">Ref ID</TableHead>
-                          <TableHead className="min-w-[200px] text-[12px]">Title</TableHead>
-                          <TableHead className="w-[150px] text-[12px]">Date & Time</TableHead>
-                          <TableHead className="w-[120px] text-[12px]">Place</TableHead>
-                          <TableHead className="min-w-[150px] text-[12px]">Responsible</TableHead>
-                          <TableHead className="w-[120px] text-[12px]">Participants</TableHead>
-                          <TableHead className="w-[100px] text-[12px]">Status</TableHead>
-                          <TableHead className="w-[150px] text-[12px]">Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                    {filteredBookings.map((booking) => (
-                    <TableRow key={booking.id} onClick={(e) => e.stopPropagation()}>
-                      <TableCell className="text-[12px]">
-                        {booking.bookingRefId ? (
-                          <Badge variant="secondary" className="font-mono font-bold text-[11px]">
-                            {booking.bookingRefId}
-                          </Badge>
-                        ) : (
-                          <span className="text-[11px] text-muted-foreground">—</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-[12px]">
-                        <div>
-                          <div className="flex items-center gap-1.5">
-                            <p className="font-medium text-[12px] truncate">{booking.title}</p>
-                            {booking.refreshments?.required && (
-                              <Badge variant="outline" className="text-orange-600 border-orange-600 text-[10px] px-1 py-0">
-                                🍽️
-                              </Badge>
-                            )}
-                          </div>
-                          {booking.description && (
-                            <p className="text-[11px] text-muted-foreground truncate">{booking.description}</p>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-[12px]">
-                        <div className="flex items-center gap-1.5">
-                          <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
-                          <div>
-                            <p className="text-[11px] font-medium">{formatDate(booking.date)}</p>
-                            <p className="text-[10px] text-muted-foreground">
-                              {formatTime(booking.startTime)} - {formatTime(booking.endTime)}
-                            </p>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-[12px]">
-                        <div className="flex items-center gap-1.5">
-                          <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
-                          <span className="truncate">{booking.place}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-[12px]">
-                        {booking.responsiblePerson ? (
-                          <div className="flex items-center gap-1.5">
-                            <Avatar className="h-5 w-5">
-                              <AvatarFallback className="text-[10px]">
-                                {booking.responsiblePerson.name
-                                  .split(" ")
-                                  .map((n) => n[0])
-                                  .join("")}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div className="min-w-0">
-                              <p className="text-[11px] font-medium truncate">{booking.responsiblePerson.name}</p>
-                              <p className="text-[10px] text-muted-foreground truncate">{booking.responsiblePerson.department}</p>
-                            </div>
-                          </div>
-                        ) : (
-                          <span className="text-[11px] text-muted-foreground">Not assigned</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-[12px]">
-                        <div className="flex items-center gap-1.5">
-                          <Users className="h-3.5 w-3.5 text-muted-foreground" />
-                          <span className="text-[11px]">
-                            {booking.totalParticipantsCount ?? (booking.selectedEmployees.length + booking.externalParticipants.length)}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-[12px]">
-                        <Badge {...getStatusBadgeProps(booking.status)}>{booking.status}</Badge>
-                      </TableCell>
-                      <TableCell className="text-[12px]">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          {/* Check if responsible person email matches current user email */}
-                          {(() => {
-                            // Get responsible person email
-                            const responsiblePersonEmail = booking.responsiblePerson?.email || ''
-                            // Get current user email
-                            const currentUserEmail = user?.email || ''
-                            
-                            // Check if emails match (case-insensitive)
-                            const isResponsiblePerson = responsiblePersonEmail.toLowerCase().trim() === currentUserEmail.toLowerCase().trim()
-                            
-                            // Check if booking is cancelled or completed
-                            const bookingStatus = String(booking.status || '').toLowerCase().trim()
-                            const isCancelled = bookingStatus === 'cancelled'
-                            const isCompleted = booking.status === "completed"
-                            const isCancelledOrCompleted = isCancelled || isCompleted
-                            
-                            // If user is the responsible person, show buttons
-                            if (isResponsiblePerson) {
-                              return (
-                                <>
-                                  {/* Mail Button - Only show if NOT cancelled or completed */}
-                                  {!isCancelledOrCompleted && (
-                                    <Button 
-                                      variant="outline" 
-                                      size="sm" 
-                                      onClick={(e) => {
-                                        e.preventDefault()
-                                        e.stopPropagation()
-                                        handleSendEmailClick(booking)
-                                      }}
-                                      className="text-blue-600 border-blue-600 hover:bg-blue-50 h-7 px-2"
-                                      title="Send email to participants"
-                                    >
-                                      <Mail className="h-3.5 w-3.5" />
-                                    </Button>
+                <div className="space-y-4">
+                  <div className="border rounded-lg overflow-hidden dark:border-border">
+                    <div className="overflow-x-auto">
+                      <div className="overflow-y-auto">
+                        <Table>
+                          <TableHeader className="sticky top-0 z-10 bg-background dark:bg-card">
+                            <TableRow>
+                              <TableHead className="w-[100px] text-[12px]">Ref ID</TableHead>
+                              <TableHead className="min-w-[200px] text-[12px]">Title</TableHead>
+                              <TableHead className="w-[150px] text-[12px]">Date & Time</TableHead>
+                              <TableHead className="w-[120px] text-[12px]">Place</TableHead>
+                              <TableHead className="min-w-[150px] text-[12px]">Responsible</TableHead>
+                              <TableHead className="w-[120px] text-[12px]">Participants</TableHead>
+                              <TableHead className="w-[100px] text-[12px]">Status</TableHead>
+                              <TableHead className="w-[150px] text-[12px]">Actions</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {paginatedBookings.map((booking) => (
+                              <TableRow key={booking.id} onClick={(e) => e.stopPropagation()}>
+                                <TableCell className="text-[12px]">
+                                  {booking.bookingRefId ? (
+                                    <Badge variant="secondary" className="font-mono font-bold text-[11px]">
+                                      {booking.bookingRefId}
+                                    </Badge>
+                                  ) : (
+                                    <span className="text-[11px] text-muted-foreground">—</span>
                                   )}
-                                  
-                                  {/* Edit Button - Hide completely if cancelled or completed */}
-                                  {!isCancelled && !isCompleted && (
-                                    <Button 
-                                      variant="outline" 
-                                      size="sm" 
-                                      onClick={(e) => {
-                                        e.preventDefault()
-                                        e.stopPropagation()
-                                        handleEdit(booking)
-                                      }}
-                                      className="h-7 px-2"
-                                      title="Edit booking"
-                                    >
-                                      <Edit className="h-3.5 w-3.5" />
-                                    </Button>
+                                </TableCell>
+                                <TableCell className="text-[12px]">
+                                  <div>
+                                    <div className="flex items-center gap-1.5">
+                                      <p className="font-medium text-[12px] truncate">{booking.title}</p>
+                                      {booking.refreshments?.required && (
+                                        <Badge variant="outline" className="text-orange-600 border-orange-600 text-[10px] px-1 py-0">
+                                          🍽️
+                                        </Badge>
+                                      )}
+                                    </div>
+                                    {booking.description && (
+                                      <p className="text-[11px] text-muted-foreground truncate">{booking.description}</p>
+                                    )}
+                                  </div>
+                                </TableCell>
+                                <TableCell className="text-[12px]">
+                                  <div className="flex items-center gap-1.5">
+                                    <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+                                    <div>
+                                      <p className="text-[11px] font-medium">{formatDate(booking.date)}</p>
+                                      <p className="text-[10px] text-muted-foreground">
+                                        {formatTime(booking.startTime)} - {formatTime(booking.endTime)}
+                                      </p>
+                                    </div>
+                                  </div>
+                                </TableCell>
+                                <TableCell className="text-[12px]">
+                                  <div className="flex items-center gap-1.5">
+                                    <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
+                                    <span className="truncate">{booking.place}</span>
+                                  </div>
+                                </TableCell>
+                                <TableCell className="text-[12px]">
+                                  {booking.responsiblePerson ? (
+                                    <div className="flex items-center gap-1.5">
+                                      <Avatar className="h-5 w-5">
+                                        <AvatarFallback className="text-[10px]">
+                                          {booking.responsiblePerson.name
+                                            .split(" ")
+                                            .map((n) => n[0])
+                                            .join("")}
+                                        </AvatarFallback>
+                                      </Avatar>
+                                      <div className="min-w-0">
+                                        <p className="text-[11px] font-medium truncate">{booking.responsiblePerson.name}</p>
+                                        <p className="text-[10px] text-muted-foreground truncate">{booking.responsiblePerson.department}</p>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <span className="text-[11px] text-muted-foreground">Not assigned</span>
                                   )}
-                              
-                                  {/* Delete/Cancel Button - Only show if NOT cancelled and NOT completed */}
-                                  {!isCancelled && !isCompleted && (
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={(e) => {
-                                        e.preventDefault()
-                                        e.stopPropagation()
-                                        handleCancel(booking.id)
-                                      }}
-                                      className="text-red-600 hover:text-red-700 hover:border-red-600 dark:text-red-400 dark:hover:text-red-300 dark:border-red-400 dark:hover:border-red-300 dark:hover:bg-red-950/30 h-7 px-2"
-                                      title="Cancel booking"
-                                    >
-                                      <Trash2 className="h-3.5 w-3.5" />
-                                    </Button>
-                                  )}
-                                  
-                                  {/* Info Button - Show ONLY for cancelled bookings to view cancellation reason */}
-                                  {isCancelled && (
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={(e) => {
-                                        e.preventDefault()
-                                        e.stopPropagation()
-                                        handleShowCancellationReason(booking)
-                                      }}
-                                      className="text-blue-600 hover:text-blue-700 hover:border-blue-600 dark:text-blue-400 dark:hover:text-blue-300 dark:border-blue-400 dark:hover:border-blue-300 dark:hover:bg-blue-950/30 h-7 px-2"
-                                      title="View cancellation details"
-                                    >
-                                      <Info className="h-3.5 w-3.5" />
-                                    </Button>
-                                  )}
-                                </>
-                              )
-                            }
-                            
-                            // For other bookings (not responsible person), show only cancellation reason view button (if cancelled)
-                            if (isCancelled) {
-                              return (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={(e) => {
-                                    e.preventDefault()
-                                    e.stopPropagation()
-                                    handleShowCancellationReason(booking)
-                                  }}
-                                  className="text-blue-600 hover:text-blue-700 hover:border-blue-600 dark:text-blue-400 dark:hover:text-blue-300 dark:border-blue-400 dark:hover:border-blue-300 dark:hover:bg-blue-950/30 h-7 px-2"
-                                  title="View cancellation details"
-                                >
-                                  <Info className="h-3.5 w-3.5" />
-                                </Button>
-                              )
-                            }
-                            
-                            return null
-                          })()}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                                </TableCell>
+                                <TableCell className="text-[12px]">
+                                  <div className="flex items-center gap-1.5">
+                                    <Users className="h-3.5 w-3.5 text-muted-foreground" />
+                                    <span className="text-[11px]">
+                                      {booking.totalParticipantsCount ?? (booking.selectedEmployees.length + booking.externalParticipants.length)}
+                                    </span>
+                                  </div>
+                                </TableCell>
+                                <TableCell className="text-[12px]">
+                                  <Badge {...getStatusBadgeProps(booking.status)}>{booking.status}</Badge>
+                                </TableCell>
+                                <TableCell className="text-[12px]">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    {/* Check if responsible person email matches current user email */}
+                                    {(() => {
+                                      // Get responsible person email
+                                      const responsiblePersonEmail = booking.responsiblePerson?.email || ''
+                                      // Get current user email
+                                      const currentUserEmail = user?.email || ''
+
+                                      // Check if emails match (case-insensitive)
+                                      const isResponsiblePerson = responsiblePersonEmail.toLowerCase().trim() === currentUserEmail.toLowerCase().trim()
+
+                                      // Check if booking is cancelled or completed
+                                      const bookingStatus = String(booking.status || '').toLowerCase().trim()
+                                      const isCancelled = bookingStatus === 'cancelled'
+                                      const isCompleted = booking.status === "completed"
+                                      const isCancelledOrCompleted = isCancelled || isCompleted
+
+                                      // If user is the responsible person, show buttons
+                                      if (isResponsiblePerson) {
+                                        return (
+                                          <>
+                                            {/* Mail Button - Only show if NOT cancelled or completed */}
+                                            {!isCancelledOrCompleted && (
+                                              <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={(e) => {
+                                                  e.preventDefault()
+                                                  e.stopPropagation()
+                                                  handleSendEmailClick(booking)
+                                                }}
+                                                className="text-blue-600 border-blue-600 hover:bg-blue-50 h-7 px-2"
+                                                title="Send email to participants"
+                                              >
+                                                <Mail className="h-3.5 w-3.5" />
+                                              </Button>
+                                            )}
+
+                                            {/* Edit Button - Hide completely if cancelled or completed */}
+                                            {!isCancelled && !isCompleted && (
+                                              <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={(e) => {
+                                                  e.preventDefault()
+                                                  e.stopPropagation()
+                                                  handleEdit(booking)
+                                                }}
+                                                className="h-7 px-2"
+                                                title="Edit booking"
+                                              >
+                                                <Edit className="h-3.5 w-3.5" />
+                                              </Button>
+                                            )}
+
+                                            {/* Delete/Cancel Button - Only show if NOT cancelled and NOT completed */}
+                                            {!isCancelled && !isCompleted && (
+                                              <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={(e) => {
+                                                  e.preventDefault()
+                                                  e.stopPropagation()
+                                                  handleCancel(booking.id)
+                                                }}
+                                                className="text-red-600 hover:text-red-700 hover:border-red-600 dark:text-red-400 dark:hover:text-red-300 dark:border-red-400 dark:hover:border-red-300 dark:hover:bg-red-950/30 h-7 px-2"
+                                                title="Cancel booking"
+                                              >
+                                                <Trash2 className="h-3.5 w-3.5" />
+                                              </Button>
+                                            )}
+
+                                            {/* Info Button - Show ONLY for cancelled bookings to view cancellation reason */}
+                                            {isCancelled && (
+                                              <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={(e) => {
+                                                  e.preventDefault()
+                                                  e.stopPropagation()
+                                                  handleShowCancellationReason(booking)
+                                                }}
+                                                className="text-blue-600 hover:text-blue-700 hover:border-blue-600 dark:text-blue-400 dark:hover:text-blue-300 dark:border-blue-400 dark:hover:border-blue-300 dark:hover:bg-blue-950/30 h-7 px-2"
+                                                title="View cancellation details"
+                                              >
+                                                <Info className="h-3.5 w-3.5" />
+                                              </Button>
+                                            )}
+                                          </>
+                                        )
+                                      }
+
+                                      // For other bookings (not responsible person), show only cancellation reason view button (if cancelled)
+                                      if (isCancelled) {
+                                        return (
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={(e) => {
+                                              e.preventDefault()
+                                              e.stopPropagation()
+                                              handleShowCancellationReason(booking)
+                                            }}
+                                            className="text-blue-600 hover:text-blue-700 hover:border-blue-600 dark:text-blue-400 dark:hover:text-blue-300 dark:border-blue-400 dark:hover:border-blue-300 dark:hover:bg-blue-950/30 h-7 px-2"
+                                            title="View cancellation details"
+                                          >
+                                            <Info className="h-3.5 w-3.5" />
+                                          </Button>
+                                        )
+                                      }
+
+                                      return null
+                                    })()}
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
                   </div>
+
+                  {/* Pagination Controls */}
+                  {totalPages > 1 && (
+                    <div className="py-4 border-t dark:border-border">
+                      <Pagination>
+                        <PaginationContent>
+                          <PaginationItem>
+                            <PaginationPrevious
+                              href="#"
+                              onClick={(e) => {
+                                e.preventDefault()
+                                if (currentPage > 1) handlePageChange(currentPage - 1)
+                              }}
+                              className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                            />
+                          </PaginationItem>
+
+                          {Array.from({ length: totalPages }).map((_, i) => {
+                            const page = i + 1;
+                            // Logic to show limited page numbers with ellipsis
+                            if (
+                              page === 1 ||
+                              page === totalPages ||
+                              (page >= currentPage - 1 && page <= currentPage + 1)
+                            ) {
+                              return (
+                                <PaginationItem key={page}>
+                                  <PaginationLink
+                                    href="#"
+                                    isActive={currentPage === page}
+                                    onClick={(e) => {
+                                      e.preventDefault()
+                                      handlePageChange(page)
+                                    }}
+                                  >
+                                    {page}
+                                  </PaginationLink>
+                                </PaginationItem>
+                              );
+                            } else if (
+                              (page === currentPage - 2 && currentPage > 3) ||
+                              (page === currentPage + 2 && currentPage < totalPages - 2)
+                            ) {
+                              return (
+                                <PaginationItem key={page}>
+                                  <PaginationEllipsis />
+                                </PaginationItem>
+                              );
+                            }
+                            return null;
+                          })}
+
+                          <PaginationItem>
+                            <PaginationNext
+                              href="#"
+                              onClick={(e) => {
+                                e.preventDefault()
+                                if (currentPage < totalPages) handlePageChange(currentPage + 1)
+                              }}
+                              className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                            />
+                          </PaginationItem>
+                        </PaginationContent>
+                      </Pagination>
+                    </div>
+                  )}
                 </div>
-              </div>
               )}
             </CardContent>
           </Card>
@@ -3492,20 +3583,20 @@ export function StaffBookingManagement() {
                                 const currentUserEmail = user?.email || ''
                                 const isResponsiblePerson = responsiblePersonEmail.toLowerCase().trim() === currentUserEmail.toLowerCase().trim()
                                 const isCancelledOrCompleted = booking.status === "cancelled" || booking.status === "completed"
-                                
+
                                 // Only show Mail button if user is responsible person AND booking is NOT cancelled or completed
                                 if (isResponsiblePerson && !isCancelledOrCompleted) {
                                   return (
-                              <Button
-                                onClick={() => handleSendEmailClick(booking)}
-                                size="sm"
-                                variant="outline"
-                                className="flex items-center gap-1 text-blue-600 border-blue-600 hover:bg-blue-50"
+                                    <Button
+                                      onClick={() => handleSendEmailClick(booking)}
+                                      size="sm"
+                                      variant="outline"
+                                      className="flex items-center gap-1 text-blue-600 border-blue-600 hover:bg-blue-50"
                                       title="Send email to participants"
-                              >
-                                <Mail className="h-4 w-4" />
-                                Send Email
-                              </Button>
+                                    >
+                                      <Mail className="h-4 w-4" />
+                                      Send Email
+                                    </Button>
                                   )
                                 }
                                 return null
@@ -3631,14 +3722,14 @@ export function StaffBookingManagement() {
                   <div className="space-y-1">
                     <Label className="text-xs text-muted-foreground dark:text-muted-foreground">Cancelled At</Label>
                     <p className="text-sm font-medium dark:text-foreground">
-                      {selectedCancellation.cancelled_at 
+                      {selectedCancellation.cancelled_at
                         ? new Date(selectedCancellation.cancelled_at).toLocaleString('en-US', {
-                            year: 'numeric',
-                            month: 'short',
-                            day: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })
+                          year: 'numeric',
+                          month: 'short',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })
                         : 'N/A'}
                     </p>
                   </div>
@@ -3685,7 +3776,7 @@ export function StaffBookingManagement() {
               </p>
             )}
           </DialogHeader>
-          
+
           {selectedBookingForEmail && (
             <div className="space-y-6">
               {/* Email Type Selection */}
@@ -3719,10 +3810,10 @@ export function StaffBookingManagement() {
                     <input
                       type="checkbox"
                       id="selectAllParticipants"
-                      checked={bookingParticipants.length > 0 && 
-                               bookingParticipants
-                                 .filter(p => p.has_email === 1)
-                                 .every(p => selectedEmailParticipants.includes(p.id))}
+                      checked={bookingParticipants.length > 0 &&
+                        bookingParticipants
+                          .filter(p => p.has_email === 1)
+                          .every(p => selectedEmailParticipants.includes(p.id))}
                       onChange={handleSelectAllParticipants}
                       className="h-4 w-4"
                       disabled={isLoadingParticipants}
@@ -3787,7 +3878,7 @@ export function StaffBookingManagement() {
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          <Badge 
+                          <Badge
                             variant={participant.has_email === 0 ? 'destructive' : 'outline'}
                             className="text-xs"
                           >
@@ -3875,6 +3966,6 @@ export function StaffBookingManagement() {
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+    </div >
   )
 }

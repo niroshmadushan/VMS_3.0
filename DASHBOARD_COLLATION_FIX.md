@@ -131,3 +131,6 @@ When concatenating strings from different tables, MySQL may assign implicit coll
 Using `COALESCE(pr.first_name, '')` ensures that NULL values are converted to empty strings before concatenation, preventing NULL results.
 
 
+
+
+

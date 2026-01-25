@@ -31,17 +31,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const authManager = AuthManager.getInstance()
 
   useEffect(() => {
-    console.log('AuthProvider - Initializing...')
-    
-    // Subscribe to auth state changes with logging
+    // Subscribe to auth state changes
     const unsubscribe = authManager.subscribe((state) => {
-      console.log('AuthProvider - State changed:', {
-        isAuthenticated: state.isAuthenticated,
-        hasUser: !!state.user,
-        userRole: state.user?.role,
-        isLoading: state.isLoading,
-        error: state.error
-      })
       setAuthState(state)
     })
     

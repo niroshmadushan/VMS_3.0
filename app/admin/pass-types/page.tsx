@@ -337,11 +337,11 @@ function PassTypesContent() {
         // Pass is within new range, update display name if needed
         const newDisplayName = prefix ? `${prefix}-${String(pass.pass_number).padStart(3, '0')}` : String(pass.pass_number).padStart(3, '0')
         if (pass.pass_display_name !== newDisplayName) {
-          await placeManagementAPI.updateRecord('passes',
+            await placeManagementAPI.updateRecord('passes',
             { id: pass.id },
-            { pass_display_name: newDisplayName }
-          )
-        }
+              { pass_display_name: newDisplayName }
+            )
+          }
       } else {
         // Pass is outside new range, soft delete if available
         if (pass.status === 'available') {

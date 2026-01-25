@@ -35,27 +35,64 @@ export interface AuthResponse {
 import { API_BASE_URL, APP_ID, SERVICE_KEY } from './api-config'
 
 // Helper function to make API requests
+// Use Next.js API routes (relative paths) for frontend, backend API for server-side
 const apiRequest = async (endpoint: string, options: RequestInit = {}): Promise<AuthResponse> => {
   try {
-    const url = `${API_BASE_URL}${endpoint}`
-    
-    console.log('🌐 API Request:', url)
-    console.log('🔑 App-Id:', APP_ID)
-    console.log('🔑 Service-Key:', SERVICE_KEY ? '✅ Set' : '❌ Missing')
-    
+    // Use relative path for client-side requests (Next.js API routes)
+    // Use full URL for server-side requests
+    const isServer = typeof window === 'undefined'
+    const url = isServer ? `${API_BASE_URL}${endpoint}` : endpoint
+
     const response = await fetch(url, {
       ...options,
       headers: {
         'Content-Type': 'application/json',
-        'X-App-Id': APP_ID,
-        'X-Service-Key': SERVICE_KEY,
+        'x-app-id': APP_ID,
+        'x-service-key': SERVICE_KEY,
+        'Origin': (typeof window !== 'undefined'
+          ? (process.env.NODE_ENV === 'development' ? 'http://localhost:6001' : window.location.origin)
+          : '') || '',
         ...options.headers,
       },
     })
 
+    // Check content type to ensure we're getting JSON, not MD/HTML
+    const contentType = response.headers.get('content-type') || ''
+
+    if (!contentType.includes('application/json')) {
+      const text = await response.text()
+
+      // If response is MD file or HTML, return error
+      if (text.includes('#') || text.includes('<!DOCTYPE') || text.includes('<html') || text.trim().startsWith('#')) {
+        return {
+          success: false,
+          message: 'Backend API returned documentation instead of JSON. Please check if the backend server is running and configured correctly.',
+          error: 'INVALID_RESPONSE_TYPE'
+        }
+      }
+
+      // Try to parse as JSON anyway
+      try {
+        const data = JSON.parse(text)
+        if (!response.ok) {
+          return {
+            success: false,
+            message: data.message || 'Request failed',
+            error: data.message
+          }
+        }
+        return data
+      } catch (parseError) {
+        return {
+          success: false,
+          message: 'Backend API returned invalid response format. Expected JSON.',
+          error: 'INVALID_RESPONSE_FORMAT'
+        }
+      }
+    }
+
     const data = await response.json()
-    console.log('API Response status:', response.status, 'data:', data)
-    
+
     if (!response.ok) {
       return {
         success: false,
@@ -116,21 +153,15 @@ export const removeStoredToken = (): void => {
 
 // Sign up new user
 export async function signUp(data: SignUpData): Promise<AuthResponse> {
-  console.log('📝 SignUp with role:', {
-    email: data.email,
-    firstName: data.firstName,
-    lastName: data.lastName,
-    role: data.role
-  })
-  
+
   const response = await apiRequest('/api/auth/signup', {
     method: 'POST',
     body: JSON.stringify({
       email: data.email,
       firstName: data.firstName,
       lastName: data.lastName,
-      password: data.password,
-      role: data.role || 'user'
+      password: data.password
+      // role: data.role // Backend automatically assigns 'user' role
     })
   })
 
@@ -139,8 +170,7 @@ export async function signUp(data: SignUpData): Promise<AuthResponse> {
 
 // Sign in user (step 1 - sends OTP OR completes direct login)
 export async function signIn(data: SignInData): Promise<AuthResponse> {
-  console.log('SignIn request to /api/auth/login with:', { email: data.email })
-  
+
   const response = await apiRequest('/api/auth/login', {
     method: 'POST',
     body: JSON.stringify({
@@ -149,12 +179,9 @@ export async function signIn(data: SignInData): Promise<AuthResponse> {
     })
   })
 
-  console.log('SignIn API response:', response)
-  
   // If direct login (no OTP required), store tokens and user data
   if (response.success && !response.data?.otpRequired) {
     if (response.data?.session?.token) {
-      console.log('Direct login success - storing authentication data')
       setStoredToken(response.data.session.token)
       if (response.data.session.refreshToken) {
         localStorage.setItem('refreshToken', response.data.session.refreshToken)
@@ -164,7 +191,7 @@ export async function signIn(data: SignInData): Promise<AuthResponse> {
       }
     }
   }
-  
+
   return response
 }
 
@@ -188,7 +215,7 @@ export async function verifyOTP(email: string, otpCode: string): Promise<AuthRes
       localStorage.setItem('userData', JSON.stringify(response.data.user))
     }
   }
-  
+
   return response
 }
 
@@ -198,15 +225,15 @@ export async function signOut(): Promise<AuthResponse> {
     const response = await authenticatedRequest('/api/auth/logout', {
       method: 'POST'
     })
-    
+
     // Clear stored tokens regardless of API response
     clearStoredAuth()
-    
+
     return response
   } catch (error) {
     // Clear stored tokens even if logout API fails
     clearStoredAuth()
-    
+
     return {
       success: false,
       message: 'Logout completed locally',
@@ -220,7 +247,6 @@ export function clearStoredAuth(): void {
   localStorage.removeItem('authToken')
   localStorage.removeItem('refreshToken')
   localStorage.removeItem('userData')
-  console.log('Cleared all stored authentication data')
 }
 
 // Check if token is expired (basic JWT expiration check)
@@ -230,7 +256,6 @@ export function isTokenExpired(token: string): boolean {
     const currentTime = Math.floor(Date.now() / 1000)
     return payload.exp < currentTime
   } catch (error) {
-    console.error('Error checking token expiration:', error)
     return true // Assume expired if we can't parse it
   }
 }
@@ -358,60 +383,44 @@ export async function refreshToken(): Promise<AuthResponse> {
 
 // Get current user profile
 export async function getCurrentUser(): Promise<UserProfile | null> {
-  console.log('getCurrentUser - Starting...')
-  
+
   // First try to get user from stored data
   const storedUserData = localStorage.getItem('userData')
   const token = getStoredToken()
-  
-  console.log('getCurrentUser - Stored data check:', {
-    hasStoredUserData: !!storedUserData,
-    hasToken: !!token
-  })
-  
+
   if (storedUserData && token) {
     try {
       const user = JSON.parse(storedUserData)
-      console.log('getCurrentUser - Found stored user data:', {
-        userId: user.id,
-        email: user.email,
-        role: user.role
-      })
-      
+
       // Check if token is expired locally first
       if (isTokenExpired(token)) {
-        console.log('getCurrentUser - Token is expired, clearing auth data')
         clearStoredAuth()
         return null
       }
-      
-      console.log('getCurrentUser - Token is valid, returning user')
+
       // Return user immediately without validation for better UX
       // Validation can happen in background if needed
       return user
     } catch (error) {
-      console.error('getCurrentUser - Error parsing stored user data:', error)
+      // Error parsing stored user data
     }
   }
 
   // Fallback to token validation only if no stored data
   if (!storedUserData && token) {
-    console.log('getCurrentUser - No stored user data, attempting token validation')
     try {
       const response = await validateToken()
-      
+
       if (response.success && response.data) {
-        console.log('getCurrentUser - Token validation successful, storing user data')
         // Store user data for future use
         localStorage.setItem('userData', JSON.stringify(response.data))
         return response.data
       }
     } catch (error) {
-      console.error('getCurrentUser - Token validation failed:', error)
+      // Token validation failed
     }
   }
-  
-  console.log('getCurrentUser - No valid authentication found, returning null')
+
   return null
 }
 
@@ -594,7 +603,7 @@ export class AuthManager {
 
   async initialize(): Promise<void> {
     this.setState({ isLoading: true })
-    
+
     try {
       const user = await getCurrentUser()
       this.setState({
@@ -615,14 +624,13 @@ export class AuthManager {
 
   async signIn(email: string, password: string): Promise<AuthResponse> {
     this.setState({ isLoading: true, error: null })
-    
+
     try {
       const response = await signIn({ email, password })
-      
+
       // If direct login (no OTP required), update auth state
       if (response.success && !response.data?.otpRequired) {
         const user = response.data?.user
-        console.log('AuthManager - Direct login success, updating state with user:', user)
         this.setState({
           user,
           isAuthenticated: true,
@@ -632,7 +640,7 @@ export class AuthManager {
       } else {
         this.setState({ isLoading: false })
       }
-      
+
       return response
     } catch (error: any) {
       this.setState({ isLoading: false, error: error.message })
@@ -646,15 +654,14 @@ export class AuthManager {
 
   async verifyOTP(email: string, otpCode: string): Promise<AuthResponse> {
     this.setState({ isLoading: true, error: null })
-    
+
     try {
       const response = await verifyOTP(email, otpCode)
-      
+
       if (response.success) {
         // Use user data directly from the response according to documentation format
         const user = response.data?.user
-        console.log('AuthManager - OTP verified, user data:', user)
-        
+
         this.setState({
           user,
           isAuthenticated: true,
@@ -664,7 +671,7 @@ export class AuthManager {
       } else {
         this.setState({ isLoading: false, error: response.message })
       }
-      
+
       return response
     } catch (error: any) {
       this.setState({ isLoading: false, error: error.message })
@@ -678,17 +685,16 @@ export class AuthManager {
 
   async signOut(): Promise<void> {
     this.setState({ isLoading: true })
-    
+
     try {
       await signOut()
     } catch (error) {
       // Continue with logout even if API call fails
-      console.error('SignOut error:', error)
     }
-    
+
     // Clear all auth data
     clearStoredAuth()
-    
+
     this.setState({
       user: null,
       isAuthenticated: false,

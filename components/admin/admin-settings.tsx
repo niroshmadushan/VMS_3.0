@@ -487,14 +487,14 @@ export function AdminSettings() {
               <Palette className="h-3 w-3 mr-1" />
               Preferences
             </TabsTrigger>
-          </TabsList>
+        </TabsList>
         </div>
 
         {/* Profile Tab */}
         <TabsContent value="profile" className="space-y-2 w-full">
           <div className="flex justify-center">
             <div className="w-full max-w-[50%] space-y-2">
-              <Card className="border shadow-md dark:bg-card dark:border-border">
+          <Card className="border shadow-md dark:bg-card dark:border-border">
             <CardHeader className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/20 dark:to-purple-950/20 dark:bg-card border-b dark:border-border/50 pb-2 pt-2.5">
               <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2 text-[13px] font-semibold dark:text-foreground">
@@ -625,8 +625,8 @@ export function AdminSettings() {
           </CardContent>
         </Card>
 
-              {/* Account Information Card */}
-              <Card className="border shadow-md dark:bg-card dark:border-border">
+          {/* Account Information Card */}
+          <Card className="border shadow-md dark:bg-card dark:border-border">
             <CardHeader className="bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-950/20 dark:to-blue-950/20 dark:bg-card border-b dark:border-border/50 pb-1.5 pt-2">
             <CardTitle className="flex items-center gap-1.5 text-[13px] font-semibold dark:text-foreground">
                 <Shield className="h-3 w-3 text-green-600 dark:text-green-400" />
@@ -693,44 +693,44 @@ export function AdminSettings() {
         <TabsContent value="security" className="space-y-2 w-full">
           <div className="flex justify-center">
             <div className="w-full max-w-[50%]">
-              <Card className="border shadow-md dark:bg-card dark:border-border">
-                <CardHeader className="bg-gradient-to-r from-red-50 to-orange-50 dark:from-red-950/20 dark:to-orange-950/20 dark:bg-card border-b dark:border-border/50 pb-1.5 pt-2">
-                  <CardTitle className="flex items-center gap-1.5 text-[13px] font-semibold dark:text-foreground">
-                    <Key className="h-3 w-3 text-red-600 dark:text-red-400" />
-                    Password Management
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="pt-2 pb-2 dark:bg-card">
-                  <div className="space-y-2">
-                    <div className="p-2 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-                      <p className="text-[11px] text-blue-900 dark:text-blue-300 mb-0.5">
-                        <strong>Password Reset:</strong> Click the button below to receive a password reset link via email.
-                      </p>
-                      <p className="text-[11px] text-blue-700 dark:text-blue-400">
-                        You will receive an email with instructions to reset your password securely.
-                      </p>
-                    </div>
+          <Card className="border shadow-md dark:bg-card dark:border-border">
+            <CardHeader className="bg-gradient-to-r from-red-50 to-orange-50 dark:from-red-950/20 dark:to-orange-950/20 dark:bg-card border-b dark:border-border/50 pb-1.5 pt-2">
+              <CardTitle className="flex items-center gap-1.5 text-[13px] font-semibold dark:text-foreground">
+                <Key className="h-3 w-3 text-red-600 dark:text-red-400" />
+                Password Management
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-2 pb-2 dark:bg-card">
+              <div className="space-y-2">
+                <div className="p-2 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                  <p className="text-[11px] text-blue-900 dark:text-blue-300 mb-0.5">
+                    <strong>Password Reset:</strong> Click the button below to receive a password reset link via email.
+                  </p>
+                  <p className="text-[11px] text-blue-700 dark:text-blue-400">
+                    You will receive an email with instructions to reset your password securely.
+                  </p>
+      </div>
 
                     <div className="flex justify-end">
-                      <Button 
-                        onClick={handlePasswordReset}
+                <Button 
+                  onClick={handlePasswordReset}
                         className="w-auto gap-1.5 h-7 px-3 bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-700 text-[11px]"
-                        size="sm"
-                      >
+                  size="sm"
+                >
                         <Key className="h-3 w-3" />
-                        Send Password Reset Email
-                      </Button>
+                  Send Password Reset Email
+                </Button>
                     </div>
 
-                    <div className="p-2 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-                      <p className="text-[11px] text-yellow-800 dark:text-yellow-300">
-                        <strong>Note:</strong> For security reasons, you cannot change your password directly here. 
-                        A secure reset link will be sent to your registered email address.
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+                <div className="p-2 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                  <p className="text-[11px] text-yellow-800 dark:text-yellow-300">
+                    <strong>Note:</strong> For security reasons, you cannot change your password directly here. 
+                    A secure reset link will be sent to your registered email address.
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
             </div>
           </div>
         </TabsContent>
@@ -739,7 +739,7 @@ export function AdminSettings() {
         <TabsContent value="preferences" className="space-y-2 w-full">
           <div className="flex justify-center">
             <div className="w-full max-w-[50%]">
-              <Card className="border shadow-md dark:bg-card dark:border-border">
+          <Card className="border shadow-md dark:bg-card dark:border-border">
             <CardHeader className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-950/20 dark:to-pink-950/20 dark:bg-card border-b dark:border-border/50 pb-1.5 pt-2">
           <CardTitle className="flex items-center gap-1.5 text-[13px] font-semibold dark:text-foreground">
                 <Palette className="h-3 w-3 text-purple-600 dark:text-purple-400" />

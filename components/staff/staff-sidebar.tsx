@@ -65,6 +65,11 @@ const navigation = [
     href: "/staff/settings",
     icon: Settings,
   },
+  {
+    name: "Doc",
+    href: "/staff/documentation",
+    icon: FileText,
+  },
 ]
 
 export function StaffSidebar() {
@@ -110,7 +115,7 @@ export function StaffSidebar() {
     const newTheme = theme === 'light' ? 'dark' : 'light'
     setTheme(newTheme)
     localStorage.setItem('theme', newTheme)
-    
+
     // Apply theme to document
     if (newTheme === 'dark') {
       document.documentElement.classList.add('dark')

@@ -219,7 +219,7 @@ export function AvailabilityChecker() {
         toast.error('Place configuration not found')
         return
       }
-      
+
       setSelectedPlaceData(place)
       const config = place.configuration
       setPlaceConfig(config)
@@ -300,7 +300,7 @@ export function AvailabilityChecker() {
 
           return true
         })
-
+        
         setExistingBookings(filteredBookings)
 
         // Generate available slots
@@ -475,9 +475,9 @@ export function AvailabilityChecker() {
               <Select 
                 value={selectedPlace} 
                 onValueChange={(value) => {
-                  setSelectedPlace(value)
+                setSelectedPlace(value)
                   const place = availablePlaces.find(p => p.id === value)
-                  setSelectedPlaceData(place || null)
+                setSelectedPlaceData(place || null)
                 }}
                 disabled={!selectedDate || isLoadingPlaces}
               >

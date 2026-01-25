@@ -54,9 +54,11 @@ const navigationConfig = {
     { name: "External Members", href: "/staff/external-members", icon: UserCheck },
     // { name: "Feedback", href: "/staff/feedback", icon: MessageSquare }, // Temporarily hidden - will be developed in a few days
     { name: "Settings", href: "/staff/settings", icon: Settings },
+    { name: "Doc", href: "/staff/documentation", icon: FileText },
   ],
   assistant: [
     { name: "Mark Attendance", href: "/assistant", icon: UserCheck },
+    { name: "Doc", href: "/assistant/documentation", icon: FileText },
   ],
   reception: [
     { name: "Dashboard", href: "/reception", icon: LayoutDashboard },
@@ -78,9 +80,9 @@ interface RoleBasedNavigationProps {
 export function RoleBasedNavigation({ userRole, currentPath }: RoleBasedNavigationProps) {
   console.log('RoleBasedNavigation - userRole:', userRole, 'currentPath:', currentPath)
   console.log('Available roles in config:', Object.keys(navigationConfig))
-  
+
   const navigation = userRole ? (navigationConfig[userRole as keyof typeof navigationConfig] || []) : []
-  
+
   console.log('Available navigation items:', navigation.length)
   console.log('Navigation items for role:', userRole, navigation.map(item => item.name))
 
