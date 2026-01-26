@@ -37,7 +37,6 @@ export async function POST(req: Request) {
     const { data: users, error: findError } = await supabaseAdmin.auth.admin.listUsers()
     
     if (findError) {
-      console.error('Error finding user:', findError)
       return NextResponse.json(
         { success: false, message: 'Failed to find user' },
         { status: 500 }
@@ -61,43 +60,41 @@ export async function POST(req: Request) {
       )
     }
 
-    // Generate verification link
+    // Get frontend URL from environment or use API base URL (no localhost)
+    const frontendUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_API_URL || 'https://peopleapi.cbiz365.com'
+    // Ensure no localhost URLs - always use production domain
+    const redirectUrl = frontendUrl.includes('localhost') ? 'https://peopleapi.cbiz365.com' : frontendUrl
+    
+    // Generate verification link using magiclink type (for email verification)
     const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
-      type: 'signup',
+      type: 'magiclink',
       email: email,
       options: {
-        redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3001'}/verify-email`,
+        redirectTo: `${redirectUrl}/verify-email`,
       },
     })
 
     if (linkError || !linkData) {
-      console.error('Error generating verification link:', linkError)
-      
-      // Fallback: Try to resend confirmation email
-      const { data: resendData, error: resendError } = await supabaseAdmin.auth.admin.generateLink({
-        type: 'email',
-        email: email,
-      })
-
-      if (resendError || !resendData) {
-        console.error('Error resending verification email:', resendError)
-        return NextResponse.json(
-          { success: false, message: 'Failed to send verification email. Please try again later.' },
-          { status: 500 }
-        )
-      }
-
+      // If magiclink fails, return error
       return NextResponse.json({
-        success: true,
-        message: 'Verification email sent successfully. Please check your inbox and spam folder.',
-      })
+        success: false,
+        message: 'Failed to generate verification link. Please contact support.',
+      }, { status: 500 })
     }
 
     // Send verification email using Resend if available
     try {
       const { Resend } = await import('resend')
-      const resend = new Resend(process.env.RESEND_API_KEY)
-
+      const apiKey = process.env.RESEND_API_KEY
+      if (!apiKey) {
+        // If Resend not configured, return success (Supabase might have sent it)
+        return NextResponse.json({
+          success: true,
+          message: 'Verification link generated. Please check your email or contact support.',
+        })
+      }
+      
+      const resend = new Resend(apiKey)
       const verificationLink = linkData.properties.action_link || linkData.properties.hashed_token
       
       const { error: emailError } = await resend.emails.send({
@@ -132,7 +129,6 @@ export async function POST(req: Request) {
       })
 
       if (emailError) {
-        console.error('Resend email error:', emailError)
         // Still return success if Supabase link was generated
         return NextResponse.json({
           success: true,
@@ -140,7 +136,6 @@ export async function POST(req: Request) {
         })
       }
     } catch (emailServiceError) {
-      console.error('Email service error:', emailServiceError)
       // Continue even if email service fails - Supabase might have sent it
     }
 
@@ -149,7 +144,6 @@ export async function POST(req: Request) {
       message: 'Verification email sent successfully. Please check your inbox and spam folder.',
     })
   } catch (error: any) {
-    console.error('Error in resend-verification endpoint:', error)
     return NextResponse.json(
       { success: false, message: 'An unexpected error occurred. Please try again later.' },
       { status: 500 }

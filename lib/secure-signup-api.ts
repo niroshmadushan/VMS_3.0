@@ -3,7 +3,7 @@
  * Integrates with the external secure signup backend API
  */
 
-import { API_BASE_URL, APP_ID, SERVICE_KEY } from './api-config'
+import { API_BASE_URL, APP_ID, SERVICE_KEY, getApiHeaders } from './api-config'
 
 export interface SignupFormData {
   email: string
@@ -79,8 +79,8 @@ export function validatePassword(password: string): { valid: boolean; errors: st
   if (!password) {
     errors.push('Password is required')
   } else {
-    if (password.length < 12) {
-      errors.push('Password must be at least 12 characters long')
+    if (password.length < 8) {
+      errors.push('Password must be at least 8 characters long')
     }
     if (!/[A-Z]/.test(password)) {
       errors.push('Password must contain at least one uppercase letter')
@@ -117,7 +117,7 @@ export function checkPasswordStrength(password: string): {
   isValid: boolean
 } {
   const checks = {
-    length: password.length >= 12,
+    length: password.length >= 8,
     uppercase: /[A-Z]/.test(password),
     lowercase: /[a-z]/.test(password),
     number: /\d/.test(password),
@@ -209,15 +209,16 @@ export function getAllowedDomains(): string[] {
 
 /**
  * Sanitize form data
+ * Note: role field is NOT included as backend assigns 'user' role automatically
  */
-export function sanitizeFormData(formData: SignupFormData): SignupFormData {
+export function sanitizeFormData(formData: SignupFormData): Omit<SignupFormData, 'role'> {
   return {
     email: formData.email.trim().toLowerCase(),
     password: formData.password, // Don't trim password
     firstName: formData.firstName.trim(),
     lastName: formData.lastName.trim(),
-    secretCode: formData.secretCode.trim().toUpperCase(),
-    role: formData.role || 'user'
+    secretCode: formData.secretCode.trim()
+    // role field is intentionally excluded - backend assigns 'user' role automatically
   }
 }
 
@@ -241,35 +242,46 @@ export class SecureSignupAPI {
 
   /**
    * Sign up a new user
+   * Note: The role field is NOT sent - backend automatically assigns 'user' role
+   * To create admin/staff accounts, create as 'user' first, then update via User Management API
    */
   async signup(formData: SignupFormData): Promise<SignupResponse> {
     try {
-      // Sanitize input
+      // Sanitize input (role field is excluded - backend assigns 'user' automatically)
       const sanitizedData = sanitizeFormData(formData)
 
-      const response = await fetch(`${this.baseURL}/api/auth/secure-signup`, {
+      // Use the correct endpoint: /api/auth/signup
+      // Headers include x-app-id and x-service-key for authentication
+      const response = await fetch(`${this.baseURL}/api/auth/signup`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-App-ID': this.appId,
-          'X-Service-Key': this.serviceKey
-        },
+        headers: getApiHeaders(),
         body: JSON.stringify(sanitizedData)
       })
 
       const data = await response.json()
 
       if (!response.ok) {
+        // Handle specific status codes
+        let errorMessage = data.message || 'Signup failed'
+
+        // Provide more specific messages based on status code
+        if (response.status === 403) {
+          errorMessage = data.message || 'Invalid secret code provided'
+        } else if (response.status === 409) {
+          errorMessage = data.message || 'Email address already registered'
+        } else if (response.status === 400) {
+          errorMessage = data.message || 'Validation failed'
+        }
+
         return {
           success: false,
-          message: data.message || 'Signup failed',
+          message: errorMessage,
           errors: data.errors || []
         }
       }
 
       return data
     } catch (error: any) {
-      console.error('Secure signup API error:', error)
       return {
         success: false,
         message: error.message || 'Network error. Please try again.',
@@ -316,6 +328,7 @@ export class SecureSignupAPI {
 
 // Export default instance
 export const secureSignupAPI = new SecureSignupAPI()
+
 
 
 

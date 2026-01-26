@@ -81,7 +81,7 @@ export async function POST(req: Request) {
           is_active,
           original_email: email, // Store original email to preserve format (e.g., dots in Gmail)
         },
-        emailRedirectTo: process.env.NEXT_PUBLIC_SITE_URL + '/login',
+        emailRedirectTo: (process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_API_URL || 'https://peopleapi.cbiz365.com') + '/login',
       },
     })
 

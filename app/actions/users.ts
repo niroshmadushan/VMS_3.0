@@ -37,7 +37,7 @@ async function sendCredentialsEmail(email: string, password: string): Promise<vo
         <p>Your account has been created.</p>
         <p><strong>Email:</strong> ${email}</p>
         <p><strong>Temporary Password:</strong> ${password}</p>
-        <p>Please log in at <a href="${process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'}/login">here</a> and change your password immediately.</p>
+        <p>Please log in at <a href="${process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_API_URL || 'https://peopleapi.cbiz365.com'}/login">here</a> and change your password immediately.</p>
       `,
     })
 
@@ -182,7 +182,7 @@ export async function resetUserPassword(formData: FormDataType): Promise<{ succe
   try {
     const email = formData.get('email') as string
     const { error } = await supabaseAdmin.auth.admin.resetPasswordForEmail(email, {
-      redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'}/auth/reset`,
+      redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_API_URL || 'https://peopleapi.cbiz365.com'}/auth/reset`,
       type: 'recovery',
     })
 
